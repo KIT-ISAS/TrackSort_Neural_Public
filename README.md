@@ -10,7 +10,7 @@ We use the docker images for [tensorflow](https://www.tensorflow.org/install/doc
 
 **Prerequisites**:
 1. Install docker from source (not apt, because outdated)
-2. Install latest nvidia drivers (no need to install CUDA, but be careful if your drivers are too old then you cannot install the latest CUDA version. See the CUDA compatibility [table](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#binary-compatibility__table-toolkit-driver))
+2. Install latest nvidia drivers (no need to install CUDA, but be careful if your drivers are too old then docker is also not able to install the latest CUDA version. See the CUDA compatibility [table](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#binary-compatibility__table-toolkit-driver))
 
 **Install docker image**:
 1. `docker pull tensorflow/tensorflow:latest-gpu-py3-jupyter`
