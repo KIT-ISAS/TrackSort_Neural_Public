@@ -5,7 +5,7 @@ Using a RNN to predict next measurement of tracks.
 ## Notebook
 
 Follow these instructions to run notebooks on the gpu pc at the institute.
-We use the docker images for tensorflow [1](https://www.tensorflow.org/install/docker).
+We use the docker images for [tensorflow](https://www.tensorflow.org/install/docker).
 
 
 **Prerequisites**:
