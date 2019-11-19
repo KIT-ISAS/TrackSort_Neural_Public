@@ -5,12 +5,12 @@ Using a RNN to predict next measurement of tracks.
 ## Notebook
 
 Follow these instructions to run notebooks on the gpu pc at the institute.
-We use the docker images for tensorflow [1](https://www.tensorflow.org/install/docker).
+We use the docker images for [tensorflow](https://www.tensorflow.org/install/docker).
 
 
 **Prerequisites**:
 1. Install docker from source (not apt, because outdated)
-2. Install latest nvidia drivers (no need to install CUDA, but be careful if your drivers are too old then you cannot install the latest CUDA version. See the CUDA compatibility [table](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#binary-compatibility__table-toolkit-driver))
+2. Install latest nvidia drivers (no need to install CUDA, but be careful if your drivers are too old then docker is also not able to install the latest CUDA version. See the CUDA compatibility [table](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#binary-compatibility__table-toolkit-driver))
 
 **Install docker image**:
 1. `docker pull tensorflow/tensorflow:latest-gpu-py3-jupyter`
