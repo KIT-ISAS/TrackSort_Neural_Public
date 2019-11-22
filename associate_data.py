@@ -66,38 +66,53 @@ finished_trajectories = []
 model = Model()
 # the loop over the time steps
 for it in range(100):
-	# case 1
+	# case 1 - all predicted measurements can be found in real measurements
+	
+	# mask for measurements of current timestep 
 	active_indices = list(filter(lambda x: data[it][x][0] != np.Infinity, range(MAX_NUM_TRAJECTORIES)))
+	# apply mask
 	current_measurements = list(map(lambda x: data[it][x], active_indices))
 	num_measurements = len(current_measurements)
 	current_predictions = model.predict()
 	num_predictions = len(current_predictions)
+	
 	# case 2 - particle leaves perception
+	# the predicted particles which are in the terminal region of the belt
 	last_tenth = list(filter(lambda x: SIZE_X - x[0] <= 200, current_predictions))
 	last_tenth_idxs = list(filter(lambda x: SIZE_X - current_predictions[x][0] <= 200, range(num_predictions)))
+	# for every predicted particle at the end of the belt: add an unique artificial measurement outside of the belt
 	last_tenth_artificial_measurements = list(map(lambda x: np.array([2005, x[1]]), last_tenth))
+	
 	# case 3 - particle enters perception
 	first_tenth = list(filter(lambda x: x[0] <= 200, current_measurements))
 	first_tenth_idxs = list(filter(lambda x: current_measurements[x][0] <= 200, range(num_measurements)))
-	last_tenth_artificial_predictions = list(map(lambda x: np.array([-5, x[1]]), first_tenth))
+	# for every measurement in the beginning of the belt: add an artificial track
+	first_tenth_artificial_predictions = list(map(lambda x: np.array([-5, x[1]]), first_tenth))
+	
 	# TODO case 4
 
 	# TODO case 5
 
 	# create the distance matrix
+	# Attention: The order of the matrix is used for the classification of event later on
+	#  ... for example whether the match is an update of a trajectory or a deletion.
 	current_measurements += last_tenth_artificial_measurements
-	current_predictions += last_tenth_artificial_predictions
+	current_predictions += first_tenth_artificial_predictions
 	# code.interact(local=dict(globals(), **locals()))
+	
+	# insert the l2 norm between measurement and prediction
 	distances = np.zeros([len(current_measurements), len(current_predictions)])
 	for measurement_idx, measurement in enumerate(current_measurements):
 		for prediction_idx, prediction in enumerate(current_predictions):
 			distances[measurement_idx][prediction_idx] = np.linalg.norm(measurement - prediction)
-	# actual matching
+	# actual matching -> rows: list() and cols: list()
+	# example: rows[0] and cols[0] contain the indices of the best match, ...
 	row_ind, col_ind = linear_sum_assignment(distances)
 	for i in range(len(row_ind)):
 		if row_ind[i] < num_measurements and col_ind[i] < num_predictions:
 			model.update_trajectory(i, current_measurements[row_ind[i]], current_predictions[col_ind[i]])
 		elif row_ind[i] >= num_measurements and col_ind[i] >= num_predictions:
+			# Artificial measurement was matched with artificial prediction
 			pass # nothing to do or am i overseeing something?
 		elif row_ind[i] >= num_measurements and col_ind[i] < num_predictions:
 			try:
@@ -109,6 +124,8 @@ for it in range(100):
 			model.new_trajectory(current_measurements[first_tenth_idxs[col_ind[i] - num_predictions]])
 
 # TODO compare trajectories
+
+# Assumption: We create the trajectories in the same order as they were generated
 trajectory_distance_sum = 0
 for i in len(MAX_NUM_TRAJECTORIES):
 	for j in range(TRAJECTORY_LENGTH):
