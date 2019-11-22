@@ -2,6 +2,12 @@
 
 Using a RNN to predict next measurement of tracks.
 
+## Requirements
+
+`apt-get -q install wget`
+
+`python3 -m pip install -r requirements.txt`
+
 ## Notebook
 
 Follow these instructions to run notebooks on the gpu pc at the institute.
