@@ -1,6 +1,7 @@
 # NextStep-RNN
 
 Using a RNN to predict next measurement of tracks.
+Quick starts are provided in the "/Notebook" folder.
 
 ## Requirements
 
@@ -12,7 +13,6 @@ Using a RNN to predict next measurement of tracks.
 
 Follow these instructions to run notebooks on the gpu pc at the institute.
 We use the docker images for [tensorflow](https://www.tensorflow.org/install/docker).
-
 
 **Prerequisites**:
 1. Install docker from source (not apt, because outdated)

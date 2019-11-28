@@ -4,19 +4,29 @@
 #    - FakeDataSet: Randomly created lines with noise
 #    - CsvDataSet: ToDo(Daniel): Loads (real) tracks from a glob pattern of *.csv files
 
+import io
 import random
+import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
 from abc import ABC, abstractmethod
+from sklearn.model_selection import train_test_split
 
 
 class AbstractDataSet(ABC):
+    # dimensions of the belt in pixels
     belt_width = 2000
     belt_height = 2000
 
+    # the nan_value is used for padding and must not appear in the data
     nan_value = 0
+    # the number of dimensions an observation has: for example (x,y) has 2
     input_dim = 2
+
+    batch_size = 128
+    train_split_ratio = 0.9
+    test_split_ratio = 0.1
 
     @abstractmethod
     def get_seq2seq_data(self, nan_value=0):
@@ -92,20 +102,14 @@ class AbstractDataSet(ABC):
         """
         raise NotImplementedError
 
-    @classmethod
-    def get_last_timestep_of_track(cls, track):
-        i = None
-        for i in range(track.shape[0]):
-            if not np.any(track[i]):
-                return i
-        return i
-
-    def plot_track(self, track, color='black', start=0, end=-1, label='track'):
+    def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False):
         track = track[start:end]
 
         axes = plt.gca()
-        axes.set_xlim([0, self.belt_width + 100])
-        axes.set_ylim([0, self.belt_height + 100])
+        axes.set_aspect('equal')
+        if not fit_scale_to_content:
+            axes.set_xlim([0, self.belt_width + 100])
+            axes.set_ylim([0, self.belt_height + 100])
 
         plt.xlabel('x position [px]')
         plt.ylabel('y position [px]')
@@ -116,23 +120,185 @@ class AbstractDataSet(ABC):
 
         return axes
 
-    def plot_random_tracks(self, n=15):
+    def plot_random_tracks(self, n=15, end_time_step=None, fit_scale_to_content=False):
         tracks = self.get_aligned_track_data()
         for _ in range(n):
             random_index = random.randint(0, tracks.shape[0] - 1)
             random_track = tracks[random_index]
             axes = self.plot_track(random_track,
                                    color=np.random.rand(3),
-                                   end=self.get_last_timestep_of_track(random_track),
-                                   label='track {}'.format(random_index))
+                                   end=end_time_step if end_time_step else self.get_last_timestep_of_track(
+                                       random_track),
+                                   label='track {}'.format(random_index),
+                                   fit_scale_to_content=fit_scale_to_content
+                                   )
             plt.title('Tracks')
         plt.show()
+
+    def plot_tracks_with_predictions(self, input_tracks, target_tracks, predicted_tracks, denormalize=False,
+                                     display=True, tf_summary_name=None, tf_summary_step=1,
+                                     start_time_step=0, end_time_step=None, fit_scale_to_content=False):
+        """
+        Plot the input_tracks, target_tracks and predicted_tracks into one plot.
+        Set the tf_summary_name in order to save to tf summary.
+
+
+        :param input_tracks:
+        :param target_tracks:
+        :param predicted_tracks:
+        :param denormalize:
+        :param display:
+        :param tf_summary_name:
+        :param tf_summary_step:
+        :param start_time_step:
+        :param end_time_step:
+        :param fit_scale_to_content:
+        :return:
+        """
+        if denormalize:
+            input_batch = self.denormalize_tracks(input_tracks)
+            target_batch = self.denormalize_tracks(target_tracks)
+            batch_predictions = self.denormalize_tracks(predicted_tracks)
+
+        for track_idx in range(input_tracks.shape[0]):
+            seq_length = self.get_last_timestep_of_track(input_tracks[track_idx])
+            if end_time_step:
+                seq_length = end_time_step
+            axes = self.plot_track(input_tracks[track_idx], start=start_time_step,
+                                   fit_scale_to_content=fit_scale_to_content,
+                                   color='black', end=seq_length, label="Input truth {}".format(track_idx))
+            axes = self.plot_track(target_tracks[track_idx], start=start_time_step,
+                                   fit_scale_to_content=fit_scale_to_content,
+                                   color='green', end=seq_length, label="Output truth {}".format(track_idx))
+            axes = self.plot_track(predicted_tracks[track_idx], start=start_time_step,
+                                   fit_scale_to_content=fit_scale_to_content,
+                                   color='blue', end=seq_length, label="Prediction {}".format(track_idx))
+            plt.title('Track with predictions')
+
+        # store image in tf summary
+        if tf_summary_name:
+            # store plot in memory buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            # Convert PNG buffer to TF image
+            image = tf.image.decode_png(buf.getvalue(), channels=4)
+            # add batch dim
+            image = tf.expand_dims(image, 0)
+            tf.summary.image(tf_summary_name, image, step=tf_summary_step)
+
+        if display:
+            plt.show()
+        else:
+            plt.clf()
+
+    def plot_random_predictions(self, model, dataset, n=5, tf_summary_step=1, display=False, tf_summary_name=None,
+                                denormalize=True, fit_scale_to_content=False, end_time_step=None):
+        """
+        Sample n random tracks from the dataset.
+        Then use the model to make prediction und plot everything.
+        If desired, the plots can be written to a tf summary image.
+
+        Example:
+            >>> self.plot_random_predictions(model, dataset, n=1, display=True, \
+                                                      fit_scale_to_content=True, end_time_step=10)
+
+        :param model:
+        :param dataset:
+        :param n: has to be smaller than batch size
+        :param step:
+        :param display:
+        :return:
+        """
+
+        assert n < self.batch_size
+
+        for input_batch, target_batch in dataset.take(1):
+            # reset model state
+            hidden = model.reset_states()
+            batch_predictions = model(input_batch)
+
+            self.plot_tracks_with_predictions(input_batch[0:n].numpy(),
+                                              target_batch[0:n].numpy(),
+                                              batch_predictions[0:n].numpy(),
+                                              denormalize=denormalize, display=display, tf_summary_name=tf_summary_name,
+                                              tf_summary_step=tf_summary_step,
+                                              fit_scale_to_content=fit_scale_to_content,
+                                              end_time_step=end_time_step
+                                              )
+
+    def normalize_tracks(self, tracks, is_seq2seq_data=False):
+        """
+        The values within a track a normalized -> ]0, 1].
+        The zero is excluded because assume that the input data also
+        does not contain zeros except as padding value (nan_value).
+
+        :param tracks:
+        :param is_seq2seq_data:
+        :return:
+        """
+        tracks[:, :, 0] /= self.belt_width
+        tracks[:, :, 1] /= self.belt_width
+
+        if is_seq2seq_data:
+            tracks[:, :, 2] /= self.belt_width
+            tracks[:, :, 3] /= self.belt_width
+        return tracks
+
+    def denormalize_tracks(self, tracks, is_seq2seq_data=False):
+        tracks[:, :, 0] *= self.belt_width
+        tracks[:, :, 1] *= self.belt_width
+
+        if is_seq2seq_data:
+            tracks[:, :, 2] *= self.belt_width
+            tracks[:, :, 3] *= self.belt_width
+        return tracks
+
+    def split_train_test(self, tracks, test_ratio=0.1):
+        train_tracks, test_tracks = train_test_split(tracks, test_size=test_ratio)
+        return train_tracks, test_tracks
+
+    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1):
+        tracks = self.get_seq2seq_data()
+        if normalized:
+            tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
+        train_tracks, test_tracks = self.split_train_test(tracks, test_ratio=test_ratio)
+
+        raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
+        raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
+
+        # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
+        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
+        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
+
+        self.minibatches_train = minibatches_train
+        self.minibatches_test = minibatches_test
+
+        def split_input_target(chunk):
+            # split the tensor (x, y, x_target, y_target)
+            #  -> into two tensors (x, y) and (x_target, y_target)
+            input_seq = chunk[:, :, :2]
+            target_seq = chunk[:, :, 2:]
+            return input_seq, target_seq
+
+        dataset_train = minibatches_train.map(split_input_target)
+        dataset_test = minibatches_test.map(split_input_target)
+
+        return dataset_train, dataset_test
+
+    @classmethod
+    def get_last_timestep_of_track(cls, track):
+        i = None
+        for i in range(track.shape[0]):
+            if not np.any(track[i]):
+                return i
+        return i
 
 
 class FakeDataSet(AbstractDataSet):
     def __init__(self, timesteps=35, number_trajectories=100,
                  additive_noise_stddev=5, splits=0, additive_target_stddev=100,
-                 min_number_points_per_trajectory=10,
+                 min_number_points_per_trajectory=20, batch_size=128,
                  belt_width=2000, belt_height=2000):
         """
         Create Fake Data Lines for timesteps with normally distributed noise on a belt.
@@ -159,10 +325,17 @@ class FakeDataSet(AbstractDataSet):
         self.additive_target_stddev = additive_target_stddev
         self.splits = splits
         self.min_number_points_per_trajectory = min_number_points_per_trajectory
+        self.batch_size = batch_size
 
         self.track_data = self._generate_tracks()
         self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_track_data)
+
+        # if we don't have enough tracks, then the smaller split (usually test) is so small that is smaller
+        # than a batch. Because we use drop_remainder=True we cannot allow this, or else the only batch
+        # would be empty -> as a result we would not have test data
+        assert self.n_trajectories * min(self.test_split_ratio, self.train_split_ratio) > self.batch_size, \
+            "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
 
     def _generate_tracks(self):
         tracks = []
@@ -175,7 +348,7 @@ class FakeDataSet(AbstractDataSet):
         # for every trajectory
         for track_number in range(self.n_trajectories):
             # pick a random point in time to start the trajectory
-            start_timestep = random.randint(0, self.timesteps-self.min_number_points_per_trajectory)
+            start_timestep = random.randint(0, self.timesteps - self.min_number_points_per_trajectory)
 
             # list containing all points: add NaNs for every skipped timestep
             trajectory = [self.nan_value_ary for _ in range(start_timestep)]
@@ -191,8 +364,8 @@ class FakeDataSet(AbstractDataSet):
 
             # change in x and y direction has the maximum length of step_length
             #  because the particles move with the same velocity.
-            delta_x = (end_x-start_x)
-            delta_y = (end_y-start_y)
+            delta_x = (end_x - start_x)
+            delta_y = (end_y - start_y)
             if -1 < (delta_y / delta_x) < 1:
                 alpha = np.arcsin(delta_y / delta_x)
             else:
