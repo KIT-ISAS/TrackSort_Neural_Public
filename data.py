@@ -102,7 +102,7 @@ class AbstractDataSet(ABC):
         """
         raise NotImplementedError
 
-    def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False):
+    def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False, legend=True):
         track = track[start:end]
 
         axes = plt.gca()
@@ -116,7 +116,9 @@ class AbstractDataSet(ABC):
 
         axes.scatter(track[:, 0], track[:, 1], color=color)
         axes.plot(track[:, 0], track[:, 1], color=color, label=label)
-        axes.legend()
+
+        if legend:
+            axes.legend()
 
         return axes
 

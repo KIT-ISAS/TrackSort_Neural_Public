@@ -1,3 +1,5 @@
+import math
+
 import tensorflow as tf
 import numpy as np
 
@@ -56,6 +58,7 @@ def rnn_model_factory(
     rnn_model = rnn_models[rnn_model_name]
 
     # Add the recurrent layers
+    rnn_layer_count = 0
     for hidden_units_in_rnn in [num_units_first_rnn, num_units_second_rnn, num_units_third_rnn, num_units_fourth_rnn]:
         if hidden_units_in_rnn == 0:
             # as soon as one layer has no units, we don't create the layer.
@@ -65,7 +68,9 @@ def rnn_model_factory(
             model.add(rnn_model(hidden_units_in_rnn,
                                 return_sequences=True,
                                 stateful=stateful,
+                                name='rnn-{}'.format(rnn_layer_count),
                                 unroll=unroll))
+            rnn_layer_count += 1
 
     # Add the dense layers
     for units_in_dense_layer in [num_units_first_dense, num_units_second_dense, num_units_third_dense,
@@ -254,3 +259,154 @@ def train_epoch_generator(rnn_model, train_step, dataset_train, batch_size):
         return avg_loss, train_step_counter
 
     return train_epoch
+
+
+class ModelManager(object):
+    def __init__(self, maximum_number_of_tracks, batch_size, rnn_model, num_dims=2, dtype=np.float64):
+        """
+        Wrapper for an estimator containing layers with state (all layers inheriting from RNN)
+
+        When used for tracking, we want to call the RNN with a full batch containing the current states of the tracks.
+        The model manager makes available an api like the following:
+
+        1. First you have to define the maximum number of tracks which shall be managed (if you have a batch size of 128
+            and you want to use 140 tracks, then the model has to be run twice with different batches and states)
+        2. For every track that you want to initialize, call: model_manager.allocate_track() which returns a track_id that
+            you can use to reference the track. The state of the track is clean.
+        3. Every track can use exactly one measurement to predict the next step.
+           Call: model_manager.set_track_measurement(track_id, np.array([x, y], dtype=np.float64))
+        4. Once you are done assigning measurements, you can run the prediction with:
+            model_manager.predict(). This returns a list of predictions
+        5. You can get the prediction for a track manually with model_manager.get_prediction(track_id)
+        6. If you want to stop a track, call: model_manager.free(track_id)
+        7. Resetting the full ModelManager: model_manager.free_all()
+
+        :param maximum_number_of_tracks:
+        :param batch_size:
+        :param rnn_model: keras model
+        :param num_dims:
+        :param dtype:
+        """
+        self.maximum_number_of_tracks = maximum_number_of_tracks
+        self.batch_size = batch_size
+        self.num_dims = num_dims
+        self.dtype = dtype
+        self.n_batches = math.ceil(maximum_number_of_tracks/batch_size)
+        self.rnn_model = rnn_model
+
+        # we start with cleaned states
+        self.rnn_model.reset_states()
+
+        # for every batch we store the state of a full model
+        self.batch_states = [self._get_rnn_states() for _ in range(self.n_batches)]
+
+        # store the occupied ids
+        # the ids are in range(maximum_number_of_tracks) sharded across the batches
+        self.used_state_ids = set()
+        self.all_ids = set(range(maximum_number_of_tracks))
+
+        # the measurements (only one time step)
+        self.batch_measurements = [np.zeros([self.batch_size, 1, num_dims], dtype=self.dtype) for _ in range(self.n_batches)]
+
+    def _pop_next_free_track_id(self):
+        difference = self.all_ids - self.used_state_ids
+        assert len(difference) > 0, "No track id left. Everything allocated."
+        new_id = difference.pop()
+        self.used_state_ids.add(new_id)
+        return new_id
+
+    def _get_rnn_states(self):
+        rnn_layer_states = []
+
+        for i in range(1000):
+            try:
+                layer = self.rnn_model.get_layer(index=i)
+            except:
+                break
+
+            if isinstance(layer, tf.keras.layers.RNN):
+                rnn_layer_states.append([sub_state.numpy() for sub_state in layer.states])
+
+        return np.array(rnn_layer_states, dtype=self.dtype)
+
+    def _get_batch_and_row_id(self, track_id):
+        batch_id = track_id // self.batch_size
+        row_id = track_id % self.batch_size
+        return batch_id, row_id
+
+    def _reset_state_of_track(self, track_id):
+        batch_id, row_id = self._get_batch_and_row_id(track_id)
+        batch_state = self.batch_states[batch_id]
+
+        # for every layer in the batch state (e.g. lstm1 or lstm2)
+        for layer_state in batch_state:
+            # for every sub_state in layer_state (e.g. cell memory and output of lstm)
+            for sub_state in layer_state:
+                # replace with zeros
+                sub_state[row_id] *= 0.0  # tf.zeros_like(sub_state[row_id], dtype=tf.float64)
+
+    def allocate_track(self):
+        new_id = self._pop_next_free_track_id()
+        self._reset_state_of_track(new_id)
+        return new_id
+
+    def set_track_measurement(self, track_id, measurement):
+        """
+        Add the measurement for a track. Every track can only have one measurement.
+
+        :param track_id:
+        :param measurement: np.array([x,y], dtype=tf.float64)
+        """
+        batch_id, row_id = self._get_batch_and_row_id(track_id)
+        self.batch_measurements[batch_id][row_id, 0, :] = measurement
+
+    def _set_rnn_state(self, batch_state):
+        rnn_layer_counter = 0
+        for i in range(1000):
+            try:
+                layer = self.rnn_model.get_layer(index=i)
+            except:
+                break
+
+            if isinstance(layer, tf.keras.layers.RNN):
+                for sub_state_number, sub_state in enumerate(layer.states):
+                    layer.states[sub_state_number].assign(tf.convert_to_tensor(batch_state[rnn_layer_counter][sub_state_number]))
+                rnn_layer_counter += 1
+
+    def predict(self):
+        """
+        Make the prediction for all tracks.
+        If necessary the keras model predicts multiple times to use all data.
+
+        :return: np.array([...], shape=[n_batches * batch_size, num_dims])
+        """
+        predictions = []
+        for batch_i in range(self.n_batches):
+            # set state for the batch
+            self._set_rnn_state(self.batch_states[batch_i])
+            # make prediction
+            batch_predictions = self.rnn_model(self.batch_measurements[batch_i])
+            predictions.append(batch_predictions)
+            # store the state
+            self.batch_states[batch_i] = self._get_rnn_states()
+
+        return np.array(predictions).reshape([self.n_batches*self.batch_size, self.num_dims])
+
+    def free(self, track_id):
+        self.used_state_ids.remove(track_id)
+        self.all_ids.add(track_id)
+
+    def free_all(self):
+        self.used_state_ids = set()
+        self.all_ids = set(range(self.maximum_number_of_tracks))
+
+
+
+
+
+
+
+
+
+
+
