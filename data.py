@@ -5,10 +5,13 @@
 #    - CsvDataSet: ToDo(Daniel): Loads (real) tracks from a glob pattern of *.csv files
 
 import io
+import glob
 import random
+
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from abc import ABC, abstractmethod
 from sklearn.model_selection import train_test_split
@@ -23,6 +26,8 @@ class AbstractDataSet(ABC):
     nan_value = 0
     # the number of dimensions an observation has: for example (x,y) has 2
     input_dim = 2
+
+    timesteps = None
 
     batch_size = 128
     train_split_ratio = 0.9
@@ -296,6 +301,39 @@ class AbstractDataSet(ABC):
                 return i
         return i
 
+    def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
+        seq2seq_data = []
+
+        # for every track we create:
+        #  x, y, x_target, y_target nan_value-padded
+        for track_number in range(aligned_track_data.shape[0]):
+            # make sure the last entry of the input arrays are nan-values
+            x = aligned_track_data[track_number][:, 0]
+            x = np.concatenate((x[:-1], np.array([self.nan_value])))
+            y = aligned_track_data[track_number][:, 1]
+            y = np.concatenate((y[:-1], np.array([self.nan_value])))
+
+            # remove the last input because we have no target for it
+            last_index = self.get_last_timestep_of_track(x) - 1
+            x[last_index] = self.nan_value
+            y[last_index] = self.nan_value
+
+            # the ground truth where the particle will be
+            x_target = np.concatenate((aligned_track_data[track_number][1:, 0].copy(), np.array([self.nan_value])))
+            y_target = np.concatenate((aligned_track_data[track_number][1:, 1].copy(), np.array([self.nan_value])))
+
+            input_matrix = np.vstack((x, y, x_target, y_target))
+
+            # initialize the array with nan-value
+            matrix = np.ones([self.timesteps, self.input_dim * 2]) * self.nan_value
+
+            # insert the data of the track into the zero background (example: nan-value=0 -> black background)
+            matrix[0:x.size, 0:self.input_dim * 2] = input_matrix.T
+
+            seq2seq_data.append(matrix)
+
+        return np.array(seq2seq_data)
+
 
 class FakeDataSet(AbstractDataSet):
     def __init__(self, timesteps=35, number_trajectories=100,
@@ -417,44 +455,80 @@ class FakeDataSet(AbstractDataSet):
 
         return np.array(aligned_tracks)
 
-    def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
-        seq2seq_data = []
-
-        # for every track we create:
-        #  x, y, x_target, y_target nan_value-padded
-        for track_number in range(aligned_track_data.shape[0]):
-            # make sure the last entry of the input arrays are nan-values
-            x = aligned_track_data[track_number][:, 0]
-            x = np.concatenate((x[:-1], np.array([self.nan_value])))
-            y = aligned_track_data[track_number][:, 1]
-            y = np.concatenate((y[:-1], np.array([self.nan_value])))
-
-            # remove the last input because we have no target for it
-            last_index = self.get_last_timestep_of_track(x) - 1
-            x[last_index] = self.nan_value
-            y[last_index] = self.nan_value
-
-            # the ground truth where the particle will be
-            x_target = np.concatenate((aligned_track_data[track_number][1:, 0].copy(), np.array([self.nan_value])))
-            y_target = np.concatenate((aligned_track_data[track_number][1:, 1].copy(), np.array([self.nan_value])))
-
-            input_matrix = np.vstack((x, y, x_target, y_target))
-
-            # initialize the array with nan-value
-            matrix = np.ones([self.timesteps, self.input_dim * 2]) * self.nan_value
-
-            # insert the data of the track into the zero background (example: nan-value=0 -> black background)
-            matrix[0:x.size, 0:self.input_dim * 2] = input_matrix.T
-
-            seq2seq_data.append(matrix)
-
-        return np.array(seq2seq_data)
-
     def get_track_data(self):
         return self.track_data
 
     def get_aligned_track_data(self):
         return self.aligned_track_data
+
+    def get_seq2seq_data(self, nan_value=0):
+        return self.seq2seq_data
+
+    def get_mlp_data(self):
+        pass
+
+    def get_measurement_at_timestep(self, timestep):
+        data = self.get_track_data()[:, timestep, :]
+        return data
+
+
+class CsvDataSet(AbstractDataSet):
+    def __init__(self, glob_file_pattern, min_number_detections=6, nan_value=0, input_dim=2,
+                 timesteps=35, batch_size=128):
+        self.glob_file_pattern = glob_file_pattern
+        self.file_list = sorted(glob.glob(glob_file_pattern))
+        self.min_number_detections = min_number_detections
+
+        self.nan_value = nan_value
+        self.input_dim = input_dim
+        self.batch_size = batch_size
+
+        # ToDo(Daniel): self.num_time_steps = len(self._extract_longest_track())
+        self.timesteps = timesteps
+        self.tracks = self._load_tracks()
+
+        # we assume the csv data is aligned by default
+        self.aligned_tracks = self.tracks
+        self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_tracks)
+
+        # normalize in all dimensions with the same factor
+        self.normalization_constant = np.nanmax(self.seq2seq_data)
+        self.belt_width = self.normalization_constant
+
+    def _load_tracks(self):
+        tracks = []
+
+        for file_ in self.file_list:
+            # read the tracks from one measurement
+            df = pd.read_csv(file_)
+
+            # remove columns with less then 6 detections (same as Tobias did)
+            df.dropna(axis=1, thresh=self.min_number_detections, inplace=True)
+
+            # there are two columns per track, for example "TrackID_4_X" and "TrackID_4_Y"
+            number_of_tracks = int((df.shape[1]) / 2)
+
+            # We wan't to use 0.0 as NaN value. Therefore we have to check that it does not
+            #   exist in the data.   Note: the double .min().min() is necessary because we
+            #   first get the column minima and then we get the table minimum from that
+            assert df.min().min() > 0.0, "Error: The dataframe {} contains a minimum <= 0.0".format(file_)
+
+            # for every track we create:
+            # - track
+            for track_number in range(number_of_tracks):
+                # create the simple tracks
+                # **Attention:** the columns are ordered as (Y,X) and we turn it around to (X,Y)
+                track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
+                tracks.append(np.nan_to_num(track))
+
+        tracks = np.array(tracks)
+        return tracks
+
+    def get_track_data(self):
+        return self.tracks
+
+    def get_aligned_track_data(self):
+        return self.aligned_tracks
 
     def get_seq2seq_data(self, nan_value=0):
         return self.seq2seq_data
