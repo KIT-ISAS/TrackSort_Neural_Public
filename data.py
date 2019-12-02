@@ -163,9 +163,9 @@ class AbstractDataSet(ABC):
         :return:
         """
         if denormalize:
-            input_batch = self.denormalize_tracks(input_tracks)
-            target_batch = self.denormalize_tracks(target_tracks)
-            batch_predictions = self.denormalize_tracks(predicted_tracks)
+            input_tracks = self.denormalize_tracks(input_tracks)
+            target_tracks = self.denormalize_tracks(target_tracks)
+            predicted_tracks = self.denormalize_tracks(predicted_tracks)
 
         for track_idx in range(input_tracks.shape[0]):
             seq_length = self.get_last_timestep_of_track(input_tracks[track_idx])
@@ -218,7 +218,7 @@ class AbstractDataSet(ABC):
         :return:
         """
 
-        assert n < self.batch_size
+        assert n <= self.batch_size
 
         for input_batch, target_batch in dataset.take(1):
             # reset model state
@@ -333,6 +333,27 @@ class AbstractDataSet(ABC):
             seq2seq_data.append(matrix)
 
         return np.array(seq2seq_data)
+
+    def get_box_plot(self, model, dataset):
+        maes = []
+
+        for input_batch, target_batch in dataset:
+            hidden = model.reset_states()
+            batch_predictions = model(input_batch)
+            for track_id in range(batch_predictions.shape[0]):
+                last_id = self.get_last_timestep_of_track(input_batch[track_id])
+                mae_per_timestep = np.sum(
+                    ((target_batch[track_id][:last_id] - batch_predictions[track_id][:last_id]) * self.belt_width) ** 2,
+                    axis=1)
+                mean_mae_per_track = np.mean(np.sqrt(mae_per_timestep))
+                maes.append(mean_mae_per_track)
+
+        maes = np.array(maes)
+
+        fig1, ax1 = plt.subplots()
+        ax1.yaxis.grid(True)
+        ax1.set_title('Boxplot')
+        ax1.boxplot(maes, showfliers=False)
 
 
 class FakeDataSet(AbstractDataSet):
@@ -492,7 +513,7 @@ class CsvDataSet(AbstractDataSet):
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_tracks)
 
         # normalize in all dimensions with the same factor
-        self.normalization_constant = np.nanmax(self.seq2seq_data)
+        self.normalization_constant = np.nanmax(self.seq2seq_data) * 1.1  # this leaves room for tracks at the borders
         self.belt_width = self.normalization_constant
 
     def _load_tracks(self):
@@ -503,7 +524,7 @@ class CsvDataSet(AbstractDataSet):
             df = pd.read_csv(file_)
 
             # remove columns with less then 6 detections (same as Tobias did)
-            df.dropna(axis=1, thresh=self.min_number_detections, inplace=True)
+            df = df.dropna(axis=1, thresh=self.min_number_detections, inplace=False)
 
             # there are two columns per track, for example "TrackID_4_X" and "TrackID_4_Y"
             number_of_tracks = int((df.shape[1]) / 2)

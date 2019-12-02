@@ -69,6 +69,7 @@ def rnn_model_factory(
                                 return_sequences=True,
                                 stateful=stateful,
                                 name='rnn-{}'.format(rnn_layer_count),
+                                recurrent_initializer='glorot_uniform',
                                 unroll=unroll))
             rnn_layer_count += 1
 
@@ -116,6 +117,7 @@ def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
     """
     # the placeholder character used for padding
     mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
+    norm_factor = tf.constant(normalization_factor, dtype=tf.float64)
 
     @tf.function
     def f():
@@ -139,10 +141,9 @@ def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
             # Revert the normalization
             # ToDo: Replace this hacky solution with same normalization in both directions
             #    with usage of x_max and y_max   with tf.scatter_nd_update(...)
-            target_batch_unnormalized = target_batch * normalization_factor
-            pred_batch_unnormalized = batch_predictions * normalization_factor
+            target_batch_unnormalized = target_batch * norm_factor
+            pred_batch_unnormalized = batch_predictions * norm_factor
 
-            # multiply categorical_crossentropy with the mask
             if squared:
                 batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized,
                                                                 pred_batch_unnormalized) * mask
