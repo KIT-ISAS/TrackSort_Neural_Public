@@ -7,6 +7,7 @@
 import io
 import glob
 import random
+import code
 
 import tensorflow as tf
 import numpy as np
@@ -23,7 +24,7 @@ class AbstractDataSet(ABC):
     belt_height = 2000
 
     # the nan_value is used for padding and must not appear in the data
-    nan_value = 0
+    nan_value = -1
     # the number of dimensions an observation has: for example (x,y) has 2
     input_dim = 2
 
@@ -96,6 +97,27 @@ class AbstractDataSet(ABC):
              4 | (N,N) | (N,N) | (N,N)
         """
         raise NotImplementedError
+
+    def get_particles(self):
+        """
+        Returns a list of particles.
+        Each particle is a list of pairs.
+        The first element of the pair is the measurement point.
+        The second element is the timestep of the measurement.
+        """
+        track_data = self.get_aligned_track_data()
+        particles = []
+        for track_idx in range(track_data.shape[0]):
+            is_started = False
+            for time_idx in range(tracke_data.shape[1]):
+                if not is_started and track_data[track_idx][time_idx] != np.array([nan_value, nan_value]):
+                    is_started = True
+                    particles.append([track_data[track_idx][time_idx], time_idx])
+                if is_started and track_data[track_idx][time_idx] == np.array([nan_value, nan_value]):
+                    continue
+            if not is_started:
+                print('something went wrong in get_particles')
+                code.interact(local=dict(globals(), **locals()))
 
     def get_measurement_at_timestep(self, timestep):
         """
