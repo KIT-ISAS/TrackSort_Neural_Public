@@ -2,7 +2,7 @@
 # -------
 # - AbstractDataSet: Abstract class which defines the necessary interface for every data set
 #    - FakeDataSet: Randomly created lines with noise
-#    - CsvDataSet: ToDo(Daniel): Loads (real) tracks from a glob pattern of *.csv files
+#    - CsvDataSet: Loads (real) tracks from a glob pattern of *.csv files
 
 import io
 import glob
@@ -24,7 +24,7 @@ class AbstractDataSet(ABC):
     belt_height = 2000
 
     # the nan_value is used for padding and must not appear in the data
-    nan_value = -1
+    nan_value = 0
     # the number of dimensions an observation has: for example (x,y) has 2
     input_dim = 2
 
@@ -156,8 +156,7 @@ class AbstractDataSet(ABC):
             random_track = tracks[random_index]
             axes = self.plot_track(random_track,
                                    color=np.random.rand(3),
-                                   end=end_time_step if end_time_step else self.get_last_timestep_of_track(
-                                       random_track),
+                                   end=end_time_step if end_time_step else self.get_last_timestep_of_track(random_track)-1,
                                    label='track {}'.format(random_index),
                                    fit_scale_to_content=fit_scale_to_content
                                    )
@@ -287,6 +286,15 @@ class AbstractDataSet(ABC):
         train_tracks, test_tracks = train_test_split(tracks, test_size=test_ratio)
         return train_tracks, test_tracks
 
+    def get_seq2seq_data_and_labels(self, normalized=True):
+        tracks = self.get_seq2seq_data()
+        if normalized:
+            tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
+        input_seq = tracks[:, :, :2]
+        target_seq = tracks[:, :, 2:]
+
+        return input_seq, target_seq
+
     def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1):
         tracks = self.get_seq2seq_data()
         if normalized:
@@ -315,11 +323,10 @@ class AbstractDataSet(ABC):
 
         return dataset_train, dataset_test
 
-    @classmethod
-    def get_last_timestep_of_track(cls, track):
+    def get_last_timestep_of_track(self, track):
         i = None
         for i in range(track.shape[0]):
-            if not np.any(track[i]):
+            if np.all(track[i] == [self.nan_value, self.nan_value]):
                 return i
         return i
 
@@ -361,7 +368,7 @@ class FakeDataSet(AbstractDataSet):
     def __init__(self, timesteps=35, number_trajectories=100,
                  additive_noise_stddev=5, splits=0, additive_target_stddev=100,
                  min_number_points_per_trajectory=20, batch_size=128,
-                 belt_width=2000, belt_height=2000):
+                 belt_width=2000, belt_height=2000, nan_value=0, step_length=70):
         """
         Create Fake Data Lines for timesteps with normally distributed noise on a belt.
 
@@ -388,6 +395,9 @@ class FakeDataSet(AbstractDataSet):
         self.splits = splits
         self.min_number_points_per_trajectory = min_number_points_per_trajectory
         self.batch_size = batch_size
+        self.nan_value = nan_value
+        self.step_length = step_length
+
 
         self.track_data = self._generate_tracks()
         self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
@@ -404,7 +414,7 @@ class FakeDataSet(AbstractDataSet):
         # the nan value used for every dimension of a skipped timestep
         self.nan_value_ary = [self.nan_value, self.nan_value]
 
-        step_length = self.belt_width / self.timesteps
+        step_length = self.step_length
 
         # for every trajectory
         for track_number in range(self.n_trajectories):
@@ -415,8 +425,8 @@ class FakeDataSet(AbstractDataSet):
             trajectory = [self.nan_value_ary for _ in range(start_timestep)]
 
             # spawn the new trajectory on the left side
-            start_x = start_timestep * step_length
-            start_y = random.randint(0, self.belt_max_x)
+            start_x = random.randint(0, self.belt_width//10)
+            start_y = random.randint(0, self.belt_height)
             trajectory.append([start_x, start_y])
 
             # end on the right side
@@ -436,12 +446,22 @@ class FakeDataSet(AbstractDataSet):
             dx = np.cos(alpha) * step_length
             dy = np.sin(alpha) * step_length
 
+            track_done = False            
+            
             # iterate over all the time steps from start_time_step+1   until end
             for t in range(start_timestep + 2, self.timesteps + 1):
                 # generate next position
                 new_x = trajectory[-1][0] + dx
                 new_y = trajectory[-1][1] + dy + random.normalvariate(0, self.additive_noise_stddev)
-                trajectory.append([new_x, new_y])
+                
+                # if particle is outside of the belt add nan_values
+                if not track_done and (new_x > end_x or new_y > self.belt_height or new_y < 0):
+                    track_done = True
+
+                if track_done:
+                    trajectory.append([self.nan_value, self.nan_value])
+                else:
+                    trajectory.append([new_x, new_y])
 
             tracks.append(trajectory)
 
@@ -488,8 +508,10 @@ class FakeDataSet(AbstractDataSet):
     def get_mlp_data(self):
         pass
 
-    def get_measurement_at_timestep(self, timestep):
-        data = self.get_track_data()[:, timestep, :]
+    def get_measurement_at_timestep(self, timestep, normalized=True):
+        data = self.get_track_data()[:, [timestep], :].copy()
+        if normalized:
+            return self.normalize_tracks(data, is_seq2seq_data=False)
         return data
 
 
@@ -557,10 +579,11 @@ class CsvDataSet(AbstractDataSet):
     def get_mlp_data(self):
         pass
 
-    def get_measurement_at_timestep(self, timestep):
-        data = self.get_track_data()[:, timestep, :]
+    def get_measurement_at_timestep(self, timestep, normalized=True):
+        data = self.get_track_data()[:, [timestep], :].copy()
+        if normalized:
+            return self.normalize_tracks(data, is_seq2seq_data=False)
         return data
-
 
 if __name__ == '__main__':
     f = FakeDataSet()
