@@ -374,8 +374,7 @@ class FakeDataSet(AbstractDataSet):
         # if we don't have enough tracks, then the smaller split (usually test) is so small that is smaller
         # than a batch. Because we use drop_remainder=True we cannot allow this, or else the only batch
         # would be empty -> as a result we would not have test data
-        assert self.n_trajectories * min(self.test_split_ratio, self.train_split_ratio) > self.batch_size, \
-            "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
+        assert self.n_trajectories * min(self.test_split_ratio, self.train_split_ratio) > self.batch_size, "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
 
     def _generate_tracks(self):
         tracks = []

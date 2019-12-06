@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 
 from tensorflow.keras import backend as K
+tf.keras.backend.set_floatx('float64')
 
 
 rnn_models = {
