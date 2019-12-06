@@ -108,23 +108,23 @@ def solve_matching_problem(dataset, model_manager):
 		# mask for measurements of current timestep
 		current_measurements_real = list(dataset.get_measurement_at_timestep(it))
 		current_measurements_real = list(filter(lambda x: x[0] != NAN_VALUE, current_measurements_real))
-		num_measurements = len(current_measurements_real)
+		num_measurements_real = len(current_measurements_real)
 		current_predictions_real = list(model_manager.predict())
 		current_predictions_real = list(filter(lambda x: x[0] >= 0, current_predictions_real)) # TODO this is only a heuristic and no guarantee!!!
-		num_predictions = len(current_predictions_real)
+		num_predictions_real = len(current_predictions_real)
 		#
-		if num_measurements == 0 and num_predictions == 0:
+		if num_measurements_real == 0 and num_predictions_real == 0:
 			continue
 		# case 2 - particle leaves perception
 		# the predicted particles which are in the terminal region of the belt
 		last_tenth = list(filter(lambda x: SIZE_X - x[0] <= X_DETECTION_TOLERANCE, current_predictions_real))
-		last_tenth_prediction_idxss = list(filter(lambda x: SIZE_X - current_predictions_real[x][0] <= X_DETECTION_TOLERANCE, range(num_predictions)))
+		last_tenth_prediction_idxss = list(filter(lambda x: SIZE_X - current_predictions_real[x][0] <= X_DETECTION_TOLERANCE, range(num_predictions_real)))
 		# for every predicted particle at the end of the belt: add an unique artificial measurement outside of the belt
 		current_measurements_artificial = list(map(lambda x: np.array([SIZE_X + X_THRESHOLD, x[1]]), last_tenth))
 		
 		# case 3 - particle enters perception
 		first_tenth = list(filter(lambda x: x[0] <= X_DETECTION_TOLERANCE, current_measurements_real))
-		first_tenth_measurement_idxss = list(filter(lambda x: current_measurements_real[x][0] <= X_DETECTION_TOLERANCE, range(num_measurements)))
+		first_tenth_measurement_idxss = list(filter(lambda x: current_measurements_real[x][0] <= X_DETECTION_TOLERANCE, range(num_measurements_real)))
 		# for every measurement in the beginning of the belt: add an artificial track
 		current_predictions_artificial = list(map(lambda x: np.array([-X_THRESHOLD, x[1]]), first_tenth))
 		
@@ -157,7 +157,7 @@ def solve_matching_problem(dataset, model_manager):
 		measurement_idxs, prediction_idxs = nearest_neighbour(distances)
 		elements_to_delete = []
 		for i in range(len(measurement_idxs)):
-			if measurement_idxs[i] < num_measurements and prediction_idxs[i] < num_predictions:
+			if measurement_idxs[i] < num_measurements_real and prediction_idxs[i] < num_predictions_real:
 				'''if current_measurements[measurement_idxs[i]][1] != current_predictions[prediction_idxs[i]][1]:
 					print('something went wrong in update_trajectory!')
 					code.interact(local=dict(globals(), **locals()))
@@ -173,51 +173,31 @@ def solve_matching_problem(dataset, model_manager):
 				except Exception as exp:
 					print('error in update_trajectory')
 					code.interact(local=dict(globals(), **locals()))
-			elif measurement_idxs[i] >= num_measurements and prediction_idxs[i] >= num_predictions:
+			elif measurement_idxs[i] >= num_measurements_real and prediction_idxs[i] >= num_predictions_real:
 				# Artificial measurement was matched with artificial prediction
 				# that this case won't appear seems to be very problematic for integer programming
 				pass
-			elif measurement_idxs[i] >= num_measurements and prediction_idxs[i] < num_predictions:
+			elif measurement_idxs[i] >= num_measurements_real and prediction_idxs[i] < num_predictions_real:
 				# delete the trajectory
 				# code.interact(local=dict(globals(), **locals()))
-				if MODE == 'minimal_example':
-					elements_to_delete.append(prediction_idxs[i])
-				else:
-					trajectory_id = current_trajectories[prediction_idxs[i]]
-					model_manager.free(trajectory_id)
-					finished_trajectories.append(trajectory_id)
-					current_trajectories.remove(trajectory_id)
-			elif measurement_idxs[i] < num_measurements and prediction_idxs[i] >= num_predictions:
+				trajectory_id = current_trajectories[prediction_idxs[i]]
+				model_manager.free(trajectory_id)
+				finished_trajectories.append(trajectory_id)
+				current_trajectories.remove(trajectory_id)
+			elif measurement_idxs[i] < num_measurements_real and prediction_idxs[i] >= num_predictions_real:
 				# create a new trajetory
 				# code.interact(local=dict(globals(), **locals()))
 				try:
 					trajectory_id = model_manager.allocate_track()
 					current_trajectories.append(trajectory_id)
 					# TODO check if this really is correct!
-					trajectories[trajectory_id] = [[current_measurements[first_tenth_measurement_idxss[prediction_idxs[i] - num_predictions]]], [it]]
+					trajectories[trajectory_id] = [[current_measurements[first_tenth_measurement_idxss[prediction_idxs[i] - num_predictions_real]]], [it]]
 				except Exception as exp:
 					print('error in new_trajectory')
 					code.interact(local=dict(globals(), **locals()))
-		if MODE == 'minimal_example':
-			# avoid translation of the indexes
-			elements_to_delete = np.sort(elements_to_delete)[::-1]
-			for idx in range(elements_to_delete.shape[0]):
-				'''if len(current_trajectories[elements_to_delete[idx]]) != TRAJECTORY_LENGTH: # TODO how to manage mapping from ID to trajectory???
-					print('trajectory length missmatch')
-					code.interact(local=dict(globals(), **locals()))'''
-				try:
-					if MODE == 'minimal_example':
-						finished_trajectories.append(model_manager.delete_trajectory(elements_to_delete[idx]))
-					else:
-						# TODO debug
-						model_manager.free(elements_to_delete[idx])
-						finished_trajectories.append(current_trajectories.pop(elements_to_delete[idx]))
-				except Exception as exp:
-					print('error in delete_trajectory')
-					code.interact(local=dict(globals(), **locals()))
 	return finished_trajectories, trajectories
 #
-print('this is the basic mode, now you can execute and test everything as if you were in a normal python shell, that executed all commands until now!')
+print('this is the base mode, now you can execute and test everything as if you were in a normal python shell, that executed all commands until now!')
 print('matching can be done now!')
 code.interact(local=dict(globals(), **locals()))
 finished_trajectories, trajectories = solve_matching_problem(dataset, model_manager)
