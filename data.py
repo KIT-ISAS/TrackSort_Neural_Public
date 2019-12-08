@@ -109,11 +109,11 @@ class AbstractDataSet(ABC):
         particles = []
         for track_idx in range(track_data.shape[0]):
             is_started = False
-            for time_idx in range(tracke_data.shape[1]):
-                if not is_started and track_data[track_idx][time_idx] != np.array([nan_value, nan_value]):
+            for time_idx in range(track_data.shape[1]):
+                if not is_started and track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value]):
                     is_started = True
                     particles.append([track_data[track_idx][time_idx], time_idx])
-                if is_started and track_data[track_idx][time_idx] == np.array([nan_value, nan_value]):
+                if is_started and track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value]):
                     continue
             if not is_started:
                 print('something went wrong in get_particles')
@@ -287,7 +287,7 @@ class AbstractDataSet(ABC):
         return train_tracks, test_tracks
 
     def get_seq2seq_data_and_labels(self, normalized=True):
-        tracks = self.get_seq2seq_data()
+        tracks = self.get_seq2seq_data().copy()
         if normalized:
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
         input_seq = tracks[:, :, :2]
@@ -333,6 +333,8 @@ class AbstractDataSet(ABC):
     def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
         seq2seq_data = []
 
+        longest_track = 0
+
         # for every track we create:
         #  x, y, x_target, y_target nan_value-padded
         for track_number in range(aligned_track_data.shape[0]):
@@ -346,6 +348,10 @@ class AbstractDataSet(ABC):
             last_index = self.get_last_timestep_of_track(x) - 1
             x[last_index] = self.nan_value
             y[last_index] = self.nan_value
+
+            # find the longest track
+            if longest_track < last_index:
+                longest_track = last_index
 
             # the ground truth where the particle will be
             x_target = np.concatenate((aligned_track_data[track_number][1:, 0].copy(), np.array([self.nan_value])))
@@ -361,7 +367,9 @@ class AbstractDataSet(ABC):
 
             seq2seq_data.append(matrix)
 
-        return np.array(seq2seq_data)
+        self.longest_track = longest_track
+
+        return np.array(seq2seq_data)[:, :longest_track+1, :]
 
     def get_box_plot(self, model, dataset):
         maes = []
@@ -605,6 +613,7 @@ class CsvDataSet(AbstractDataSet):
         if normalized:
             return self.normalize_tracks(data, is_seq2seq_data=False)
         return data
+
 
 if __name__ == '__main__':
     f = FakeDataSet()

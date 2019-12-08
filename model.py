@@ -328,8 +328,9 @@ class ModelManager(object):
 
             if isinstance(layer, tf.keras.layers.RNN):
                 rnn_layer_states.append([sub_state.numpy() for sub_state in layer.states])
+                # print(rnn_layer_states)
 
-        return np.array(rnn_layer_states, dtype=self.dtype)
+        return rnn_layer_states
 
     def _get_batch_and_row_id(self, track_id):
         batch_id = track_id // self.batch_size
@@ -401,6 +402,10 @@ class ModelManager(object):
     def free_all(self):
         self.used_state_ids = set()
         self.all_ids = set(range(self.maximum_number_of_tracks))
+
+    def get_all_measurements(self):
+        return np.array(self.batch_measurements).reshape([self.n_batches * self.batch_size, self.num_dims])
+
 
 
 
