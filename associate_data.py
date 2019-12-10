@@ -1,80 +1,25 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from data import CsvDataSet, FakeDataSet
-from model import ModelManager, rnn_model_factory
-import model
-import data
 import tensorflow as tf
 from tensorflow.keras import backend as K
 import code
+from scipy.spatial import distance_matrix
+from scipy.optimize import linear_sum_assignment
+import os, sys, shutil
+import random
+import itertools
+import matplotlib.pyplot as plt
 
-# using the external data set loader and an actual model
-num_time_steps = 35
-batch_size = 128
-NAN_VALUE = -1
-belt_width = 2000
+from tensorboard.plugins.hparams import api as hp
+from tensorflow.keras import backend as K
+from datetime import datetime
+from collections import defaultdict
 
-dataset = data.FakeDataSet(timesteps=num_time_steps, 
-							batch_size=batch_size,
-							number_trajectories=6000, 
-							additive_noise_stddev=2, 
-							additive_target_stddev=20,
-							belt_width=belt_width)
-#
-dataset_train, dataset_test = dataset.get_tf_data_sets_seq2seq_data(normalized=True)
-
-# Train model
-rnn_model, hash_ = model.rnn_model_factory(
-		num_units_first_rnn=2, 
-		num_units_second_rnn=0,
-		num_units_first_dense=0,
-		rnn_model_name='lstm',
-		num_time_steps=num_time_steps, 
-		batch_size=batch_size, 
-		nan_value=NAN_VALUE, 
-		# unroll=False,
-		input_dim=2)
-print(rnn_model.summary())
-
-optimizer = tf.keras.optimizers.Adam()
-train_step_fn = model.train_step_generator(rnn_model, optimizer)
-calc_mae_test_fn = model.tf_error(rnn_model, dataset_test, belt_width, squared=False)
-
-loss_history = []
-total_num_epochs = 400
-
-for epoch in range(total_num_epochs):
-	# learning rate decay after 100 epochs
-	if (epoch+1) % 150 == 0:
-		old_lr = K.get_value(optimizer.lr)
-		new_lr = old_lr * 0.1
-		print("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-		K.set_value(optimizer.lr, new_lr)
-
-	for (batch_n, (inp, target)) in enumerate(dataset_train):
-		_ = rnn_model.reset_states()
-		loss = train_step_fn(inp, target)	
-		loss_history.append(loss)
-
-	print("{}/{}: \t loss={}".format(epoch, total_num_epochs, loss))
-
-# test model
-test_mae = calc_mae_test_fn()
-print(test_mae.numpy())
-
-# create the model manager
-model_manager = ModelManager(dataset.n_trajectories, batch_size, rnn_model)
-
-#
-TIME_STEPS = num_time_steps
-MAX_NUM_TRAJECTORIES = dataset.n_trajectories
-SIZE_X = dataset.belt_max_x
-SIZE_Y = dataset.belt_max_y
-# the region, where the track is considered to appear / disappear
-X_DETECTION_TOLERANCE = SIZE_X / 10
-# the distance of the pseudo measurements and tracks to the actual belt
-X_THRESHOLD = 5
-
+# custom modules
+import data
+import model
+from data import CsvDataSet, FakeDataSet
+from model import ModelManager, rnn_model_factory
 
 # definition of my own nearest neighbour method
 def nearest_neighbour(weight_matrix):
@@ -93,6 +38,305 @@ def nearest_neighbour(weight_matrix):
 				return measurement_idxs, prediction_idxs
 	print('something went wrong in nearest_neighbour!')
 	code.interact(local=dict(globals(), **locals()))
+
+num_time_steps = 350
+nan_value = 0
+batch_size = 64
+belt_width = 2000
+
+dataset = data.FakeDataSet(timesteps=num_time_steps, batch_size=batch_size, number_trajectories=700, 
+                           additive_noise_stddev=2, additive_target_stddev=20, belt_width=belt_width,
+                          nan_value=nan_value)
+
+dataset_train, dataset_test = dataset.get_tf_data_sets_seq2seq_data(normalized=True)
+
+longest_track_time_steps = dataset.longest_track
+
+# dataset.plot_random_tracks(n=15)
+
+LOAD_MODEL = True
+# define model
+if LOAD_MODEL:
+	rnn_model = tf.keras.models.load_model('models/rnn_model_fake_data.h5')
+else:
+	rnn_model, hash_ = model.rnn_model_factory(
+			num_units_first_rnn=16, 
+			num_units_second_rnn=16,
+			num_units_first_dense=0,
+			rnn_model_name='lstm',
+			num_time_steps=longest_track_time_steps, 
+			batch_size=batch_size, 
+			nan_value=nan_value, 
+	    unroll=True,
+			input_dim=2)
+	print(rnn_model.summary())
+
+	optimizer = tf.keras.optimizers.Adam()
+	train_step_fn = model.train_step_generator(rnn_model, optimizer)
+
+	total_num_epochs = 1000
+
+
+	# Train model
+	for epoch in range(total_num_epochs):
+		# learning rate decay after 100 epochs
+		if (epoch+1) % 150 == 0:
+			old_lr = K.get_value(optimizer.lr)
+			new_lr = old_lr * 0.1
+			print("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+			K.set_value(optimizer.lr, new_lr)
+
+		for (batch_n, (inp, target)) in enumerate(dataset_train):
+			_ = rnn_model.reset_states()
+			loss = train_step_fn(inp, target)	
+
+		print("{}/{}: \t loss={}".format(epoch, total_num_epochs, loss))
+
+
+
+# create the model manager
+model_manager = model.ModelManager(dataset.n_trajectories, batch_size, rnn_model)
+
+TIME_STEPS = num_time_steps
+MAX_NUM_TRAJECTORIES = dataset.n_trajectories
+SIZE_X = 1.
+SIZE_Y = 1.
+# the region, where the track is considered to appear / disappear
+X_DETECTION_TOLERANCE = SIZE_X / 10.
+X_DISAPPEAR_TOLERANCE = 0.05
+
+# the distance of the pseudo measurements and tracks to the actual belt
+X_THRESHOLD = 5./2000.
+
+# generate increasing ids
+def id_generator():
+    n = 0
+    while True:
+        yield n
+        n += 1
+
+id_seed = id_generator()
+
+all_ids = []
+
+# mm: model_manager
+# id => mm_id
+id_2_mm = {}
+
+# mm_id => id
+mm_2_id = {}
+
+# id => list(observations)
+track_history = defaultdict(list)
+
+active_ids = set()
+
+measurements = None
+
+shutil.rmtree('visualizations/matching_visualization', ignore_errors=True)
+os.makedirs('visualizations/matching_visualization')
+
+for time_step in range(num_time_steps):
+    plt.title('Time step: {}'.format(time_step))
+    plt.xlim((0.0,1.0))
+    plt.ylim((0.0,1.0))
+    predictions_mm_ids = [id_2_mm[i] for i in sorted(active_ids)]
+    predictions_ids = [i for i in sorted(active_ids)]
+    predictions = model_manager.predict()
+    
+    predictions_mask = np.zeros(predictions.shape[0], dtype=np.bool)
+    predictions_mask[predictions_mm_ids] = True
+    
+    predictions = predictions[predictions_mask]
+
+    # old measurement
+    old_observations = np.array(model_manager.batch_measurements).reshape([model_manager.n_batches * model_manager.batch_size, model_manager.num_dims])[predictions_mask]
+
+    if measurements is not None:
+      plt.scatter(measurements[:, 0], measurements[:, 1], c='cyan', label='old measurement')
+
+      for pred_i in range(predictions.shape[0]):
+        start = old_observations[pred_i]
+        end = predictions[pred_i]
+        line = np.stack((start, end), axis=0)
+        plt.plot(line[:, 0], line[:, 1], c='red')
+    
+    
+    measurements = dataset.get_measurement_at_timestep(time_step)
+    mask = np.any(measurements != [nan_value, nan_value], axis=-1)
+    measurements = measurements[mask]
+    
+    plt.scatter(measurements[:, 0], measurements[:, 1], c='blue', label='measurement')
+    plt.scatter(predictions[:, 0], predictions[:, 1], marker='4', c='red', label='prediction')
+    # plt.show()
+    
+    if measurements.shape[0] == 0:
+        continue
+    
+    # 1. particle enters perception: add an artificial track for every measurement at the first 1/10 of the belt
+    #   -> for every of these tracks: create an artificial measurement
+    mask_new_tracks = measurements[:, 0] < X_DETECTION_TOLERANCE
+    count_new_tracks = np.sum(mask_new_tracks)
+    
+    artificial_predictions = np.stack((np.ones(count_new_tracks)*-X_THRESHOLD,
+                                        measurements[mask_new_tracks][:, 1]), axis=-1)
+    
+    # 2. particle leaves perception: the predicted particles which are in the terminal region of the belt
+    mask_end_measurements = predictions[:, 0] > SIZE_X - X_DISAPPEAR_TOLERANCE
+    count_end_measurements = np.sum(mask_end_measurements)
+    artificial_measurements = np.stack((np.ones(count_end_measurements)*(SIZE_X + X_THRESHOLD),
+                                        predictions[mask_end_measurements][:, 1]), axis=-1)
+    
+    # Distance matrix
+    all_measurements = np.concatenate((measurements, artificial_measurements))
+    all_predictions = np.concatenate((predictions, artificial_predictions))
+    distances = distance_matrix(all_measurements, all_predictions)
+
+    # ToDo: set the special distances for the artificial components
+    #   (the artificial measurements and predictions are close together)
+    # 1. artificial measurements (where tracks end) are only connected to the
+    #    provocing track and one 
+    distances[measurements.shape[0]:, :] = 9999
+    for measurement_idx, prediction_idx in enumerate(np.where(mask_end_measurements)[0]):
+      print('measurement_idx: ' + str(measurement_idx))
+      distances[measurements.shape[0]+measurement_idx, prediction_idx] = np.abs(predictions[prediction_idx, 0] - (SIZE_X + X_THRESHOLD))
+
+    with np.printoptions(precision=3, suppress=True):
+      print("Distances")
+      print(distances)
+        
+    # TODO make this run: measurement_assignment_ids, prediction_assignment_ids  = linear_sum_assignment(distances)
+    measurement_assignment_ids, prediction_assignment_ids  = nearest_neighbour(distances)
+    
+    # Different cases
+    #    A | B
+    #    -----
+    #    C | D
+    for measurement_id, prediction_id in zip(list(measurement_assignment_ids), 
+                                             list(prediction_assignment_ids)):
+        # A) measurement <-> existing prediction   => add measurement as new observation of the track
+        if measurement_id < measurements.shape[0] and prediction_id < predictions.shape[0]:
+            id_ = predictions_ids[prediction_id]
+            mm_track_id = id_2_mm[id_]
+            model_manager.set_track_measurement(mm_track_id, all_measurements[measurement_id])
+            # store observation
+            track_history[id_].append([time_step, all_measurements[measurement_id]])
+
+            line = np.stack((all_measurements[measurement_id], all_predictions[prediction_id]), axis=0)
+            plt.plot(line[:, 0], line[:, 1], c='green')
+            
+            
+        # B) artificial measurement <-> prediction  => delete track
+        elif measurement_id >= measurements.shape[0] and prediction_id < predictions.shape[0]:
+            id_ = predictions_ids[prediction_id]
+            active_ids.remove(id_)
+            mm_track_id = id_2_mm[id_]
+            model_manager.free(mm_track_id)
+
+            del mm_2_id[mm_track_id]
+            del id_2_mm[id_]
+            
+        # C) measurement <-> artificial prediction  => create track     
+        elif measurement_id < measurements.shape[0] and prediction_id >= predictions.shape[0]:
+            # new global id
+            id_ = next(id_seed)
+            active_ids.add(id_)
+            # new model manger id
+            mm_track_id = model_manager.allocate_track()
+            id_2_mm[id_] = mm_track_id
+            mm_2_id[mm_track_id] = id_
+
+            model_manager.set_track_measurement(mm_track_id, all_measurements[measurement_id])
+            # store observation
+            track_history[id_].append([time_step, all_measurements[measurement_id]])
+
+        # D) artificial measurement <-> artificial prediction   => do nothing
+        elif measurement_id >= measurements.shape[0] and prediction_id >= predictions.shape[0]:
+            pass  
+
+    plt.legend(loc="upper left")
+    timestep_str = str(time_step)
+    pad_len = 5 - len(timestep_str)
+    padding = pad_len * '0'
+    timestep_str = padding + timestep_str
+    plt.savefig('visualizations/matching_visualization/' + timestep_str)
+    plt.clf()
+
+    #if time_step == 3:
+    #  break;
+
+#
+print('this is the base mode, now you can execute and test everything as if you were in a normal python shell, that executed all commands until now!')
+print('matching can be done now!')
+code.interact(local=dict(globals(), **locals()))
+# finished_trajectories, trajectories = solve_matching_problem(dataset, model_manager)
+
+
+
+
+# type of errors
+# error of first kind: track contains multiple particles
+num_errors_of_first_kind = 0
+for track_id in track_history.keys():
+	track_values = track_history[track_id]
+	num_errors_of_first_kind += int(len(list(filter(lambda x: x != track_values[0], track_values))) != 0)
+
+ratio_error_of_first_kind = num_errors_of_first_kind / len(track_history.keys())
+print('ratio_error_of_first_kind: ' + str(ratio_error_of_first_kind))
+
+# error of first kind: particle is in multiple tracks
+# assigment_of(particles[0][0])
+def assigment_of(particle):
+	for track_id in track_history.keys():
+		track = track_history[track_id]
+		for idx in range(len(track)):
+			# check if values and time are the same
+			if track[idx] == particle[0] and track[idx] == particle[1]:
+				return track_id
+	print('no matching track id found in assigment_of!')
+	code.interact(local=dict(globals(), **locals()))
+
+# get the particles from the dataset instance
+particles = dataset.get_particles()
+# count the number of errors
+num_errors_of_second_kind = 0
+for particle in particles:
+	reference = assigment_of(particle[0])
+	num_errors_of_second_kind += int(len(list(filter(lambda x: assigment_of(x) != reference, particle))) != 0)
+
+ratio_errors_of_second_kind = num_errors_of_second_kind / len(particles)
+print('ratio_errors_of_second_kind: ' + str(ratio_errors_of_second_kind))
+code.interact(local=dict(globals(), **locals()))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''# TODO compare trajectories
+# Assumption: We create the trajectories in the same order as they were generated
+trajectory_distance_sum = 0.0
+# TODO sophisticated trajectory matching
+# finished_trajectory_idxs = np.argsort(np.array(list(zip(list(map(lambda x: x[1], finished_trajectories)), list(map(lambda x: x[0][-1][0], finished_trajectories))))))
+finished_trajectory_idxs = range(MAX_NUM_TRAJECTORIES)
+# code.interact(local=dict(globals(), **locals()))
+for i in range(MAX_NUM_TRAJECTORIES):
+	for j in range(TRAJECTORY_LENGTH):
+		gt = np.array([trajectories[i][1][j], trajectories[i][2][j]])
+		trajectory_distance_sum += np.linalg.norm(finished_trajectories[finished_trajectory_idxs[i]][0][j] - gt)
+trajectory_distance_avg = trajectory_distance_sum / (MAX_NUM_TRAJECTORIES * TRAJECTORY_LENGTH)
+print('data association finished!')
+code.interact(local=dict(globals(), **locals()))'''
 
 def solve_matching_problem(dataset, model_manager):
 	# solve the actual matching problem
@@ -196,55 +440,3 @@ def solve_matching_problem(dataset, model_manager):
 					print('error in new_trajectory')
 					code.interact(local=dict(globals(), **locals()))
 	return finished_trajectories, trajectories
-#
-print('this is the base mode, now you can execute and test everything as if you were in a normal python shell, that executed all commands until now!')
-print('matching can be done now!')
-code.interact(local=dict(globals(), **locals()))
-finished_trajectories, trajectories = solve_matching_problem(dataset, model_manager)
-
-
-# type of errors
-# error of first kind: track contains multiple particles
-num_errors_of_first_kind = 0
-for track_id in finished_trajectories:
-	track = trajectories[track_id]
-	track_values = track[0]
-	num_errors_of_first_kind += int(len(list(filter(lambda x: x != track_values[0], track_values))) != 0)
-ratio_error_of_first_kind = num_errors_of_first_kind / len(finished_trajectories)
-print('ratio_error_of_first_kind: ' + str(ratio_error_of_first_kind))
-
-# error of first kind: particle is in multiple tracks
-def assigment_of(particle):
-	for track_id in finished_trajectories:
-		track = trajectories[track_id]
-		for idx in range(len(track[0])):
-			# check if values and time are the same
-			if track[0][idx] == particle[0] and track[1][idx] == particle[1]:
-				return track_id
-	print('no matching track id found in assigment_of!')
-	code.interact(local=dict(globals(), **locals()))
-# get the particles from the dataset instance
-particles = dataset.get_particles()
-# count the number of errors
-num_errors_of_second_kind = 0
-for particle in particles:
-	reference = assigment_of(particle[0])
-	num_errors_of_second_kind += int(len(list(filter(lambda x: assigment_of(x) != reference, particle))) != 0)
-ratio_errors_of_second_kind = num_errors_of_second_kind / len(particles)
-print('ratio_errors_of_second_kind: ' + str(ratio_errors_of_second_kind))
-code.interact(local=dict(globals(), **locals()))
-
-'''# TODO compare trajectories
-# Assumption: We create the trajectories in the same order as they were generated
-trajectory_distance_sum = 0.0
-# TODO sophisticated trajectory matching
-# finished_trajectory_idxs = np.argsort(np.array(list(zip(list(map(lambda x: x[1], finished_trajectories)), list(map(lambda x: x[0][-1][0], finished_trajectories))))))
-finished_trajectory_idxs = range(MAX_NUM_TRAJECTORIES)
-# code.interact(local=dict(globals(), **locals()))
-for i in range(MAX_NUM_TRAJECTORIES):
-	for j in range(TRAJECTORY_LENGTH):
-		gt = np.array([trajectories[i][1][j], trajectories[i][2][j]])
-		trajectory_distance_sum += np.linalg.norm(finished_trajectories[finished_trajectory_idxs[i]][0][j] - gt)
-trajectory_distance_avg = trajectory_distance_sum / (MAX_NUM_TRAJECTORIES * TRAJECTORY_LENGTH)
-print('data association finished!')
-code.interact(local=dict(globals(), **locals()))'''
