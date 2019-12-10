@@ -156,7 +156,8 @@ class AbstractDataSet(ABC):
             random_track = tracks[random_index]
             axes = self.plot_track(random_track,
                                    color=np.random.rand(3),
-                                   end=end_time_step if end_time_step else self.get_last_timestep_of_track(random_track)-1,
+                                   end=end_time_step if end_time_step else self.get_last_timestep_of_track(
+                                       random_track) - 1,
                                    label='track {}'.format(random_index),
                                    fit_scale_to_content=fit_scale_to_content
                                    )
@@ -330,6 +331,19 @@ class AbstractDataSet(ABC):
                 return i
         return i
 
+    def get_longest_track(self):
+        longest_track = 0
+
+        for track_number in range(aligned_track_data.shape[0]):
+            x = self.aligned_track_data[track_number][:, 0]
+
+            last_index = self.get_last_timestep_of_track(x) - 1
+
+            if longest_track < last_index:
+                longest_track = last_index
+
+        return longest_track
+
     def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
         seq2seq_data = []
 
@@ -369,7 +383,9 @@ class AbstractDataSet(ABC):
 
         self.longest_track = longest_track
 
-        return np.array(seq2seq_data)[:, :longest_track+1, :]
+        print(longest_track)
+
+        return np.array(seq2seq_data)[:, :longest_track + 1, :]
 
     def get_box_plot(self, model, dataset):
         maes = []
@@ -427,7 +443,6 @@ class FakeDataSet(AbstractDataSet):
         self.nan_value = nan_value
         self.step_length = step_length
 
-
         self.track_data = self._generate_tracks()
         self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_track_data)
@@ -435,7 +450,8 @@ class FakeDataSet(AbstractDataSet):
         # if we don't have enough tracks, then the smaller split (usually test) is so small that is smaller
         # than a batch. Because we use drop_remainder=True we cannot allow this, or else the only batch
         # would be empty -> as a result we would not have test data
-        assert self.n_trajectories * min(self.test_split_ratio, self.train_split_ratio) > self.batch_size, "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
+        assert self.n_trajectories * min(self.test_split_ratio,
+                                         self.train_split_ratio) > self.batch_size, "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
 
     def _generate_tracks(self):
         tracks = []
@@ -454,7 +470,7 @@ class FakeDataSet(AbstractDataSet):
             trajectory = [self.nan_value_ary for _ in range(start_timestep)]
 
             # spawn the new trajectory on the left side
-            start_x = random.randint(0, self.belt_width//10)
+            start_x = random.randint(0, self.belt_width // 10)
             start_y = random.randint(0, self.belt_height)
             trajectory.append([start_x, start_y])
 
@@ -475,14 +491,14 @@ class FakeDataSet(AbstractDataSet):
             dx = np.cos(alpha) * step_length
             dy = np.sin(alpha) * step_length
 
-            track_done = False            
-            
+            track_done = False
+
             # iterate over all the time steps from start_time_step+1   until end
             for t in range(start_timestep + 2, self.timesteps + 1):
                 # generate next position
                 new_x = trajectory[-1][0] + dx
                 new_y = trajectory[-1][1] + dy + random.normalvariate(0, self.additive_noise_stddev)
-                
+
                 # if particle is outside of the belt add nan_values
                 if not track_done and (new_x > end_x or new_y > self.belt_height or new_y < 0):
                     track_done = True
