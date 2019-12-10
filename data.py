@@ -572,6 +572,8 @@ class CsvDataSet(AbstractDataSet):
                  timesteps=35, batch_size=128):
         self.glob_file_pattern = glob_file_pattern
         self.file_list = sorted(glob.glob(glob_file_pattern))
+        assert len(self.file_list) > 0, "No files found"
+
         self.min_number_detections = min_number_detections
 
         self.nan_value = nan_value
@@ -608,13 +610,18 @@ class CsvDataSet(AbstractDataSet):
             #   first get the column minima and then we get the table minimum from that
             assert df.min().min() > 0.0, "Error: The dataframe {} contains a minimum <= 0.0".format(file_)
 
+            # ToDo: calc track length!
+            longest_track = self.timesteps  # df.count().max()
+
             # for every track we create:
             # - track
             for track_number in range(number_of_tracks):
                 # create the simple tracks
                 # **Attention:** the columns are ordered as (Y,X) and we turn it around to (X,Y)
                 track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
-                tracks.append(np.nan_to_num(track))
+                background = np.zeros([longest_track, self.input_dim])
+                background[:track.shape[0], :track.shape[1]] = track
+                tracks.append(np.nan_to_num(background))
 
         tracks = np.array(tracks)
         return tracks
