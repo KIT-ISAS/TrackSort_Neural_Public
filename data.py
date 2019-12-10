@@ -110,14 +110,21 @@ class AbstractDataSet(ABC):
         for track_idx in range(track_data.shape[0]):
             is_started = False
             for time_idx in range(track_data.shape[1]):
-                if not is_started and track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value]):
-                    is_started = True
-                    particles.append([track_data[track_idx][time_idx], time_idx])
-                if is_started and track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value]):
-                    continue
-            if not is_started:
+                try:
+                    if not is_started and (track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
+                        is_started = True
+                        particles.append([[time_idx, track_data[track_idx][time_idx]]])
+                    elif is_started and not (track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
+                        particles[-1].append([time_idx, track_data[track_idx][time_idx]])
+                    elif is_started and (track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
+                        break
+                except Exception as exp:
+                    print('error in get_particles')
+                    code.interact(local=dict(globals(), **locals()))
+            '''if not is_started: # TODO apparently there are empty tracks!!!
                 print('something went wrong in get_particles')
-                code.interact(local=dict(globals(), **locals()))
+                code.interact(local=dict(globals(), **locals()))'''
+        return particles
 
     def get_measurement_at_timestep(self, timestep):
         """

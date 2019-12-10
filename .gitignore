@@ -1,9 +1,15 @@
 # ipynb
 logs
 Pfeffer
+images
+visualizations
+models
 .ipynb_checkpoints
 training_checkpoints
 Pfeffer.zip
+__pycache__
+cpu_env
+gpu_env
 
 # IDE
 .idea
