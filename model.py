@@ -342,11 +342,12 @@ class ModelManager(object):
         batch_state = self.batch_states[batch_id]
 
         # for every layer in the batch state (e.g. lstm1 or lstm2)
-        for layer_state in batch_state:
+        for layer_state_i in range(len(batch_state)):
             # for every sub_state in layer_state (e.g. cell memory and output of lstm)
-            for sub_state in layer_state:
+            for sub_state_i in range(len(batch_state[layer_state_i])):
                 # replace with zeros
-                sub_state[row_id] *= 0.0  # tf.zeros_like(sub_state[row_id], dtype=tf.float64)
+                self.batch_states[batch_id][layer_state_i][sub_state_i][row_id] *= 0
+                # sub_state[row_id] *= 0.0  # tf.zeros_like(sub_state[row_id], dtype=tf.float64)
 
     def allocate_track(self):
         new_id = self._pop_next_free_track_id()
