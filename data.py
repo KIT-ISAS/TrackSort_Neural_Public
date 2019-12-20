@@ -31,8 +31,8 @@ class AbstractDataSet(ABC):
     timesteps = None
 
     batch_size = 128
-    train_split_ratio = 0.9
-    test_split_ratio = 0.1
+    train_split_ratio = 0.5
+    test_split_ratio = 0.5
 
     @abstractmethod
     def get_seq2seq_data(self, nan_value=0):

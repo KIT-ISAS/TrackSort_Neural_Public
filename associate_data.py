@@ -9,6 +9,8 @@ import os, sys, shutil
 import random
 import itertools
 import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sn
 
 from tensorboard.plugins.hparams import api as hp
 from tensorflow.keras import backend as K
@@ -39,12 +41,12 @@ def nearest_neighbour(weight_matrix):
 	print('something went wrong in nearest_neighbour!')
 	code.interact(local=dict(globals(), **locals()))
 
-num_time_steps = 350
+num_time_steps = 100
 nan_value = 0
 batch_size = 64
 belt_width = 2000
 
-dataset = data.FakeDataSet(timesteps=num_time_steps, batch_size=batch_size, number_trajectories=700, 
+dataset = data.FakeDataSet(timesteps=num_time_steps, batch_size=batch_size, number_trajectories=130, 
                            additive_noise_stddev=2, additive_target_stddev=20, belt_width=belt_width,
                           nan_value=nan_value)
 
@@ -94,16 +96,21 @@ else:
 
 
 
+shutil.rmtree('visualizations/matching_visualization_local', ignore_errors=True)
+os.makedirs('visualizations/matching_visualization_local')
+
+number_tracks = dataset.track_data.shape[0]
+
 # create the model manager
-model_manager = model.ModelManager(dataset.n_trajectories, batch_size, rnn_model)
+model_manager = model.ModelManager(number_tracks, batch_size, rnn_model)
 
 TIME_STEPS = num_time_steps
-MAX_NUM_TRAJECTORIES = dataset.n_trajectories
+MAX_NUM_TRAJECTORIES = number_tracks
 SIZE_X = 1.
 SIZE_Y = 1.
 # the region, where the track is considered to appear / disappear
 X_DETECTION_TOLERANCE = SIZE_X / 10.
-X_DISAPPEAR_TOLERANCE = 0.05
+X_DISAPPEAR_TOLERANCE = 0
 
 # the distance of the pseudo measurements and tracks to the actual belt
 X_THRESHOLD = 5./2000.
@@ -129,14 +136,12 @@ mm_2_id = {}
 # id => list(observations)
 track_history = defaultdict(list)
 
-active_ids = set()
-
 measurements = None
 
-shutil.rmtree('visualizations/matching_visualization', ignore_errors=True)
-os.makedirs('visualizations/matching_visualization')
+active_ids = set()
 
 for time_step in range(num_time_steps):
+    print('Time step: {}'.format(time_step))
     plt.title('Time step: {}'.format(time_step))
     plt.xlim((0.0,1.0))
     plt.ylim((0.0,1.0))
@@ -190,23 +195,46 @@ for time_step in range(num_time_steps):
     # Distance matrix
     all_measurements = np.concatenate((measurements, artificial_measurements))
     all_predictions = np.concatenate((predictions, artificial_predictions))
-    distances = distance_matrix(all_measurements, all_predictions)
+    distances = distance_matrix(all_measurements, all_predictions) ** 2
 
     # ToDo: set the special distances for the artificial components
     #   (the artificial measurements and predictions are close together)
     # 1. artificial measurements (where tracks end) are only connected to the
     #    provocing track and one 
-    distances[measurements.shape[0]:, :] = 9999
-    for measurement_idx, prediction_idx in enumerate(np.where(mask_end_measurements)[0]):
-      print('measurement_idx: ' + str(measurement_idx))
-      distances[measurements.shape[0]+measurement_idx, prediction_idx] = np.abs(predictions[prediction_idx, 0] - (SIZE_X + X_THRESHOLD))
+    large_value = 5
+    pseudo_distance = 0.1
 
-    with np.printoptions(precision=3, suppress=True):
-      print("Distances")
-      print(distances)
+    distances[measurements.shape[0]:, :] = large_value
+    for measurement_idx, prediction_idx in enumerate(np.where(mask_end_measurements)[0]):
+      # the distance between the pseudo measurement and the track
+      distance_value = np.abs(predictions[prediction_idx, 0] - (SIZE_X + X_THRESHOLD))
+      print('dist', distance_value)
+      distances[measurements.shape[0]+measurement_idx, prediction_idx] = distance_value
+
+      # What if the track doesn't match the pseudo measurement? (for example: because there is a better measurement for the track)
+      #  -> then we want the pseudo measurement to match a pseudo track
+      #      -> therefore, we create a new pseudo track with the following distances:
+      #             - to real measurements: infinty
+      #             - to pseudo measurements: 0.1 (pseudo_distance)
+      #                (Attention. 0.1 is an arbitrary number which should actually be a sigma value!!!)
+      new_column = np.ones(distances.shape[0])[:, np.newaxis] * large_value
+      new_column[measurements.shape[0]:] = pseudo_distance
+      distances = np.hstack((distances, new_column))
+
+      # Now that we created a new column, we must create a new placeholder
+      #   row. For the column to match.
+      new_row = np.ones(distances.shape[1])[:, np.newaxis].T * large_value
+      new_row[:, all_predictions.shape[0]:] = pseudo_distance
+      distances = np.vstack((distances, new_row))
+
+
+
+    #with np.printoptions(precision=3, suppress=True):
+    #  print("Distances")
+    #  print(distances)
         
-    # TODO make this run: measurement_assignment_ids, prediction_assignment_ids  = linear_sum_assignment(distances)
-    measurement_assignment_ids, prediction_assignment_ids  = nearest_neighbour(distances)
+    # measurement_assignment_ids, prediction_assignment_ids  = linear_sum_assignment(distances)
+    measurement_assignment_ids, prediction_assignment_ids  = linear_sum_assignment(distances)
     
     # Different cases
     #    A | B
@@ -228,13 +256,14 @@ for time_step in range(num_time_steps):
             
         # B) artificial measurement <-> prediction  => delete track
         elif measurement_id >= measurements.shape[0] and prediction_id < predictions.shape[0]:
+            print("B")
             id_ = predictions_ids[prediction_id]
             active_ids.remove(id_)
             mm_track_id = id_2_mm[id_]
-            model_manager.free(mm_track_id)
-
-            del mm_2_id[mm_track_id]
-            del id_2_mm[id_]
+            # ToDo: fix this
+            # model_manager.free(mm_track_id)
+            # del mm_2_id[mm_track_id]
+            # del id_2_mm[id_]
             
         # C) measurement <-> artificial prediction  => create track     
         elif measurement_id < measurements.shape[0] and prediction_id >= predictions.shape[0]:
@@ -252,18 +281,18 @@ for time_step in range(num_time_steps):
 
         # D) artificial measurement <-> artificial prediction   => do nothing
         elif measurement_id >= measurements.shape[0] and prediction_id >= predictions.shape[0]:
-            pass  
+            print("D")  
 
     plt.legend(loc="upper left")
-    timestep_str = str(time_step)
-    pad_len = 5 - len(timestep_str)
-    padding = pad_len * '0'
-    timestep_str = padding + timestep_str
-    plt.savefig('visualizations/matching_visualization/' + timestep_str)
+    plt.savefig('visualizations/matching_visualization_local/{:05d}'.format(time_step))
     plt.clf()
 
-    #if time_step == 3:
-    #  break;
+    df_cm = pd.DataFrame(distances, range(distances.shape[0]),
+                  range(distances.shape[1]))
+    # sn.set(font_scale=1.4)#for label size
+    sn.heatmap(df_cm, annot=False)
+    # plt.show()
+    plt.clf()
 
 #
 print('this is the base mode, now you can execute and test everything as if you were in a normal python shell, that executed all commands until now!')
