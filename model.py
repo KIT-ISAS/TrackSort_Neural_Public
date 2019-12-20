@@ -283,11 +283,11 @@ class ModelManager(object):
         6. If you want to stop a track, call: model_manager.free(track_id)
         7. Resetting the full ModelManager: model_manager.free_all()
 
-        :param maximum_number_of_tracks:
-        :param batch_size:
+        :param maximum_number_of_tracks: total number of tracks which have to be handled simultaneously
+        :param batch_size: batch size of the keras model
         :param rnn_model: keras model
-        :param num_dims:
-        :param dtype:
+        :param num_dims: how many dimensions has the input of one time step (if a position is given, then 2)
+        :param dtype: the numpy datatype, either np.float64 or np.float32
         """
         self.maximum_number_of_tracks = maximum_number_of_tracks
         self.batch_size = batch_size
@@ -299,7 +299,7 @@ class ModelManager(object):
         # we start with cleaned states
         self.rnn_model.reset_states()
 
-        # for every batch we store the state of a full model
+        # for every batch we store the clean state of a full model
         self.batch_states = [self._get_rnn_states() for _ in range(self.n_batches)]
 
         # store the occupied ids
@@ -311,6 +311,8 @@ class ModelManager(object):
         self.batch_measurements = [np.zeros([self.batch_size, 1, num_dims], dtype=self.dtype) for _ in range(self.n_batches)]
 
     def _pop_next_free_track_id(self):
+        "Returns a new track id. If not available, then raises AssertionError"
+
         difference = self.all_ids - self.used_state_ids
         assert len(difference) > 0, "No track id left. Everything allocated."
         new_id = difference.pop()
@@ -318,14 +320,21 @@ class ModelManager(object):
         return new_id
 
     def _get_rnn_states(self):
+        "Returns all states of current batch sequential model"
+
         rnn_layer_states = []
 
+        # get all layers in ascending order
+        # ToDo: Replace this with while-true with break condition
         for i in range(1000):
+            # Not asking for permission but handling the error is faster in python
             try:
                 layer = self.rnn_model.get_layer(index=i)
             except:
                 break
 
+            # only store the state of the layer if it is a recurrent layer
+            #   DenseLayers don't have a state
             if isinstance(layer, tf.keras.layers.RNN):
                 rnn_layer_states.append([sub_state.numpy() for sub_state in layer.states])
                 # print(rnn_layer_states)
