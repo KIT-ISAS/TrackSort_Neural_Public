@@ -7,7 +7,7 @@ class Track(object):
     	self.initial_timestep = initial_timestep
     	self.is_alive_probability = self.global_config['initial_is_alive_probability']
 
-    def add_measurement(measurement, is_artificial):
+    def add_measurement(self, measurement, is_artificial):
     	self.measurements.append(measurement)
     	if is_artificial:
     		self.is_alive_probability -= self.global_config['is_alive_decrease']

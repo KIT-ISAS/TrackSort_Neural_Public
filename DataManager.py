@@ -417,10 +417,10 @@ class AbstractDataSet(ABC):
 
 
 class FakeDataSet(AbstractDataSet):
-    def __init__(self, timesteps=35, number_trajectories=100,
+    def __init__(self, timesteps=350, number_trajectories=1000,
                  additive_noise_stddev=5, splits=0, additive_target_stddev=100,
                  min_number_points_per_trajectory=20, batch_size=128,
-                 belt_width=2000, belt_height=2000, nan_value=0, step_length=70):
+                 belt_width=2000, belt_height=2000, nan_value=0, step_length=70, global_config=None):
         """
         Create Fake Data Lines for timesteps with normally distributed noise on a belt.
 
@@ -643,10 +643,6 @@ class CsvDataSet(AbstractDataSet):
         if normalized:
             return self.normalize_tracks(data, is_seq2seq_data=False)
         return data
-
-class DataManager(FakeDataSet):
-    def __init__(self):
-        super().__init__()
 
 
 if __name__ == '__main__':

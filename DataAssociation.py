@@ -1,18 +1,18 @@
 import numpy as np
 
 from TrackManager import TrackManager
-from DataManager import DataManager
+from DataManager import FakeDataSet
 
 class DataAssociation(object):
 	def __init__(self, global_config):
 		self.global_config = global_config
-		self.data_source = DataManager(global_config)
+		self.data_source = FakeDataSet(global_config=global_config)
 		self.track_manager = TrackManager(global_config, self.data_source)
 
 	def associate_data(self):
-		for time_step in range(self.global_config['max_num_steps']):
+		for time_step in range(self.global_config['num_timesteps']):
 			#
-			measurements = dataset.get_measurement_at_timestep(time_step)
+			measurements = self.data_source.get_measurement_at_timestep(time_step)
 			#
 			predictions = self.track_manager.get_predictions()
 			prediction_ids = predictions.keys()
@@ -46,3 +46,5 @@ class DataAssociation(object):
 				elif measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] < len(prediction_values):
 					#
 					model_manager.pseudo_track_real_measurement(measurements[measurement_idxs[idx]], time_step)
+		#
+		return self.track_manager.tracks

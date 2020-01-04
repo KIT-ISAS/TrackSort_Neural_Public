@@ -260,61 +260,103 @@ def train_epoch_generator(rnn_model, train_step, dataset_train, batch_size):
 
     return train_epoch
 
+def set_state(rnn_model, batch_state):
+    rnn_layer_counter = 0
+    for i in range(1000):
+        try:
+            layer = rnn_model.get_layer(index=i)
+        except:
+            break
+
+        if isinstance(layer, tf.keras.layers.RNN):
+            for sub_state_number, sub_state in enumerate(layer.states):
+                layer.states[sub_state_number].assign(tf.convert_to_tensor(batch_state[rnn_layer_counter][sub_state_number]))
+            rnn_layer_counter += 1
+
+
+def get_state(rnn_model):
+    rnn_layer_states = []
+    # get all layers in ascending order
+    # ToDo: Replace this with while-true with break condition
+    for i in range(1000):
+        # Not asking for permission but handling the error is faster in python
+        try:
+            layer = self.rnn_model.get_layer(index=i)
+        except:
+            break
+
+        # only store the state of the layer if it is a recurrent layer
+        #   DenseLayers don't have a state
+        if isinstance(layer, tf.keras.layers.RNN):
+            rnn_layer_states.append([sub_state.numpy() for sub_state in layer.states])
+            # print(rnn_layer_states)
+
+    return rnn_layer_states
+
+
 class Model(object):
-	def __init__(self, global_config, data_source):
-		# TODO one might want to encode the hyperparams for the RNN in the global config
-		self.global_config = global_config
-		self.data_source = data_source
-		if self.global_config['is_loaded']:
-			self.rnn_model = tf.keras.load(self.global_config['model_path'])
-		else:
-			self.rnn_model = rnn_model_factory()[0]
-			print(rnn_model.summary())
-			self.train()
+    def __init__(self, global_config, data_source):
+        # TODO one might want to encode the hyperparams for the RNN in the global config
+        self.global_config = global_config
+        self.data_source = data_source
+        if self.global_config['is_loaded']:
+            self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
+        else:
+            self.rnn_model = rnn_model_factory()[0]
+            print(rnn_model.summary())
+            self.train()
 
 
-	# expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
-	def predict(inputs, states):
-		new_states = []
-		predictions = []
-		for it in range(len(states)):
-			self.rnn_model.reset_state(states[it]) # TODO how to reset state???
-			predictions.append(self.rnn_model.predict_step) # TODO is that possible???
-			new_states.append(self.rnn_model.get_state()) # TODO look up actual command!
-		return predictions, new_states
+    def get_zero_state(self):
+        self.rnn_model.reset_states()
+        return get_state(self.rnn_model)
 
 
-
-	def train():
-		dataset_train, _ = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
-
-		optimizer = tf.keras.optimizers.Adam()
-		train_step_fn = train_step_generator(self.rnn_model, optimizer)
-
-		total_num_epochs = 1000
-
-
-		# Train model
-		for epoch in range(total_num_epochs):
-			# learning rate decay after 100 epochs
-			if (epoch+1) % 150 == 0:
-				old_lr = K.get_value(optimizer.lr)
-				new_lr = old_lr * 0.1
-				print("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-				K.set_value(optimizer.lr, new_lr)
-
-			for (batch_n, (inp, target)) in enumerate(dataset_train):
-				_ = self.rnn_model.reset_states()
-				loss = train_step_fn(inp, target)	
-
-			print("{}/{}: \t loss={}".format(epoch, total_num_epochs, loss))
+    # expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
+    def predict(self, inputs, states):
+        new_states = []
+        predictions = []
+        for it in range(len(states)):
+            set_state(self.rnn_model, states[it])
+            inputs = inputs.expand_dims(1)
+            prediction = self.rnn_model(inputs)
+            prediction = predicion.squeeze()
+            predictions.append(prediction)
+            new_states.append(get_state(self.rnn_model))
+        return predictions, new_states
 
 
 
-	def predict_final(states, y_targetline):
-		raise NotImplementedError
+    def train(self):
+        dataset_train, _ = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+
+        optimizer = tf.keras.optimizers.Adam()
+        train_step_fn = train_step_generator(self.rnn_model, optimizer)
+
+        total_num_epochs = 1000
+
+
+        # Train model
+        for epoch in range(total_num_epochs):
+            # learning rate decay after 100 epochs
+            if (epoch+1) % 150 == 0:
+                old_lr = K.get_value(optimizer.lr)
+                new_lr = old_lr * 0.1
+                print("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+                K.set_value(optimizer.lr, new_lr)
+
+            for (batch_n, (inp, target)) in enumerate(dataset_train):
+                _ = self.rnn_model.reset_states()
+                loss = train_step_fn(inp, target)    
+
+            print("{}/{}: \t loss={}".format(epoch, total_num_epochs, loss))
 
 
 
-	def train_final(x_data, y_data, pred_point):
-		raise NotImplementedError
+    def predict_final(self, states, y_targetline):
+        raise NotImplementedError
+
+
+
+    def train_final(self, x_data, y_data, pred_point):
+        raise NotImplementedError
