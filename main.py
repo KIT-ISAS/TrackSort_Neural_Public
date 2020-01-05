@@ -3,19 +3,24 @@ import code # code.interact(local=dict(globals(), **locals()))
 from DataAssociation import DataAssociation
 
 global_config = {
-	'is_loaded' : True,
-	'model_path' : 'models/rnn_model_fake_data.h5',
-	'distance_threshhold' : 5.0,
-	'num_timesteps' : 35, # TODO
+	'is_loaded' : False,
+	'weights_path' : 'models/my_rnn_model_weights.h5',
+	'model_path' : 'models/rnn_rnn_model.h5',
+	'distance_threshhold' : 5.0 / 2000,
+	'num_timesteps' : 350, # TODO
 	#
 	'initial_is_alive_probability' : 0.5,
 	'is_alive_decrease' : 0.25,
 	'is_alive_increase' : 0.5,
 	'batch_size' : 128, # TODO
+	#
+	'dataset_type' : 'FakeDataset',
+	'num_train_epochs' : 1
 }
 
 data_association = DataAssociation(global_config)
 
 tracks = data_association.associate_data()
 
+print('data association finished!')
 code.interact(local=dict(globals(), **locals()))

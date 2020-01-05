@@ -13,3 +13,4 @@ class Track(object):
     		self.is_alive_probability -= self.global_config['is_alive_decrease']
     	else:
     		self.is_alive_probability = min(1.0, self.is_alive_probability + self.global_config['is_alive_increase'])
+    	return self.is_alive_probability

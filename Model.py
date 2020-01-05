@@ -1,6 +1,7 @@
 import math
 import tensorflow as tf
 import numpy as np
+import code # code.interact(local=dict(globals(), **locals()))
 
 from tensorflow.keras import backend as K
 tf.keras.backend.set_floatx('float64')
@@ -279,15 +280,19 @@ def get_state(rnn_model):
     # get all layers in ascending order
     # ToDo: Replace this with while-true with break condition
     for i in range(1000):
+        #print('layer_number: ' + str(i))
         # Not asking for permission but handling the error is faster in python
         try:
-            layer = self.rnn_model.get_layer(index=i)
+            layer = rnn_model.get_layer(index=i)
         except:
+            #print('layer ' + str(i) + ' does not exist')
             break
 
         # only store the state of the layer if it is a recurrent layer
         #   DenseLayers don't have a state
         if isinstance(layer, tf.keras.layers.RNN):
+            #print('in rnn state')
+            #code.interact(local=dict(globals(), **locals()))
             rnn_layer_states.append([sub_state.numpy() for sub_state in layer.states])
             # print(rnn_layer_states)
 
@@ -301,9 +306,10 @@ class Model(object):
         self.data_source = data_source
         if self.global_config['is_loaded']:
             self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
+            # self.rnn_model.load_weights('weights_path')
         else:
             self.rnn_model = rnn_model_factory()[0]
-            print(rnn_model.summary())
+            print(self.rnn_model.summary())
             self.train()
 
 
@@ -313,17 +319,17 @@ class Model(object):
 
 
     # expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
-    def predict(self, inputs, states):
+    def predict(self, current_input, state):
         new_states = []
         predictions = []
-        for it in range(len(states)):
-            set_state(self.rnn_model, states[it])
-            inputs = inputs.expand_dims(1)
-            prediction = self.rnn_model(inputs)
-            prediction = predicion.squeeze()
-            predictions.append(prediction)
-            new_states.append(get_state(self.rnn_model))
-        return predictions, new_states
+        current_input = np.expand_dims(current_input, axis=1)
+        #print('in predict')
+        #code.interact(local=dict(globals(), **locals()))
+        set_state(self.rnn_model, state)
+        prediction = self.rnn_model(current_input)
+        prediction = np.squeeze(prediction)
+        new_state = get_state(self.rnn_model)
+        return prediction, new_state
 
 
 
@@ -333,11 +339,9 @@ class Model(object):
         optimizer = tf.keras.optimizers.Adam()
         train_step_fn = train_step_generator(self.rnn_model, optimizer)
 
-        total_num_epochs = 1000
-
 
         # Train model
-        for epoch in range(total_num_epochs):
+        for epoch in range(self.global_config['num_train_epochs']):
             # learning rate decay after 100 epochs
             if (epoch+1) % 150 == 0:
                 old_lr = K.get_value(optimizer.lr)
@@ -349,7 +353,10 @@ class Model(object):
                 _ = self.rnn_model.reset_states()
                 loss = train_step_fn(inp, target)    
 
-            print("{}/{}: \t loss={}".format(epoch, total_num_epochs, loss))
+            print("{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], loss))
+
+        self.rnn_model.save_weights(self.global_config['weights_path'])
+        self.rnn_model.save(self.global_config['model_path'])
 
 
 

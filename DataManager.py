@@ -136,6 +136,13 @@ class AbstractDataSet(ABC):
         """
         raise NotImplementedError
 
+
+    def get_measurement_at_timestep_list(self, timestep, normalized=True):
+        data = self.get_measurement_at_timestep(timestep)
+        data = list(map(lambda x: data[x], filter(lambda x: data[x][0][0] > 0, range(data.shape[0]))))
+        return data
+
+
     def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False, legend=True):
         track = track[start:end]
 
@@ -435,7 +442,10 @@ class FakeDataSet(AbstractDataSet):
         Attention: x-coordinate is along the height of the belt.
                y-coordinate is along the width of the belt.
         """
-        self.timesteps = timesteps
+        if 'num_timesteps' in global_config.keys():
+            self.timesteps = global_config['num_timesteps']
+        else:
+            self.timesteps = timesteps
         self.n_dim = 2
         self.n_trajectories = number_trajectories
         self.belt_max_x = belt_height
@@ -566,11 +576,14 @@ class FakeDataSet(AbstractDataSet):
             return self.normalize_tracks(data, is_seq2seq_data=False)
         return data
 
-
 class CsvDataSet(AbstractDataSet):
     def __init__(self, glob_file_pattern, min_number_detections=6, nan_value=0, input_dim=2,
-                 timesteps=35, batch_size=128):
-        self.glob_file_pattern = glob_file_pattern
+                 timesteps=35, batch_size=128, global_config=None):
+        self.global_config = global_config
+        if 'dataset_path' in self.global_config.keys():
+            self.glob_file_pattern = self.global_config['dataset_path']
+        else:
+            self.glob_file_pattern = glob_file_pattern
         self.file_list = sorted(glob.glob(glob_file_pattern))
         assert len(self.file_list) > 0, "No files found"
 
