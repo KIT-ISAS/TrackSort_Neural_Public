@@ -5,7 +5,7 @@ from moviepy.editor import *
 from DataAssociation import DataAssociation
 
 global_config = {
-	'is_loaded' : True,
+	'is_loaded' : False,
 	'weights_path' : 'models/my_rnn_model_weights.h5',
 	'model_path' : 'models/rnn_rnn_model.h5',
 	'distance_threshhold' : 0.1, # 5.0 / 2000,
