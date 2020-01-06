@@ -323,11 +323,11 @@ class Model(object):
         new_states = []
         predictions = []
         current_input = np.expand_dims(current_input, axis=1)
-        #print('in predict')
-        #code.interact(local=dict(globals(), **locals()))
         set_state(self.rnn_model, state)
         prediction = self.rnn_model(current_input)
         prediction = np.squeeze(prediction)
+        #print('in predict')
+        #code.interact(local=dict(globals(), **locals()))
         new_state = get_state(self.rnn_model)
         return prediction, new_state
 

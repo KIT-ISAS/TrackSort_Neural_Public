@@ -139,7 +139,7 @@ class AbstractDataSet(ABC):
 
     def get_measurement_at_timestep_list(self, timestep, normalized=True):
         data = self.get_measurement_at_timestep(timestep)
-        data = list(map(lambda x: data[x], filter(lambda x: data[x][0][0] > 0, range(data.shape[0]))))
+        data = list(map(lambda x: np.squeeze(data[x]), filter(lambda x: data[x][0][0] > 0, range(data.shape[0]))))
         return data
 
 
