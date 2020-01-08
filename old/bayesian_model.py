@@ -5,7 +5,9 @@ import tensorflow_probability as tfp
 import numpy as np
 
 from tensorflow.keras import backend as K
+
 tf.keras.backend.set_floatx('float64')
+
 
 def rnn_model_factory_bayesian(
         num_units_first_rnn=16, num_units_second_rnn=16, num_units_third_rnn=0, num_units_fourth_rnn=0,
@@ -87,6 +89,7 @@ def rnn_model_factory_bayesian(
     hash_ += "-dense[2]"
 
     return model, hash_
+
 
 def train_step_generator_bayesian(model, optimizer, nan_value=0):
     """

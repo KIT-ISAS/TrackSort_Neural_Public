@@ -111,12 +111,15 @@ class AbstractDataSet(ABC):
             is_started = False
             for time_idx in range(track_data.shape[1]):
                 try:
-                    if not is_started and (track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
+                    if not is_started and (
+                            track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
                         is_started = True
                         particles.append([[time_idx, track_data[track_idx][time_idx]]])
-                    elif is_started and not (track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
+                    elif is_started and not (
+                            track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         particles[-1].append([time_idx, track_data[track_idx][time_idx]])
-                    elif is_started and (track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
+                    elif is_started and (
+                            track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         break
                 except Exception as exp:
                     print('error in get_particles')

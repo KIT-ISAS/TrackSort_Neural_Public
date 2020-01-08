@@ -3,8 +3,8 @@ import tensorflow as tf
 import numpy as np
 
 from tensorflow.keras import backend as K
-tf.keras.backend.set_floatx('float64')
 
+tf.keras.backend.set_floatx('float64')
 
 rnn_models = {
     'lstm': tf.keras.layers.LSTM,
@@ -155,7 +155,7 @@ def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
             loss += K.sum(batch_loss)
             step_counter += K.sum(mask)
 
-        return loss/step_counter
+        return loss / step_counter
 
     return f
 
@@ -255,7 +255,7 @@ def train_epoch_generator(rnn_model, train_step, dataset_train, batch_size):
             train_step_counter += batch_size
             batch_counter += 1
 
-        avg_loss = sum_loss/batch_counter
+        avg_loss = sum_loss / batch_counter
 
         return avg_loss, train_step_counter
 
@@ -292,7 +292,7 @@ class ModelManager(object):
         self.batch_size = batch_size
         self.num_dims = num_dims
         self.dtype = dtype
-        self.n_batches = math.ceil(maximum_number_of_tracks/batch_size)
+        self.n_batches = math.ceil(maximum_number_of_tracks / batch_size)
         self.rnn_model = rnn_model
 
         # we start with cleaned states
@@ -307,7 +307,8 @@ class ModelManager(object):
         self.all_ids = set(range(maximum_number_of_tracks))
 
         # the measurements (only one time step)
-        self.batch_measurements = [np.zeros([self.batch_size, 1, num_dims], dtype=self.dtype) for _ in range(self.n_batches)]
+        self.batch_measurements = [np.zeros([self.batch_size, 1, num_dims], dtype=self.dtype) for _ in
+                                   range(self.n_batches)]
 
     def _pop_next_free_track_id(self):
         "Returns a new track id. If not available, then raises AssertionError"
@@ -382,7 +383,8 @@ class ModelManager(object):
 
             if isinstance(layer, tf.keras.layers.RNN):
                 for sub_state_number, sub_state in enumerate(layer.states):
-                    layer.states[sub_state_number].assign(tf.convert_to_tensor(batch_state[rnn_layer_counter][sub_state_number]))
+                    layer.states[sub_state_number].assign(
+                        tf.convert_to_tensor(batch_state[rnn_layer_counter][sub_state_number]))
                 rnn_layer_counter += 1
 
     def predict(self):
@@ -402,7 +404,7 @@ class ModelManager(object):
             # store the state
             self.batch_states[batch_i] = self._get_rnn_states()
 
-        return np.array(predictions).reshape([self.n_batches*self.batch_size, self.num_dims])
+        return np.array(predictions).reshape([self.n_batches * self.batch_size, self.num_dims])
 
     def free(self, track_id):
         self.used_state_ids.remove(track_id)
@@ -414,15 +416,3 @@ class ModelManager(object):
 
     def get_all_measurements(self):
         return np.array(self.batch_measurements).reshape([self.n_batches * self.batch_size, self.num_dims])
-
-
-
-
-
-
-
-
-
-
-
-
