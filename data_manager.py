@@ -111,12 +111,15 @@ class AbstractDataSet(ABC):
             is_started = False
             for time_idx in range(track_data.shape[1]):
                 try:
-                    if not is_started and (track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
+                    if not is_started and (
+                            track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
                         is_started = True
                         particles.append([[time_idx, track_data[track_idx][time_idx]]])
-                    elif is_started and not (track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
+                    elif is_started and not (
+                            track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         particles[-1].append([time_idx, track_data[track_idx][time_idx]])
-                    elif is_started and (track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
+                    elif is_started and (
+                            track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         break
                 except Exception as exp:
                     print('error in get_particles')
@@ -136,12 +139,10 @@ class AbstractDataSet(ABC):
         """
         raise NotImplementedError
 
-
     def get_measurement_at_timestep_list(self, timestep, normalized=True):
         data = self.get_measurement_at_timestep(timestep)
         data = list(map(lambda x: np.squeeze(data[x]), filter(lambda x: data[x][0][0] > 0, range(data.shape[0]))))
         return data
-
 
     def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False, legend=True):
         track = track[start:end]
@@ -338,6 +339,48 @@ class AbstractDataSet(ABC):
 
         return dataset_train, dataset_test
 
+    def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1):
+        track_data, spatial_labels, temporal_labels = self.get_separation_prediction_data()
+        tracks = self._convert_aligned_tracks_to_seq2seq_data(track_data)
+        num_time_steps = tracks.shape[1]
+
+        # add additional labels
+        tracks = np.concatenate(
+            (tracks,
+             np.repeat(spatial_labels[:, 1][None], num_time_steps, axis=0).T.reshape(-1, tracks.shape[1], 1),
+             np.repeat(temporal_labels[None], num_time_steps, axis=0).T.reshape(-1, tracks.shape[1], 1)
+             ),
+            axis=-1
+        )
+
+        if normalized:
+            tracks[:, :, [0, 1, 2, 3]] /= self.belt_width
+            # normalize spatial prediction
+            tracks[:, :, [4]] /= self.belt_width
+            # normalize temporal prediction
+            tracks[:, :, [4]] /= 50.
+
+        train_tracks, test_tracks = self.split_train_test(tracks, test_ratio=test_ratio)
+
+        raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
+        raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
+
+        # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
+        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
+        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
+
+        def split_input_target_separation(chunk):
+            # split the tensor (x, y, y_pred, t_pred, x_target, y_target, y_pred_target, t_pred_target)
+            #  -> into two tensors (x, y) and (x_target, y_target)
+            input_seq = chunk[:, :, :2]
+            target_seq = chunk[:, :, 2:]
+            return input_seq, target_seq
+
+        dataset_train = minibatches_train.map(split_input_target_separation)
+        dataset_test = minibatches_test.map(split_input_target_separation)
+
+        return dataset_train, dataset_test, num_time_steps
+
     def get_last_timestep_of_track(self, track):
         i = None
         for i in range(track.shape[0]):
@@ -347,9 +390,10 @@ class AbstractDataSet(ABC):
 
     def get_longest_track(self):
         longest_track = 0
+        aligned_track_data = self.get_aligned_track_data()
 
         for track_number in range(aligned_track_data.shape[0]):
-            x = self.aligned_track_data[track_number][:, 0]
+            x = aligned_track_data[track_number][:, 0]
 
             last_index = self.get_last_timestep_of_track(x) - 1
 
@@ -422,6 +466,187 @@ class AbstractDataSet(ABC):
         ax1.set_title('Boxplot')
         ax1.boxplot(maes, showfliers=False)
 
+    def get_separation_prediction_data(self, virtual_belt_edge_x_position=1200, virtual_nozzle_array_x_position=1400):
+        """
+        Get training data for the separation task.
+        For every track, which has measurements left of the virtual_belt_edge_x_position (visible measurements) and
+        crosses the virtual_nozzle_array_x_position, return the visible measurements as data and the intersection
+        as prediction label.
+
+        The most crucial step for the belt sorting machine is the activation of the correct nozzle at the end of belt.
+        In reality, the particles fall of the edge of the belt and then they have a small flight phase.
+        The particles fly over the nozzle array where they are being separated.
+        **Problem:** How to get training data of this process?
+
+        1) Use an accurate physical model
+        2) Assume that the flight phase is similar to the belt traveling phase
+
+        This method uses solution 2). Therefore we:
+        - use the last observation of tracks as the position where the particle crosses the nozzle array.
+        - In a real setup, there is a "blind" gap between the edge of the belt and the nozzle. That is the reason why
+          we don't use all measurements after a virtual belt edge.
+
+        Graphically speaking: We add a virtual edge to the belt, which makes it shorter. Then comes the flight phase
+          (where our particles still travel on the belt but we don't use its observations). Finally the particle reaches
+          the virtual nozzle array, which we use as ground truth.
+
+        Visualization:
+            A) The original belt with some particles (denoted a P)
+
+            0==============================================0               ||
+            |                 P                P           |               ||
+            |   P                                          |               ||
+            |                   P     P                  P |               ||
+            |         P                           P        |               ||
+            |                                              |               ||
+            0==============================================0               ||
+            Begin                                        Edge         Nozzle array
+
+            B) For the particle that leaves the belt over the edge,
+               we have to predict the correct position and time
+               when it will cross the nozzle.
+
+            0==============================================0               ||
+            |                 P                P           |               ||
+            |   P                                          |               ||
+            |                   P     P                  P----------------->|
+            |         P                           P        |               ||
+            |                                              |               ||
+            0==============================================0               ||
+            Begin                                        Edge         Nozzle array
+
+            C) Due to the fact, that we only have training data
+               when the particles are on the belt and not when they
+               are in their flight phase, neither above the nozzle array,
+               we introduce the virtual belt edge and virtual nozzle array.
+
+            0==============================================0               ||
+            |                 P     |           P     ||   |               ||
+            |   P                   |                 ||   |               ||
+            |                   P   |  P              || P |               ||
+            |         P             |              P  ||   |               ||
+            |                       |                 ||   |               ||
+            0==============================================0               ||
+            Begin             Virtual Edge     Virtual nozzles
+
+            D) Measurements between the virtual edge and the virtual
+               nozzle array are hidden ("blind area"). This is according
+               to the flight area.
+
+            0==============================================0               ||
+            |                 P     |                 ||   |               ||
+            |   P                   |                 ||   |               ||
+            |                   P   |                 || P |               ||
+            |         P             |                 ||   |               ||
+            |                       |                 ||   |               ||
+            0==============================================0               ||
+            Begin             Virtual Edge     Virtual nozzles
+
+            E) Label generation: The ground truth for the separation
+               prediction works as follows:
+               1. Find the two measurements of a track, whose connecting
+                  line intersects with the virtual nozzle (in the illustration below "Q" and "P")
+               2. Use the intersection as spatial prediction ground truth ("X")
+               3. In order to get the temporal ground truth ("when does the
+                  particle cross the array?"), we calculate the distance of
+                  the intersection to the measurement left and right of it.
+                  We use these distances to get a weighted average between
+                  the timestamps of the two measurements.
+
+            0==============================================0               ||
+            |                       |                 ||   |               ||
+            |                       |                 ||   |               ||
+            |                       |               Q--X--P|               ||
+            |                       |                 ||   |               ||
+            |                       |                 ||   |               ||
+            0==============================================0               ||
+            Begin             Virtual Edge     Virtual nozzles
+
+
+        :param virtual_nozzle_array_x_position:
+        :param virtual_belt_edge_x_position:
+        """
+        assert virtual_nozzle_array_x_position < self.belt_width, "virtual_nozzle_array_x_position is too far right"
+        assert virtual_belt_edge_x_position < virtual_nozzle_array_x_position, \
+            "assert: virtual_belt_edge_x_position < virtual_nozzle_array_x_position"
+
+        aligned_track_data = self.get_aligned_track_data()
+
+        # 1. only work with tracks which have visible measurements left of the virtual_belt_edge_x_position
+
+        left_of_edge_mask = aligned_track_data[:, 0, 0] < virtual_belt_edge_x_position
+        # apply mask as filter
+        aligned_track_data = aligned_track_data[left_of_edge_mask]
+
+        # 2. remove tracks without measurements after the virtual_nozzle_array_x_position
+
+        # get nonzero mask
+        not_null_mask = (np.sum((aligned_track_data != [self.nan_value, self.nan_value]).astype(np.int), axis=2) == 0)
+        # get the last measurement index
+        last_measurement_index = np.argmax(not_null_mask, axis=1) - 1
+        # last measurements
+        last_measurements = aligned_track_data[
+            np.arange(aligned_track_data.shape[0])[:, None],
+            last_measurement_index[:, None]]
+        # shape: [tracks, 2]
+        last_measurements = last_measurements.reshape(last_measurements.shape[0], 2)
+        # filter by last measurement (is it right of the array nozzle?)
+        aligned_track_data = aligned_track_data[(last_measurements[:, 0] > virtual_nozzle_array_x_position)]
+        assert aligned_track_data.shape[0] > 0, "No tracks lie in the visible area"
+
+        # 3. find the points Q and P for every track
+        # Q
+        distance_to_nozzle = (aligned_track_data - virtual_nozzle_array_x_position)
+        distance_to_nozzle[distance_to_nozzle[:, :, 0] > 0] = -np.inf
+        q_indices = distance_to_nozzle[:, :, 0].argmax(axis=1)
+        q_values = aligned_track_data[
+            np.arange(aligned_track_data.shape[0])[:, None],
+            q_indices[:, None]
+        ].reshape(-1, 2)
+        # P
+        distance_to_nozzle = (aligned_track_data - virtual_nozzle_array_x_position)
+        distance_to_nozzle[distance_to_nozzle[:, :, 0] <= 0] = +np.inf
+        p_indices = distance_to_nozzle[:, :, 0].argmin(axis=1)
+        p_values = aligned_track_data[
+            np.arange(aligned_track_data.shape[0])[:, None],
+            p_indices[:, None]
+        ].reshape(-1, 2)
+
+        # 4. Intersect the nozzle_array with the line QP -> intersection "X"
+
+        delta_xy = p_values - q_values
+        slope = delta_xy[:, 1] / delta_xy[:, 0]
+        # spatial intersection
+        y_at_nozzle = q_values[:, 1] + slope * (virtual_nozzle_array_x_position - q_values[:, 0])
+        spatial_labels = np.vstack((np.ones(y_at_nozzle.shape) * virtual_nozzle_array_x_position, y_at_nozzle)).T
+        # temporal intersection: use the euclidean distance to calculate a weighted average between
+        #     the indices of Q and P
+        qx = np.sqrt(np.sum((spatial_labels - q_values) ** 2, axis=1))
+        xp = np.sqrt(np.sum((spatial_labels - p_values) ** 2, axis=1))
+        # take the weighted average between both indices
+        temporal_labels = (qx * q_indices + xp * p_indices) / (qx + xp)
+
+        # 5. restrict dataset to measurements left of the virtual edge
+
+        distance_to_edge = (aligned_track_data - virtual_belt_edge_x_position)
+        distance_to_edge[distance_to_edge[:, :, 0] > 0] = -np.inf
+        last_measurement_before_edge_indices = distance_to_edge[:, :, 0].argmax(axis=1)
+        # build a mask for all tracks, which data points to keep
+        mask = None
+        # IMPROVEMENT: for-loop might be replaceable
+        for idx in last_measurement_before_edge_indices:
+            m = np.ones(aligned_track_data.shape[1])
+            m[idx + 1:] = 0
+            if mask is None:
+                mask = m[:, None]
+            else:
+                mask = np.hstack((mask, m[:, None]))
+        mask = mask.T.astype(np.bool)
+        # hide data
+        aligned_track_data[~mask, :] = self.nan_value
+
+        return aligned_track_data, spatial_labels, temporal_labels
+
 
 class FakeDataSet(AbstractDataSet):
     def __init__(self, timesteps=350, number_trajectories=1000,
@@ -442,7 +667,7 @@ class FakeDataSet(AbstractDataSet):
         Attention: x-coordinate is along the height of the belt.
                y-coordinate is along the width of the belt.
         """
-        if 'num_timesteps' in global_config.keys():
+        if global_config and 'num_timesteps' in global_config.keys():
             self.timesteps = global_config['num_timesteps']
         else:
             self.timesteps = timesteps
@@ -468,7 +693,8 @@ class FakeDataSet(AbstractDataSet):
         # than a batch. Because we use drop_remainder=True we cannot allow this, or else the only batch
         # would be empty -> as a result we would not have test data
         assert self.n_trajectories * min(self.test_split_ratio,
-                                         self.train_split_ratio) > self.batch_size, "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
+                                         self.train_split_ratio) > self.batch_size, \
+            "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
 
     def _generate_tracks(self):
         tracks = []
@@ -576,11 +802,12 @@ class FakeDataSet(AbstractDataSet):
             return self.normalize_tracks(data, is_seq2seq_data=False)
         return data
 
+
 class CsvDataSet(AbstractDataSet):
     def __init__(self, glob_file_pattern, min_number_detections=6, nan_value=0, input_dim=2,
                  timesteps=35, batch_size=128, global_config=None):
         self.global_config = global_config
-        if 'dataset_path' in self.global_config.keys():
+        if global_config and 'dataset_path' in self.global_config.keys():
             self.glob_file_pattern = self.global_config['dataset_path']
         else:
             self.glob_file_pattern = glob_file_pattern

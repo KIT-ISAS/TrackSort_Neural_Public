@@ -1,12 +1,13 @@
 import math, copy
 import tensorflow as tf
 import numpy as np
-import code # code.interact(local=dict(globals(), **locals()))
+import code  # code.interact(local=dict(globals(), **locals()))
 
 from tensorflow.keras import backend as K
+
 tf.keras.backend.set_floatx('float64')
 
-from Model import Model
+from model import Model
 
 
 class ModelManager(object):
@@ -14,18 +15,16 @@ class ModelManager(object):
         self.global_config = global_config
         self.model = Model(self.global_config, data_source)
         self.zero_state = self.model.get_zero_state()
-        self.current_states = [] # stored as numpy array for easier access
+        self.current_states = []  # stored as numpy array for easier access
         self.current_inputs = []
         self.current_ids = []
         self.current_is_alive = []
 
-
-
     def predict_all(self):
         prediction_dict = {}
         for batch_nr in range(len(self.current_states)):
-            #print('in predict_all')
-            #code.interact(local=dict(globals(), **locals()))
+            # print('in predict_all')
+            # code.interact(local=dict(globals(), **locals()))
             # state_statetype_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
             # state_tuple = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(state_statetype_first[0], state_statetype_first[1])
             prediction, new_state = self.model.predict(self.current_inputs[batch_nr], self.current_states[batch_nr])
@@ -36,15 +35,11 @@ class ModelManager(object):
                     prediction_dict[self.current_ids[batch_nr][idx]] = prediction[idx]
         return prediction_dict
 
-
-
     def update_by_id(self, global_track_id, measurement):
         for batch_nr in range(len(self.current_ids)):
             for idx in range(len(self.current_ids[batch_nr])):
                 if self.current_ids[batch_nr][idx] == global_track_id:
                     self.current_inputs[batch_nr][idx] = measurement
-
-
 
     def delete_by_id(self, global_track_id):
         for batch_nr in range(len(self.current_ids)):
@@ -53,8 +48,6 @@ class ModelManager(object):
                     self.current_is_alive[batch_nr][idx] = False
                     self.current_ids[batch_nr][idx] = -1
 
-
-
     def create_by_id(self, global_track_id, measurement):
         for batch_nr in range(len(self.current_is_alive)):
             for idx in range(len(self.current_is_alive[batch_nr])):
@@ -62,11 +55,11 @@ class ModelManager(object):
                     self.current_is_alive[batch_nr][idx] = True
                     self.current_inputs[batch_nr][idx] = measurement
                     self.current_ids[batch_nr][idx] = global_track_id
-                    #print('create_by_id')
-                    #code.interact(local=dict(globals(), **locals()))
-                    state_buffer = np.transpose(self.current_states[batch_nr], [2,0,1,3])
+                    # print('create_by_id')
+                    # code.interact(local=dict(globals(), **locals()))
+                    state_buffer = np.transpose(self.current_states[batch_nr], [2, 0, 1, 3])
                     state_buffer[idx] = np.zeros(state_buffer[idx].shape, dtype=np.float64)
-                    state_buffer = np.transpose(state_buffer, [1,2,0,3])
+                    state_buffer = np.transpose(state_buffer, [1, 2, 0, 3])
                     self.current_states[batch_nr] = state_buffer
                     return
         # create new entry of the lists

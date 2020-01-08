@@ -1,9 +1,10 @@
 import math
 import tensorflow as tf
 import numpy as np
-import code # code.interact(local=dict(globals(), **locals()))
+import code  # code.interact(local=dict(globals(), **locals()))
 
 from tensorflow.keras import backend as K
+
 tf.keras.backend.set_floatx('float64')
 
 rnn_models = {
@@ -18,7 +19,8 @@ def rnn_model_factory(
         num_units_first_dense=16, num_units_second_dense=0, num_units_third_dense=0, num_units_fourth_dense=0,
         rnn_model_name='lstm',
         use_batchnorm_on_dense=True,
-        num_time_steps=35, batch_size=128, nan_value=0, input_dim=2, unroll=True, stateful=True):
+        num_time_steps=35, batch_size=128, nan_value=0, input_dim=2, output_dim=2,
+        unroll=True, stateful=True):
     """
     Create a new keras model with the sequential API
 
@@ -38,6 +40,7 @@ def rnn_model_factory(
     :param batch_size:
     :param nan_value:
     :param input_dim:
+    :param output_dim:
     :param unroll:
     :param stateful: If this is False, then the state of the rnn will be reset after every batch.
             We want to control this manually therefore the default is True.
@@ -87,10 +90,13 @@ def rnn_model_factory(
                 model.add(tf.keras.layers.BatchNormalization())
                 hash_ += "-BatchNorm"
 
-    # Always end with a dense layer with two outputs (x, y)
-    model.add(tf.keras.layers.Dense(2))
+    # Always end with a dense layer with
+    # - two outputs (x, y)
+    # - or: three outputs (x, y, y_separation)
+    # - or: four outputs (x, y, y_separation, t_separation)
+    model.add(tf.keras.layers.Dense(output_dim))
 
-    hash_ += "-dense[2]"
+    hash_ += "-dense[{}]".format(output_dim)
 
     return model, hash_
 
@@ -155,7 +161,7 @@ def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
             loss += K.sum(batch_loss)
             step_counter += K.sum(mask)
 
-        return loss/step_counter
+        return loss / step_counter
 
     return f
 
@@ -171,9 +177,9 @@ def train_step_generator(model, optimizer, nan_value=0):
     :param nan_value: e.g. 0
 
     Example:
-        >>> import data
+        >>> import data_manager
         >>> keras_model = rnn_model_factory()
-        >>> dataset_train, _ = data.FakeDataSet().get_tf_data_sets_seq2seq_data()
+        >>> dataset_train, _ = data_manager.FakeDataSet().get_tf_data_sets_seq2seq_data()
         >>> train_step = model.train_step_generator(model, optimizer)
         >>>
         >>> step, batch_size = 0, 32
@@ -195,11 +201,10 @@ def train_step_generator(model, optimizer, nan_value=0):
             target = K.cast(target, tf.float64)
             predictions = model(inp)
 
-            mask = K.all(K.equal(target, mask_value), axis=-1)
+            mask = K.all(K.equal(inp, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            # multiply categorical_crossentropy with the mask
             loss = tf.keras.losses.mean_squared_error(target, predictions) * mask
 
             # take average w.r.t. the number of unmasked entries
@@ -255,11 +260,12 @@ def train_epoch_generator(rnn_model, train_step, dataset_train, batch_size):
             train_step_counter += batch_size
             batch_counter += 1
 
-        avg_loss = sum_loss/batch_counter
+        avg_loss = sum_loss / batch_counter
 
         return avg_loss, train_step_counter
 
     return train_epoch
+
 
 def set_state(rnn_model, batch_state):
     rnn_layer_counter = 0
@@ -271,7 +277,8 @@ def set_state(rnn_model, batch_state):
 
         if isinstance(layer, tf.keras.layers.RNN):
             for sub_state_number, sub_state in enumerate(layer.states):
-                layer.states[sub_state_number].assign(tf.convert_to_tensor(batch_state[rnn_layer_counter][sub_state_number]))
+                layer.states[sub_state_number].assign(
+                    tf.convert_to_tensor(batch_state[rnn_layer_counter][sub_state_number]))
             rnn_layer_counter += 1
 
 
@@ -280,19 +287,19 @@ def get_state(rnn_model):
     # get all layers in ascending order
     # ToDo: Replace this with while-true with break condition
     for i in range(1000):
-        #print('layer_number: ' + str(i))
+        # print('layer_number: ' + str(i))
         # Not asking for permission but handling the error is faster in python
         try:
             layer = rnn_model.get_layer(index=i)
         except:
-            #print('layer ' + str(i) + ' does not exist')
+            # print('layer ' + str(i) + ' does not exist')
             break
 
         # only store the state of the layer if it is a recurrent layer
         #   DenseLayers don't have a state
         if isinstance(layer, tf.keras.layers.RNN):
-            #print('in rnn state')
-            #code.interact(local=dict(globals(), **locals()))
+            # print('in rnn state')
+            # code.interact(local=dict(globals(), **locals()))
             rnn_layer_states.append([sub_state.numpy() for sub_state in layer.states])
             # print(rnn_layer_states)
 
@@ -312,11 +319,9 @@ class Model(object):
             print(self.rnn_model.summary())
             self.train()
 
-
     def get_zero_state(self):
         self.rnn_model.reset_states()
         return get_state(self.rnn_model)
-
 
     # expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
     def predict(self, current_input, state):
@@ -326,12 +331,10 @@ class Model(object):
         set_state(self.rnn_model, state)
         prediction = self.rnn_model(current_input)
         prediction = np.squeeze(prediction)
-        #print('in predict')
-        #code.interact(local=dict(globals(), **locals()))
+        # print('in predict')
+        # code.interact(local=dict(globals(), **locals()))
         new_state = get_state(self.rnn_model)
         return prediction, new_state
-
-
 
     def train(self):
         dataset_train, _ = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
@@ -339,11 +342,10 @@ class Model(object):
         optimizer = tf.keras.optimizers.Adam()
         train_step_fn = train_step_generator(self.rnn_model, optimizer)
 
-
         # Train model
         for epoch in range(self.global_config['num_train_epochs']):
             # learning rate decay after 100 epochs
-            if (epoch+1) % 150 == 0:
+            if (epoch + 1) % 150 == 0:
                 old_lr = K.get_value(optimizer.lr)
                 new_lr = old_lr * 0.1
                 print("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
@@ -351,19 +353,15 @@ class Model(object):
 
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 _ = self.rnn_model.reset_states()
-                loss = train_step_fn(inp, target)    
+                loss = train_step_fn(inp, target)
 
             print("{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], loss))
 
         self.rnn_model.save_weights(self.global_config['weights_path'])
         self.rnn_model.save(self.global_config['model_path'])
 
-
-
     def predict_final(self, states, y_targetline):
         raise NotImplementedError
-
-
 
     def train_final(self, x_data, y_data, pred_point):
         raise NotImplementedError
