@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 import code  # code.interact(local=dict(globals(), **locals()))
-import copy
+import copy, shutil, os
 
 from track_manager import TrackManager
 from data_manager import FakeDataSet, CsvDataSet
@@ -19,6 +19,8 @@ class DataAssociation(object):
 
     def associate_data(self):
         old_measurements = None
+        shutil.rmtree(self.global_config['visualization_path'], ignore_errors=True)
+        os.makedirs(self.global_config['visualization_path'])
         for time_step in range(self.global_config['num_timesteps']):
             print('')
             print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
