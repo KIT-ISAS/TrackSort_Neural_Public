@@ -20,14 +20,16 @@ global_config = {
     'dataset_type': 'FakeDataset',
     'num_train_epochs': 1000,
     'visualization_path': 'visualizations/matching_visualization_local/',
-    'visualization_video_path': 'visualizations/matching_visualization_vid.mp4'
+    'visualization_video_path': 'visualizations/matching_visualization_vid.mp4',
+    'state_overwriting_started': False,
+    'overwriting_activated': False
 }
 
 data_association = DataAssociation(global_config)
 
 tracks = data_association.associate_data()
 
-shutil.rmtree(global_config['visualization_path'], ignore_errors=True)
+shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
 clip = ImageSequenceClip(global_config['visualization_path'], fps=4)
 clip.write_videofile(global_config['visualization_video_path'], fps=4)
 

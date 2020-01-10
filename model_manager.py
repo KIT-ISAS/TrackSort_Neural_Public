@@ -51,7 +51,8 @@ class ModelManager(object):
     def create_by_id(self, global_track_id, measurement):
         for batch_nr in range(len(self.current_is_alive)):
             for idx in range(len(self.current_is_alive[batch_nr])):
-                if not self.current_is_alive[batch_nr][idx]:
+                if (self.global_config['overwriting_activated'] and not self.current_is_alive[batch_nr][idx]) or \
+                        (not self.global_config['overwriting_activated'] and self.global_config['highest_id'] == idx + self.global_config['batch_size'] * batch_nr):
                     self.current_is_alive[batch_nr][idx] = True
                     self.current_inputs[batch_nr][idx] = measurement
                     self.current_ids[batch_nr][idx] = global_track_id
@@ -66,6 +67,15 @@ class ModelManager(object):
                         state_buffer = np.transpose(state_buffer, [1, 0, 2])
                         state_buffers.append(state_buffer)
                     self.current_states[batch_nr] = state_buffers
+                    if self.global_config['overwriting_activated'] and self.global_config['highest_id'] > idx + self.global_config['batch_size'] * batch_nr and \
+                            not self.global_config['state_overwrinting_started']:
+                        self.global_config['state_overwriting_started'] = True
+                        print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
+                        print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
+                        print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
+                        print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
+                        print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
+                        # code.interact(local=dict(globals(), **locals()))
                     return
         # create new entry of the lists
         self.current_states.append(self.zero_state)
@@ -76,3 +86,10 @@ class ModelManager(object):
         self.current_is_alive[-1][0] = True
         self.current_ids[-1][0] = global_track_id
         self.current_inputs[-1][0] = measurement
+        if len(self.current_states) > 1:
+            print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
+            print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
+            print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
+            print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
+            print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
+            # code.interact(local=dict(globals(), **locals()))

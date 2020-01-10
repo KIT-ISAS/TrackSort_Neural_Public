@@ -25,8 +25,9 @@ class DataAssociation(object):
             print('')
             print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
             plt.title('Time step: {}'.format(time_step))
-            plt.xlim((0.0, 1.3))
-            plt.ylim((0.0, 1.0))
+            plt.xlim((-0.1, 1.3))
+            plt.ylim((-0.1, 1.1))
+            self.global_config['current_time_step'] = time_step
             #
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
             #
@@ -109,6 +110,7 @@ class DataAssociation(object):
                         old_measurements[prediction_id] = (prediction, False)
                     else:
                         print('track finished!')
+                        plt.scatter([prediction[0]], [prediction[1]], c='black')
                     #
                     circle = plt.Circle(prediction, self.global_config['distance_threshhold'], color='blue', fill=False)
                     plt.gcf().gca().add_artist(circle)

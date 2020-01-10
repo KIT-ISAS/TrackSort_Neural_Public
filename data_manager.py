@@ -650,7 +650,7 @@ class AbstractDataSet(ABC):
 
 class FakeDataSet(AbstractDataSet):
     def __init__(self, timesteps=350, number_trajectories=1000,
-                 additive_noise_stddev=5, splits=0, additive_target_stddev=100,
+                 additive_noise_stddev=0, splits=0, additive_target_stddev=0,
                  min_number_points_per_trajectory=20, batch_size=128,
                  belt_width=2000, belt_height=2000, nan_value=0, step_length=70, global_config=None):
         """
