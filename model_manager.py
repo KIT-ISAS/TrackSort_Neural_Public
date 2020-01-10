@@ -55,12 +55,17 @@ class ModelManager(object):
                     self.current_is_alive[batch_nr][idx] = True
                     self.current_inputs[batch_nr][idx] = measurement
                     self.current_ids[batch_nr][idx] = global_track_id
-                    # print('create_by_id')
-                    # code.interact(local=dict(globals(), **locals()))
-                    state_buffer = np.transpose(self.current_states[batch_nr], [2, 0, 1, 3])
-                    state_buffer[idx] = np.zeros(state_buffer[idx].shape, dtype=np.float64)
-                    state_buffer = np.transpose(state_buffer, [1, 2, 0, 3])
-                    self.current_states[batch_nr] = state_buffer
+                    state_buffers = []
+                    for state in self.current_states[batch_nr]:
+                        state_buffer = np.transpose(state, [1, 0, 2])
+                        try:
+                            state_buffer[idx] = np.zeros(state_buffer[idx][0].shape, dtype=np.float64)
+                        except Exception:
+                            print('create_by_id')
+                            code.interact(local=dict(globals(), **locals()))
+                        state_buffer = np.transpose(state_buffer, [1, 0, 2])
+                        state_buffers.append(state_buffer)
+                    self.current_states[batch_nr] = state_buffers
                     return
         # create new entry of the lists
         self.current_states.append(self.zero_state)

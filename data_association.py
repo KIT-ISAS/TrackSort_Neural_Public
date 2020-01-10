@@ -51,13 +51,14 @@ class DataAssociation(object):
                     plt.plot(line[:, 0], line[:, 1], c='purple')
             # print('in associate_data')
             # code.interact(local=dict(globals(), **locals()))
-            plt.scatter(np.array(measurements)[:, 0], np.array(measurements)[:, 1], c='blue', label='measurement')
+            if len(measurements) != 0:
+                plt.scatter(np.array(measurements)[:, 0], np.array(measurements)[:, 1], c='blue', label='measurement')
             if prediction_values != []:
                 plt.scatter(np.array(prediction_values)[:, 0], np.array(prediction_values)[:, 1], c='red',
                             label='prediction')
 
-            #
-            distance_matrix = np.inf * np.ones(
+            # why isn't infinity working anymore???
+            distance_matrix = 10000 * np.ones(
                 [2 * len(measurements) + len(prediction_values), 2 * len(prediction_values) + len(measurements)])
             #
             for measurement_nr in range(len(measurements)):
@@ -78,6 +79,8 @@ class DataAssociation(object):
                     len(measurements) + len(prediction_values) + prediction_nr] = 1.1 * self.global_config[
                     'distance_threshhold']
             #
+            #print('before matching')
+            #code.interact(local=dict(globals(), **locals()))
             measurement_idxs, prediction_idxs = linear_sum_assignment(distance_matrix)
             #
             counts = np.zeros([4], dtype=np.int32)
