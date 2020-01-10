@@ -649,9 +649,9 @@ class AbstractDataSet(ABC):
 
 
 class FakeDataSet(AbstractDataSet):
-    def __init__(self, timesteps=350, number_trajectories=1000,
+    def __init__(self, timesteps=350, number_trajectories=512,
                  additive_noise_stddev=0, splits=0, additive_target_stddev=0,
-                 min_number_points_per_trajectory=20, batch_size=128,
+                 min_number_points_per_trajectory=20, batch_size=64,
                  belt_width=2000, belt_height=2000, nan_value=0, step_length=70, global_config=None):
         """
         Create Fake Data Lines for timesteps with normally distributed noise on a belt.
@@ -681,6 +681,10 @@ class FakeDataSet(AbstractDataSet):
         self.additive_target_stddev = additive_target_stddev
         self.splits = splits
         self.min_number_points_per_trajectory = min_number_points_per_trajectory
+        if global_config and 'batch_size' in global_config.keys():
+            self.timesteps = global_config['batch_size']
+        else:
+            self.batch_size = batch_size
         self.batch_size = batch_size
         self.nan_value = nan_value
         self.step_length = step_length

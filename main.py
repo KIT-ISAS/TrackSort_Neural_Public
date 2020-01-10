@@ -9,8 +9,8 @@ global_config = {
     'is_loaded': True,
     'weights_path': 'models/my_16_16_rnn.h5',
     'model_path': 'models/rnn_model_fake_data.h5',
-    'distance_threshhold': 0.1,  # 5.0 / 2000,
-    'num_timesteps': 350,  # TODO
+    'distance_threshhold': 0.03,  # 5.0 / 2000,
+    'num_timesteps': 50000,  # TODO
     #
     'initial_is_alive_probability': 0.5,
     'is_alive_decrease': 0.25,
