@@ -33,6 +33,7 @@ class TrackManager(object):
 
     def pseudo_track_real_measurement(self, measurement, current_timestep):
         global_track_id = self.currently_highest_id
+        self.global_config['highest_id'] = global_track_id
         self.currently_highest_id += 1
         self.active_ids.append(global_track_id)
         self.tracks[global_track_id] = Track(self.global_config, current_timestep, measurement)
