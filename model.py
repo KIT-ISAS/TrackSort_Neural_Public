@@ -287,21 +287,16 @@ def get_state(rnn_model):
     # get all layers in ascending order
     # ToDo: Replace this with while-true with break condition
     for i in range(1000):
-        # print('layer_number: ' + str(i))
         # Not asking for permission but handling the error is faster in python
         try:
             layer = rnn_model.get_layer(index=i)
         except:
-            # print('layer ' + str(i) + ' does not exist')
             break
 
         # only store the state of the layer if it is a recurrent layer
         #   DenseLayers don't have a state
         if isinstance(layer, tf.keras.layers.RNN):
-            # print('in rnn state')
-            # code.interact(local=dict(globals(), **locals()))
             rnn_layer_states.append([sub_state.numpy() for sub_state in layer.states])
-            # print(rnn_layer_states)
 
     return rnn_layer_states
 

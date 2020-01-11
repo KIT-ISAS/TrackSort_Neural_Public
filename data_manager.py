@@ -29,10 +29,14 @@ class AbstractDataSet(ABC):
     input_dim = 2
 
     timesteps = None
+    longest_track = None
 
     batch_size = 128
     train_split_ratio = 0.5
     test_split_ratio = 0.5
+
+    def get_nan_value_ary(self):
+        return [self.nan_value, self.nan_value]
 
     @abstractmethod
     def get_seq2seq_data(self, nan_value=0):
@@ -339,7 +343,7 @@ class AbstractDataSet(ABC):
 
         return dataset_train, dataset_test
 
-    def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1):
+    def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1, time_normalization=22.):
         track_data, spatial_labels, temporal_labels = self.get_separation_prediction_data()
         tracks = self._convert_aligned_tracks_to_seq2seq_data(track_data)
         num_time_steps = tracks.shape[1]
@@ -358,7 +362,7 @@ class AbstractDataSet(ABC):
             # normalize spatial prediction
             tracks[:, :, [4]] /= self.belt_width
             # normalize temporal prediction
-            tracks[:, :, [4]] /= 50.
+            tracks[:, :, [5]] /= time_normalization
 
         train_tracks, test_tracks = self.split_train_test(tracks, test_ratio=test_ratio)
 
@@ -403,9 +407,9 @@ class AbstractDataSet(ABC):
         return longest_track
 
     def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
+        assert self.longest_track is not None, "self.longest_track not set"
+        print("longest_track=", self.longest_track)
         seq2seq_data = []
-
-        longest_track = 0
 
         # for every track we create:
         #  x, y, x_target, y_target nan_value-padded
@@ -421,10 +425,6 @@ class AbstractDataSet(ABC):
             x[last_index] = self.nan_value
             y[last_index] = self.nan_value
 
-            # find the longest track
-            if longest_track < last_index:
-                longest_track = last_index
-
             # the ground truth where the particle will be
             x_target = np.concatenate((aligned_track_data[track_number][1:, 0].copy(), np.array([self.nan_value])))
             y_target = np.concatenate((aligned_track_data[track_number][1:, 1].copy(), np.array([self.nan_value])))
@@ -432,18 +432,14 @@ class AbstractDataSet(ABC):
             input_matrix = np.vstack((x, y, x_target, y_target))
 
             # initialize the array with nan-value
-            matrix = np.ones([self.timesteps, self.input_dim * 2]) * self.nan_value
+            matrix = np.ones([self.longest_track, self.input_dim * 2]) * self.nan_value
 
             # insert the data of the track into the zero background (example: nan-value=0 -> black background)
             matrix[0:x.size, 0:self.input_dim * 2] = input_matrix.T
 
             seq2seq_data.append(matrix)
 
-        self.longest_track = longest_track
-
-        print(longest_track)
-
-        return np.array(seq2seq_data)[:, :longest_track + 1, :]
+        return np.array(seq2seq_data)[:, :self.longest_track + 1, :]
 
     def get_box_plot(self, model, dataset):
         maes = []
@@ -466,7 +462,8 @@ class AbstractDataSet(ABC):
         ax1.set_title('Boxplot')
         ax1.boxplot(maes, showfliers=False)
 
-    def get_separation_prediction_data(self, virtual_belt_edge_x_position=1200, virtual_nozzle_array_x_position=1400):
+    def get_separation_prediction_data(self, virtual_belt_edge_x_position=1200, virtual_nozzle_array_x_position=1400,
+                                       min_measurements_count=7):
         """
         Get training data for the separation task.
         For every track, which has measurements left of the virtual_belt_edge_x_position (visible measurements) and
@@ -569,10 +566,12 @@ class AbstractDataSet(ABC):
         assert virtual_nozzle_array_x_position < self.belt_width, "virtual_nozzle_array_x_position is too far right"
         assert virtual_belt_edge_x_position < virtual_nozzle_array_x_position, \
             "assert: virtual_belt_edge_x_position < virtual_nozzle_array_x_position"
+        assert min_measurements_count > 0, "min_measurements_count has to be >0"
 
         aligned_track_data = self.get_aligned_track_data()
 
         # 1. only work with tracks which have visible measurements left of the virtual_belt_edge_x_position
+        # ToDO:   -> minimum of min_measurements_count necessary
 
         left_of_edge_mask = aligned_track_data[:, 0, 0] < virtual_belt_edge_x_position
         # apply mask as filter
@@ -647,6 +646,37 @@ class AbstractDataSet(ABC):
 
         return aligned_track_data, spatial_labels, temporal_labels
 
+    def _convert_tracks_to_aligned_tracks(self, track_data):
+        """
+        Align the tracks, in order that they all start with time step = 0
+
+        :param track_data:
+        :return:
+        """
+        aligned_tracks = []
+
+        # the nan value used for every dimension of a skipped timestep
+        nan_value_ary = self.get_nan_value_ary()
+
+        # for every track
+        for track_idx in range(track_data.shape[0]):
+            # for every time step
+            skip_counter = 0
+            track = []
+            for t in range(track_data.shape[1]):
+                # skip if NaN
+                if np.all(track_data[track_idx, t] == self.nan_value):
+                    skip_counter += 1
+                else:
+                    track.append(track_data[track_idx, t])
+
+            for t in range(skip_counter):
+                track.append(nan_value_ary)
+
+            aligned_tracks.append(track)
+
+        return np.array(aligned_tracks)[:, :self.longest_track, :]
+
 
 class FakeDataSet(AbstractDataSet):
     def __init__(self, timesteps=350, number_trajectories=1000,
@@ -699,10 +729,11 @@ class FakeDataSet(AbstractDataSet):
     def _generate_tracks(self):
         tracks = []
 
-        # the nan value used for every dimension of a skipped timestep
-        self.nan_value_ary = [self.nan_value, self.nan_value]
-
         step_length = self.step_length
+
+        nan_value_ary = self.get_nan_value_ary()
+
+        longest_track = 0
 
         # for every trajectory
         for track_number in range(self.n_trajectories):
@@ -710,7 +741,7 @@ class FakeDataSet(AbstractDataSet):
             start_timestep = random.randint(0, self.timesteps - self.min_number_points_per_trajectory)
 
             # list containing all points: add NaNs for every skipped timestep
-            trajectory = [self.nan_value_ary for _ in range(start_timestep)]
+            trajectory = [nan_value_ary for _ in range(start_timestep)]
 
             # spawn the new trajectory on the left side
             start_x = random.randint(0, self.belt_width // 10)
@@ -736,7 +767,9 @@ class FakeDataSet(AbstractDataSet):
 
             track_done = False
 
-            # iterate over all the time steps from start_time_step+1   until end
+            track_length = 1
+
+            # iterate over all the time steps from start_time_step+2   until end
             for t in range(start_timestep + 2, self.timesteps + 1):
                 # generate next position
                 new_x = trajectory[-1][0] + dx
@@ -750,39 +783,16 @@ class FakeDataSet(AbstractDataSet):
                     trajectory.append([self.nan_value, self.nan_value])
                 else:
                     trajectory.append([new_x, new_y])
+                    track_length += 1
+
+            if track_length > longest_track:
+                longest_track = track_length
 
             tracks.append(trajectory)
 
+        self.track_length = longest_track
+
         return np.array(tracks)
-
-    def _convert_tracks_to_aligned_tracks(self, track_data):
-        """
-        Align the tracks, in order that they all start with time step = 0
-
-        :param track_data:
-        :return:
-        """
-        aligned_tracks = []
-
-        # for every track
-        for track_idx in range(track_data.shape[0]):
-            # for every time step
-            skip_counter = 0
-            track = []
-            for t in range(track_data.shape[1]):
-                # skip if NaN
-                if np.all(track_data[track_idx, t] == self.nan_value):
-                    skip_counter += 1
-                    continue
-                else:
-                    track.append(track_data[track_idx, t])
-
-            for t in range(skip_counter):
-                track.append(self.nan_value_ary)
-
-            aligned_tracks.append(track)
-
-        return np.array(aligned_tracks)
 
     def get_track_data(self):
         return self.track_data
@@ -805,7 +815,8 @@ class FakeDataSet(AbstractDataSet):
 
 class CsvDataSet(AbstractDataSet):
     def __init__(self, glob_file_pattern, min_number_detections=6, nan_value=0, input_dim=2,
-                 timesteps=35, batch_size=128, global_config=None):
+                 timesteps=35, batch_size=128, global_config=None, data_is_aligned=True,
+                 birth_rate_mean=6, birth_rate_std=2):
         self.global_config = global_config
         if global_config and 'dataset_path' in self.global_config.keys():
             self.glob_file_pattern = self.global_config['dataset_path']
@@ -820,20 +831,56 @@ class CsvDataSet(AbstractDataSet):
         self.input_dim = input_dim
         self.batch_size = batch_size
 
-        # ToDo(Daniel): self.num_time_steps = len(self._extract_longest_track())
-        self.timesteps = timesteps
+        # Set timesteps if wanted. Else: _load_tracks calculates the longest track length
+        if timesteps is not None:
+            self.timesteps = timesteps
         self.tracks = self._load_tracks()
 
-        # we assume the csv data is aligned by default
-        self.aligned_tracks = self.tracks
+        # csv data is aligned?
+        self.data_is_aligned = data_is_aligned
+        if data_is_aligned:
+            self.aligned_tracks = self.tracks[:, :self.longest_track, :]
+        else:
+            print("align data")
+            self.aligned_tracks = self._convert_tracks_to_aligned_tracks(self.tracks)
+
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_tracks)
+
+        # if data is aligned -> we create an artificial ordering of the tracks according to the given
+        #  number of timesteps
+        if data_is_aligned:
+            self.birth_rate_mean = birth_rate_mean
+            self.birth_rate_std = birth_rate_std
+            self.artificial_tracks = self._expand_time_of_tracks(self.aligned_tracks)
 
         # normalize in all dimensions with the same factor
         self.normalization_constant = np.nanmax(self.seq2seq_data) * 1.1  # this leaves room for tracks at the borders
         self.belt_width = self.normalization_constant
 
-    def _load_tracks(self):
+    def _load_tracks(self, data_is_aligned=True):
         tracks = []
+
+        # total rows of all files -> number of timesteps
+        longest_track = 0
+        timesteps = 0
+        # calculate length of longest track
+        for file_ in self.file_list:
+            # read the tracks from one session
+            df = pd.read_csv(file_)
+            # concatenate the timesteps
+            timesteps += df.shape[0]
+            # iterate over all tracks: track_count=int((df.shape[1]) / 2)
+            for track_number in range(int((df.shape[1]) / 2)):
+                track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
+                track_len = self.get_last_timestep_of_track(track) + 1
+                if track_len > longest_track:
+                    longest_track = track_len
+
+        print('timesteps={}'.format(timesteps))
+        self.timesteps = timesteps
+        self.longest_track = longest_track
+
+        t_step = 0
 
         for file_ in self.file_list:
             # read the tracks from one measurement
@@ -845,23 +892,21 @@ class CsvDataSet(AbstractDataSet):
             # there are two columns per track, for example "TrackID_4_X" and "TrackID_4_Y"
             number_of_tracks = int((df.shape[1]) / 2)
 
-            # We wan't to use 0.0 as NaN value. Therefore we have to check that it does not
+            # We want to use 0.0 as NaN value. Therefore we have to check that it does not
             #   exist in the data.   Note: the double .min().min() is necessary because we
             #   first get the column minima and then we get the table minimum from that
             assert df.min().min() > 0.0, "Error: The dataframe {} contains a minimum <= 0.0".format(file_)
 
-            # ToDo: calc track length!
-            longest_track = self.timesteps  # df.count().max()
-
-            # for every track we create:
-            # - track
             for track_number in range(number_of_tracks):
                 # create the simple tracks
                 # **Attention:** the columns are ordered as (Y,X) and we turn it around to (X,Y)
                 track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
-                background = np.zeros([longest_track, self.input_dim])
-                background[:track.shape[0], :track.shape[1]] = track
+                background = np.zeros([timesteps, self.input_dim])
+                background[t_step:t_step+track.shape[0], :track.shape[1]] = track
                 tracks.append(np.nan_to_num(background))
+
+            if not data_is_aligned:
+                t_step += df.shape[0]
 
         tracks = np.array(tracks)
         return tracks
@@ -879,10 +924,58 @@ class CsvDataSet(AbstractDataSet):
         pass
 
     def get_measurement_at_timestep(self, timestep, normalized=True):
-        data = self.get_track_data()[:, [timestep], :].copy()
+        if self.data_is_aligned:
+            source = self.artificial_tracks
+        else:
+            source = self.get_track_data()
+
+        data = source[:, [timestep], :].copy()
         if normalized:
             return self.normalize_tracks(data, is_seq2seq_data=False)
         return data
+
+    def _expand_time_of_tracks(self, aligned_tracks):
+        """Given aligned_track => tracks for data association
+
+        until all tracks are used:
+            n = Normal.sample(birth_rate_mean, birth_rate_std)
+            n = round(n)
+            insert n new tracks at timestep
+        """
+        track_i = 0
+        num_tracks = aligned_tracks.shape[0]
+        time_step = 0
+
+        tracks_beginning = []
+        tracks_data = []
+
+        while track_i < num_tracks:
+            # how many new tracks (similar to half normal distribution)
+            n_new_tracks = np.random.normal(0, 0.5 * self.birth_rate_std) + self.birth_rate_mean
+            n_new_tracks = max(round(n_new_tracks), 0)
+
+            # add all new tracks. Or: only as many as possible at the end
+            for i in range(min(n_new_tracks, num_tracks-track_i)):
+                tracks_beginning.append(time_step)
+                tracks_data.append(aligned_tracks[track_i])
+                track_i += 1
+
+            time_step += 1
+
+        # add enough white space at the end
+        time_step += self.longest_track
+
+        expanded_tracks = []
+
+        for track_begin, track in zip(tracks_beginning, tracks_data):
+            background = np.zeros([time_step, self.input_dim])
+            background[track_begin:track_begin+track.shape[0], :] = track
+
+            expanded_tracks.append(background.copy())
+
+        expanded_tracks = np.array(expanded_tracks)
+
+        return expanded_tracks
 
 
 if __name__ == '__main__':
