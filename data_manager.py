@@ -712,7 +712,7 @@ class FakeDataSet(AbstractDataSet):
         self.splits = splits
         self.min_number_points_per_trajectory = min_number_points_per_trajectory
         if global_config and 'batch_size' in global_config.keys():
-            self.timesteps = global_config['batch_size']
+            self.batch_size = global_config['batch_size']
         else:
             self.batch_size = batch_size
         self.batch_size = batch_size
