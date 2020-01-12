@@ -794,7 +794,7 @@ class FakeDataSet(AbstractDataSet):
 
             tracks.append(trajectory)
 
-        self.track_length = longest_track
+        self.longest_track = longest_track
 
         return np.array(tracks)
 
@@ -818,14 +818,11 @@ class FakeDataSet(AbstractDataSet):
 
 
 class CsvDataSet(AbstractDataSet):
-    def __init__(self, glob_file_pattern, min_number_detections=6, nan_value=0, input_dim=2,
+    def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2,
                  timesteps=35, batch_size=128, global_config=None, data_is_aligned=True,
                  birth_rate_mean=6, birth_rate_std=2):
         self.global_config = global_config
-        if global_config and 'dataset_path' in self.global_config.keys():
-            self.glob_file_pattern = self.global_config['dataset_path']
-        else:
-            self.glob_file_pattern = glob_file_pattern
+        self.glob_file_pattern = glob_file_pattern
         self.file_list = sorted(glob.glob(glob_file_pattern))
         assert len(self.file_list) > 0, "No files found"
 

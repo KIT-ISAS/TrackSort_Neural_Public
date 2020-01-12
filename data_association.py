@@ -14,7 +14,7 @@ class DataAssociation(object):
         if self.global_config['dataset_type'] == 'FakeDataset':
             self.data_source = FakeDataSet(global_config=global_config)
         else:
-            self.data_source = CsvDataSet(global_config=global_config)
+            self.data_source = CsvDataSet(global_config=global_config, **global_config['CsvDataSet'])
         self.track_manager = TrackManager(global_config, self.data_source)
 
     def associate_data(self):
@@ -69,16 +69,16 @@ class DataAssociation(object):
             #
             for measurement_nr in range(len(measurements)):
                 distance_matrix[measurement_nr][len(prediction_values) + measurement_nr] = self.global_config[
-                    'distance_threshhold']
+                    'distance_threshold']
                 distance_matrix[len(measurements) + len(prediction_values) + measurement_nr][
-                    len(prediction_values) + measurement_nr] = 1.1 * self.global_config['distance_threshhold']
+                    len(prediction_values) + measurement_nr] = 1.1 * self.global_config['distance_threshold']
             #
             for prediction_nr in range(len(prediction_values)):
                 distance_matrix[len(measurements) + prediction_nr][prediction_nr] = self.global_config[
-                    'distance_threshhold']
+                    'distance_threshold']
                 distance_matrix[len(measurements) + prediction_nr][
                     len(measurements) + len(prediction_values) + prediction_nr] = 1.1 * self.global_config[
-                    'distance_threshhold']
+                    'distance_threshold']
             #
             #print('before matching')
             #code.interact(local=dict(globals(), **locals()))
@@ -112,11 +112,11 @@ class DataAssociation(object):
                         print('track finished!')
                         plt.scatter([prediction[0]], [prediction[1]], c='black')
                     #
-                    circle = plt.Circle(prediction, self.global_config['distance_threshhold'], color='blue', fill=False)
+                    circle = plt.Circle(prediction, self.global_config['distance_threshold'], color='blue', fill=False)
                     plt.gcf().gca().add_artist(circle)
                     # only for visualization purposes
                     pseudo_measurement = np.array(
-                        [prediction[0] + self.global_config['distance_threshhold'], prediction[1]])
+                        [prediction[0] + self.global_config['distance_threshold'], prediction[1]])
                     line = np.stack((pseudo_measurement, prediction), axis=0)
                     plt.plot(line[:, 0], line[:, 1], c='green')
                 #
@@ -128,11 +128,11 @@ class DataAssociation(object):
                     prediction_id = self.track_manager.pseudo_track_real_measurement(measurement, time_step)
                     old_measurements[prediction_id] = (measurement, True)
                     #
-                    circle = plt.Circle(measurement, self.global_config['distance_threshhold'], color='red', fill=False)
+                    circle = plt.Circle(measurement, self.global_config['distance_threshold'], color='red', fill=False)
                     plt.gcf().gca().add_artist(circle)
                     #
                     pseudo_prediction = np.array(
-                        [measurement[0] + self.global_config['distance_threshhold'], measurement[1]])
+                        [measurement[0] + self.global_config['distance_threshold'], measurement[1]])
                     line = np.stack((measurement, pseudo_prediction), axis=0)
                     plt.plot(line[:, 0], line[:, 1], c='green')
                 else:

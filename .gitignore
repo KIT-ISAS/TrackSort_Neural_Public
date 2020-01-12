@@ -13,3 +13,7 @@ gpu_env
 
 # IDE
 .idea
+
+# venv
+virtualenv
+

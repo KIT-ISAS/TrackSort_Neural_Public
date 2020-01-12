@@ -36,7 +36,8 @@ class TrackManager(object):
         self.global_config['highest_id'] = global_track_id
         self.currently_highest_id += 1
         self.active_ids.append(global_track_id)
-        self.tracks[global_track_id] = Track(self.global_config, current_timestep, measurement)
+        self.tracks[global_track_id] = Track(self.global_config, current_timestep, measurement,
+                                             **self.global_config['Track'])
         self.model_manager.create_by_id(global_track_id, measurement)
         return global_track_id
 
