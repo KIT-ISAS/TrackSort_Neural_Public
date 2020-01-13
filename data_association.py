@@ -7,14 +7,35 @@ import copy, shutil, os
 from track_manager import TrackManager
 from data_manager import FakeDataSet, CsvDataSet
 
+# definition of my own nearest neighbour method
+def nearest_neighbour(weight_matrix):
+    num_rows = weight_matrix.shape[0]
+    num_cols = weight_matrix.shape[1]
+    measurement_idxs = []
+    prediction_idxs = []
+    sorted_idxs = np.argsort(weight_matrix.flatten())
+    for idx in range(sorted_idxs.shape[0]):
+        row = int(sorted_idxs[idx] / num_cols)
+        col = sorted_idxs[idx] - row * num_cols
+        if not row in measurement_idxs and not col in prediction_idxs:
+            measurement_idxs.append(row)
+            prediction_idxs.append(col)
+            if len(measurement_idxs) == num_rows or len(prediction_idxs) == num_cols:
+                return measurement_idxs, prediction_idxs
+    print('something went wrong in nearest_neighbour!')
+    code.interact(local=dict(globals(), **locals()))
+
 
 class DataAssociation(object):
     def __init__(self, global_config):
         self.global_config = global_config
         if self.global_config['dataset_type'] == 'FakeDataset':
             self.data_source = FakeDataSet(global_config=global_config)
-        else:
+        elif self.global_config['dataset_type'] == 'CsvDataset':
             self.data_source = CsvDataSet(global_config=global_config, **global_config['CsvDataSet'])
+        else:
+            print(self.global_config['dataset_type'] + ' is no valid data source!')
+            code.interact(local=dict(globals(), **locals()))
         self.track_manager = TrackManager(global_config, self.data_source)
 
     def associate_data(self):
@@ -80,9 +101,15 @@ class DataAssociation(object):
                     len(measurements) + len(prediction_values) + prediction_nr] = 1.1 * self.global_config[
                     'distance_threshold']
             #
+            if self.global_config['matching_algorithm'] == 'global': 
+                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.1 * self.global_config['distance_threshhold']
+            #
             #print('before matching')
             #code.interact(local=dict(globals(), **locals()))
-            measurement_idxs, prediction_idxs = linear_sum_assignment(distance_matrix)
+            if self.global_config['matching_algorithm'] == 'local':
+                measurement_idxs, prediction_idxs = nearest_neighbour(distance_matrix)
+            elif self.global_config['matching_algorithm'] == 'global':
+                measurement_idxs, prediction_idxs = linear_sum_assignment(distance_matrix)
             #
             counts = np.zeros([4], dtype=np.int32)
             old_measurements = {}

@@ -867,7 +867,7 @@ class CsvDataSet(AbstractDataSet):
         # calculate length of longest track
         for file_ in self.file_list:
             # read the tracks from one session
-            df = pd.read_csv(file_)
+            df = pd.read_csv(file_, engine='python')
             # concatenate the timesteps
             timesteps += df.shape[0]
             # iterate over all tracks: track_count=int((df.shape[1]) / 2)

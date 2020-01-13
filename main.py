@@ -1,39 +1,59 @@
 import code  # code.interact(local=dict(globals(), **locals()))
 import shutil
+import argparse
 
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
 
-batch_size = 64
+parser = argparse.ArgumentParser()
+
+# the possible arguments you can give to the model
+parser.add_argument('--is_loaded', type=bool, default=True, help='Whether the model is loaded or created + trained.')
+parser.add_argument('--model_path', default='rnn_model_fake_data.h5', help='The path where the model is stored or loaded from.')
+parser.add_argument('--matching_algorithm', default='local', help='The algorithm, that is used for matching. Current options are: ["local","global"])')
+parser.add_argument('--dataset_dir', default='data/Pfeffer/*', help='The directory of the data set. Only needed for CsvDataset.')
+parser.add_argument('--dataset_type', default='CsvDataset', help='The type of the dataset. Current options are: ["FakeDataset","CsvDataset"].')
+parser.add_argument('--distance_threshold', type=float, default=0.03, help='The threshhold, that is used for the matching with the artificial measurements and predictions')
+parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
+parser.add_argument('--num_timesteps', type=int, default=50, help='The number of timesteps of the dataset. Necessary for FakeDataset.')
+parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
+parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
+parser.add_argument('--birth_rate_mean', type=float, default=1.0, help='The birth_rate_mean value, that is used by the DataManager')
+parser.add_argument('--birth_rate_std', type=float, default=2.0, help='The birth_rate_std value, that is used by the DataManager')
+parser.add_argument('--min_number_detections', type=int, default=6, help='The min_number_detections value, that is used by the DataManager')
+parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
+parser.add_argument('--data_is_aligned', type=bool, default=True, help='Whether the data used by the DataManger is aligned or not.')
+
+args = parser.parse_args()
 
 global_config = {
-    'is_loaded': True,
-    'weights_path': 'models/my_16_16_rnn.h5',
-    'model_path': 'models/rnn_model_fake_data.h5',
-    'distance_threshold': 0.03,  # 5.0 / 2000,
-    'batch_size': batch_size,
+    'is_loaded': args.is_loaded,
+    'model_path': args.model_path,
+    'distance_threshold': args.distance_threshold,
+    'batch_size': args.batch_size,
+    'matching_algorithm': args.matching_algorithm,
     #
     'Track': {
         'initial_is_alive_probability': 0.5,
         'is_alive_decrease': 0.25,
         'is_alive_increase': 0.5,
     },
-
-    'num_timesteps': 50,
-    'dataset_type': 'CsvDataset',
+    #
+    'num_timesteps': args.num_timesteps,
+    'dataset_type': args.dataset_type,
     #
     'CsvDataSet': {
-        'glob_file_pattern': 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv',
-        'min_number_detections': 6,
-        'nan_value': 0,
-        'input_dim': 2,
-        'batch_size': batch_size,
-        'data_is_aligned': True,
-        'birth_rate_mean': 1,
-        'birth_rate_std': 2
+        'glob_file_pattern': args.dataset_dir,
+        'min_number_detections': args.min_number_detections,
+        'nan_value': args.nan_value,
+        'input_dim': args.input_dim,
+        'batch_size': args.batch_size,
+        'data_is_aligned': args.data_is_aligned,
+        'birth_rate_mean': args.birth_rate_mean,
+        'birth_rate_std': args.birth_rate_std
     },
     #
-    'num_train_epochs': 1000,
+    'num_train_epochs': args.num_train_epochs,
     'visualization_path': 'visualizations/matching_visualization_local/',
     'visualization_video_path': 'visualizations/matching_visualization_vid.mp4',
     'state_overwriting_started': False,

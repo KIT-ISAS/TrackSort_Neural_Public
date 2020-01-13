@@ -3,7 +3,15 @@
 Using a RNN to predict next measurement of tracks.
 Quick starts are provided in the "/Notebook" folder.
 
-## Requirements
+## Download data + checkpoints, install the libraries and run it with only two commands with a Linux shell on the CPU
+
+'sh setup_cpu.sh'
+
+'python main.py'
+
+You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing "python main.py --help"
+
+## Installation of the requirements alone
 
 `apt-get -q install wget`
 
