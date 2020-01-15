@@ -63,6 +63,7 @@ global_config = {
 data_association = DataAssociation(global_config)
 
 tracks = data_association.associate_data()
+particles = data_association.data_source.get_particles()
 
 shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
 clip = ImageSequenceClip(global_config['visualization_path'], fps=4)
@@ -70,3 +71,53 @@ clip.write_videofile(global_config['visualization_video_path'], fps=4)
 
 print('data association finished!')
 code.interact(local=dict(globals(), **locals()))
+
+
+# type of errors
+# error of first kind: track contains multiple particles
+def assigment_of_measurement_in_particle(timestep, measurement):
+    for idx, particle_list in enumerate(particles):
+        for particle in particle_list:
+            particle_timestep, particle_measurement = particle
+            if particle_timestep == timestep and particle_measurement[0] == measurement[0] and particle_measurement[1] == measurement[1]:
+                return idx
+    else:
+        print('measurement found no match in particles!')
+        code.interact(local=dict(globals(), **locals()))
+#
+num_errors_of_first_kind = 0
+for track_id, track in enumerate(tracks):
+    particle_id = assigment_of_measurement_in_particle(track.initial_timestep, track.measurements[0])
+    correct_condition = lambda x: assigment_of_measurement_in_particle(x[0], x[1]) != particle_id
+    check_list = []
+    for it, measurement in enumerate(track.measurements):
+        check_list.append([track.initial_timestep + it, measurement])
+    num_errors_of_first_kind += int(len(list(filter(correct_condition, check_list))) != 0)
+
+ratio_error_of_first_kind = num_errors_of_first_kind / len(tracks)
+print('ratio_error_of_first_kind: ' + str(ratio_error_of_first_kind))
+
+# type of errors
+# error of first kind: track contains multiple particles
+def assigment_of_measurement_in_track(timestep, measurement):
+    for idx, track in enumerate(tracks):
+        for it, track_measurement in enumerate(track.measurements):
+            track_timestep = track.initial_timestep + it
+            if track_timestep == timestep and track_measurement[0] == measurement[0] and track_measurement[1] == measurement[1]:
+                return idx
+    else:
+        print('measurement found no match in tracks!')
+        code.interact(local=dict(globals(), **locals()))
+#
+num_errors_of_second_kind = 0
+for particle_id, particle_list in enumerate(particles):
+    track_id = assigment_of_measurement_in_track(particle_list[0][0], particle_list[0][1])
+    correct_condition = lambda x: assigment_of_measurement_in_track(x[0], x[1]) != track_id
+    check_list = []
+    for it, particle in enumerate(particle_list):
+        check_list.append([particle[0], particle[1]])
+    num_errors_of_second_kind += int(len(list(filter(correct_condition, check_list))) != 0)
+
+ratio_error_of_second_kind = num_errors_of_second_kind / len(tracks)
+print('ratio_error_of_second_kind: ' + str(ratio_error_of_second_kind))
+
