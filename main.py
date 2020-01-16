@@ -79,20 +79,30 @@ def assigment_of_measurement_in_particle(timestep, measurement):
     for idx, particle_list in enumerate(particles):
         for particle in particle_list:
             particle_timestep, particle_measurement = particle
-            if particle_timestep == timestep and particle_measurement[0] == measurement[0] and particle_measurement[1] == measurement[1]:
+            timestep = particle_timestep # TODO fix particle timestep extraction
+            if timestep == particle_timestep and particle_measurement[0] == measurement[0] and particle_measurement[1] == measurement[1]:
+                print(str(timestep) + ' - ' + str(measurement) + ' - measurement found match in particles! - ' + str(idx))
                 return idx
-    else:
-        print('measurement found no match in particles!')
-        code.interact(local=dict(globals(), **locals()))
+    print(str(timestep) + ' - ' + str(measurement) + ' - measurement found no match in particles! Probably a artificial measurement.')
+    # code.interact(local=dict(globals(), **locals()))
+    return -1
+
+
 #
 num_errors_of_first_kind = 0
-for track_id, track in enumerate(tracks):
+for track_id in list(tracks.keys()):
+    print(track_id)
+    track = tracks[track_id]
+    # code.interact(local=dict(globals(), **locals()))
     particle_id = assigment_of_measurement_in_particle(track.initial_timestep, track.measurements[0])
-    correct_condition = lambda x: assigment_of_measurement_in_particle(x[0], x[1]) != particle_id
+    def correct_condition(x):
+        particle_id_current = assigment_of_measurement_in_particle(x[0], x[1])
+        return particle_id_current != particle_id and particle_id_current != -1
     check_list = []
     for it, measurement in enumerate(track.measurements):
         check_list.append([track.initial_timestep + it, measurement])
     num_errors_of_first_kind += int(len(list(filter(correct_condition, check_list))) != 0)
+
 
 ratio_error_of_first_kind = num_errors_of_first_kind / len(tracks)
 print('ratio_error_of_first_kind: ' + str(ratio_error_of_first_kind))
@@ -100,23 +110,31 @@ print('ratio_error_of_first_kind: ' + str(ratio_error_of_first_kind))
 # type of errors
 # error of first kind: track contains multiple particles
 def assigment_of_measurement_in_track(timestep, measurement):
-    for idx, track in enumerate(tracks):
+    for idx in list(tracks.keys()):
+        track = tracks[idx]
         for it, track_measurement in enumerate(track.measurements):
             track_timestep = track.initial_timestep + it
+            timestep = track_timestep # TODO fix particle timestep extraction
             if track_timestep == timestep and track_measurement[0] == measurement[0] and track_measurement[1] == measurement[1]:
                 return idx
     else:
-        print('measurement found no match in tracks!')
-        code.interact(local=dict(globals(), **locals()))
+        # print('measurement found no match in tracks!')
+        # code.interact(local=dict(globals(), **locals()))
+        return -1
+
+
 #
 num_errors_of_second_kind = 0
 for particle_id, particle_list in enumerate(particles):
     track_id = assigment_of_measurement_in_track(particle_list[0][0], particle_list[0][1])
-    correct_condition = lambda x: assigment_of_measurement_in_track(x[0], x[1]) != track_id
+    def correct_condition(x):
+        track_id_current = assigment_of_measurement_in_track(x[0], x[1])
+        return track_id_current != track_id and track_id_current != -1
     check_list = []
     for it, particle in enumerate(particle_list):
         check_list.append([particle[0], particle[1]])
     num_errors_of_second_kind += int(len(list(filter(correct_condition, check_list))) != 0)
+
 
 ratio_error_of_second_kind = num_errors_of_second_kind / len(tracks)
 print('ratio_error_of_second_kind: ' + str(ratio_error_of_second_kind))

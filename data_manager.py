@@ -118,10 +118,10 @@ class AbstractDataSet(ABC):
                     if not is_started and (
                             track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
                         is_started = True
-                        particles.append([[time_idx, track_data[track_idx][time_idx]]])
+                        particles.append([[time_idx, track_data[track_idx][time_idx] / self.belt_width]]) # TODO careful if self.belt_width != self.belt_height
                     elif is_started and not (
                             track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
-                        particles[-1].append([time_idx, track_data[track_idx][time_idx]])
+                        particles[-1].append([time_idx, track_data[track_idx][time_idx]  / self.belt_width]) # TODO careful if self.belt_width != self.belt_height
                     elif is_started and (
                             track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         break
@@ -286,7 +286,7 @@ class AbstractDataSet(ABC):
         :return:
         """
         tracks[:, :, 0] /= self.belt_width
-        tracks[:, :, 1] /= self.belt_width
+        tracks[:, :, 1] /= self.belt_width # TODO shouldn't here self.belt_height be used???
 
         if is_seq2seq_data:
             tracks[:, :, 2] /= self.belt_width
