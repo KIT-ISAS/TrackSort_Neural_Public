@@ -82,6 +82,12 @@ class AbstractDataSet(ABC):
         """
         raise NotImplementedError
 
+    def get_num_timesteps(self):
+        """The number of time steps of the full data set.
+        This is not dimensions used for the RNN unrolling.
+        """
+        return self.timesteps
+
     def get_aligned_track_data(self):
         """
         Return a numpy array with shape: [number_tracks, total_number_timesteps, point_dimension]
