@@ -7,7 +7,7 @@ pip install -r requirements_cpu.txt
 
 # Load models
 mkdir models
-wget -P "./data/" -N "pollithy.com/rnn_model_fake_data.h5"
+wget -P "./models/" -N "pollithy.com/rnn_model_fake_data.h5"
 
 
 # Load data
@@ -23,5 +23,5 @@ for datasetname in ${DataSetsArray[*]}; do
      dataurl="pollithy.com/${datasetname}.zip"
      zipname="${datasetname}.zip"
      wget -P "./data/" -N "${dataurl}"
-     unzip -n "./data/${zipname}"
+     unzip -n "./data/${zipname}" -d "./data/"
 done
