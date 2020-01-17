@@ -20,6 +20,8 @@ from sklearn.model_selection import train_test_split
 
 class AbstractDataSet(ABC):
     # dimensions of the belt in pixels
+    # ToDo: Currently this has to be the same value
+    #       assert belt_width == belt_height
     belt_width = 2000
     belt_height = 2000
 
@@ -349,8 +351,13 @@ class AbstractDataSet(ABC):
 
         return dataset_train, dataset_test
 
-    def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1, time_normalization=22.):
-        track_data, spatial_labels, temporal_labels = self.get_separation_prediction_data()
+    def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1, time_normalization=22.,
+                                                      virtual_belt_edge_x_position=1200,
+                                                      virtual_nozzle_array_x_position=1400):
+        track_data, spatial_labels, temporal_labels = self.get_separation_prediction_data(
+            virtual_belt_edge_x_position=virtual_belt_edge_x_position,
+            virtual_nozzle_array_x_position=virtual_nozzle_array_x_position)
+
         tracks = self._convert_aligned_tracks_to_seq2seq_data(track_data)
         num_time_steps = tracks.shape[1]
 
