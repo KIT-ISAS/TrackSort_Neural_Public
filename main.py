@@ -11,15 +11,15 @@ parser = argparse.ArgumentParser()
 # the possible arguments you can give to the model
 parser.add_argument('--is_loaded', type=bool, default=True, help='Whether the model is loaded or created + trained.')
 parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5', help='The path where the model is stored or loaded from.')
-parser.add_argument('--matching_algorithm', default='local', help='The algorithm, that is used for matching. Current options are: ["local","global"])')
+parser.add_argument('--matching_algorithm', default='global', help='The algorithm, that is used for matching. Current options are: ["local","global"])')
 parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv', help='The directory of the data set. Only needed for CsvDataset.')
 parser.add_argument('--dataset_type', default='CsvDataset', help='The type of the dataset. Current options are: ["FakeDataset","CsvDataset"].')
 parser.add_argument('--distance_threshold', type=float, default=0.01, help='The threshhold, that is used for the matching with the artificial measurements and predictions')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
-parser.add_argument('--num_timesteps', type=int, default=20, help='The number of timesteps of the dataset. Necessary for FakeDataset.')
+parser.add_argument('--num_timesteps', type=int, default=15, help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
 parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
-parser.add_argument('--birth_rate_mean', type=float, default=10.0, help='The birth_rate_mean value, that is used by the DataManager')
+parser.add_argument('--birth_rate_mean', type=float, default=5.0, help='The birth_rate_mean value, that is used by the DataManager')
 parser.add_argument('--birth_rate_std', type=float, default=2.0, help='The birth_rate_std value, that is used by the DataManager')
 parser.add_argument('--min_number_detections', type=int, default=6, help='The min_number_detections value, that is used by the DataManager')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
@@ -81,8 +81,7 @@ def run_global_config(global_config):
 	#
 	evaluator = Evaluator(global_config, particles, tracks)
 	accuracy_of_the_first_kind = 1.0 - evaluator.error_of_first_kind()
-	#accuracy_of_the_second_kind = 1.0 - evaluator.error_of_second_kind()
-	accuracy_of_the_second_kind = accuracy_of_the_first_kind
+	accuracy_of_the_second_kind = 1.0 - evaluator.error_of_second_kind()
 	score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (accuracy_of_the_first_kind + accuracy_of_the_second_kind)
 	return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
 

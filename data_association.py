@@ -81,8 +81,7 @@ class DataAssociation(object):
                             label='prediction')
 
             # why isn't infinity working anymore???
-            distance_matrix = 10000 * np.ones(
-                [2 * len(measurements) + len(prediction_values), 2 * len(prediction_values) + len(measurements)])
+            distance_matrix = 10000 * np.ones([2 * len(measurements) + len(prediction_values), 2 * len(prediction_values) + len(measurements)])
             #
             for measurement_nr in range(len(measurements)):
                 for prediction_nr in range(len(prediction_values)):
@@ -103,7 +102,17 @@ class DataAssociation(object):
                     'distance_threshold']
             #
             if self.global_config['matching_algorithm'] == 'global': 
-                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.1 * self.global_config['distance_threshhold']
+                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.2 * self.global_config['distance_threshold']
+                if len(measurements) >= len(prediction_values):
+                    distance_matrix_a = 10000 * np.ones([len(measurements), len(prediction_values) + len(measurements)])
+                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)])
+                    distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=1)
+                    distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=0)
+                else:
+                    distance_matrix_a = 10000 * np.ones([len(prediction_values) + len(measurements), len(prediction_values)])
+                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)])
+                    distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=0)
+                    distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=1)
             #
             #if self.global_config['verbos'] > 0: print('before matching')
             #code.interact(local=dict(globals(), **locals()))
