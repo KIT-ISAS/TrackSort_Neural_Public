@@ -22,7 +22,7 @@ def nearest_neighbour(weight_matrix):
             prediction_idxs.append(col)
             if len(measurement_idxs) == num_rows or len(prediction_idxs) == num_cols:
                 return measurement_idxs, prediction_idxs
-    print('something went wrong in nearest_neighbour!')
+    if self.global_config['verbos'] > 0: print('something went wrong in nearest_neighbour!')
     code.interact(local=dict(globals(), **locals()))
 
 
@@ -33,8 +33,9 @@ class DataAssociation(object):
             self.data_source = FakeDataSet(global_config=global_config)
         elif self.global_config['dataset_type'] == 'CsvDataset':
             self.data_source = CsvDataSet(global_config=global_config, **global_config['CsvDataSet'])
+            # self.global_config['num_timesteps'] = self.data_source.get_num_timesteps()
         else:
-            print(self.global_config['dataset_type'] + ' is no valid data source!')
+            if self.global_config['verbos'] > 0: print(self.global_config['dataset_type'] + ' is no valid data source!')
             code.interact(local=dict(globals(), **locals()))
         self.track_manager = TrackManager(global_config, self.data_source)
 
@@ -43,11 +44,11 @@ class DataAssociation(object):
         shutil.rmtree(self.global_config['visualization_path'], ignore_errors=True)
         os.makedirs(self.global_config['visualization_path'])
         for time_step in range(self.global_config['num_timesteps']):
-            print('')
-            print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
-            plt.title('Time step: {}'.format(time_step))
-            plt.xlim((-0.1, 1.3))
-            plt.ylim((-0.1, 1.1))
+            if self.global_config['verbos'] >= 1: print('')
+            if self.global_config['verbos'] >= 1: print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
+            if self.global_config['visualize']: plt.title('Time step: {}'.format(time_step))
+            if self.global_config['visualize']: plt.xlim((-0.1, 1.3))
+            if self.global_config['visualize']: plt.ylim((-0.1, 1.1))
             self.global_config['current_time_step'] = time_step
             #
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
@@ -58,30 +59,29 @@ class DataAssociation(object):
             #
             if old_measurements is not None:
                 if len(old_measurements) != len(prediction_values):
-                    print('number old_measurements different from number predictions!')
+                    if self.global_config['verbos'] > 0: print('number old_measurements different from number predictions!')
                     code.interact(local=dict(globals(), **locals()))
                 for idx, prediction_id in enumerate(prediction_ids):
                     if old_measurements[prediction_id][1]:
-                        plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
+                        if self.global_config['visualize']: plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
                                     c='cyan')  # , label='old measurement')
                     else:
-                        plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
+                        if self.global_config['visualize']: plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
                                     c='yellow')  # , label='old measurement artificial')
                     start = old_measurements[prediction_id][0]
                     end = predictions[prediction_id]
                     line = np.stack((start, end), axis=0)
-                    plt.plot(line[:, 0], line[:, 1], c='purple')
-            # print('in associate_data')
+                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='purple')
+            # if self.global_config['verbos'] > 0: print('in associate_data')
             # code.interact(local=dict(globals(), **locals()))
             if len(measurements) != 0:
-                plt.scatter(np.array(measurements)[:, 0], np.array(measurements)[:, 1], c='blue', label='measurement')
+                if self.global_config['visualize']: plt.scatter(np.array(measurements)[:, 0], np.array(measurements)[:, 1], c='blue', label='measurement')
             if prediction_values != []:
-                plt.scatter(np.array(prediction_values)[:, 0], np.array(prediction_values)[:, 1], c='red',
+                if self.global_config['visualize']: plt.scatter(np.array(prediction_values)[:, 0], np.array(prediction_values)[:, 1], c='red',
                             label='prediction')
 
             # why isn't infinity working anymore???
-            distance_matrix = 10000 * np.ones(
-                [2 * len(measurements) + len(prediction_values), 2 * len(prediction_values) + len(measurements)])
+            distance_matrix = 10000 * np.ones([2 * len(measurements) + len(prediction_values), 2 * len(prediction_values) + len(measurements)])
             #
             for measurement_nr in range(len(measurements)):
                 for prediction_nr in range(len(prediction_values)):
@@ -102,9 +102,19 @@ class DataAssociation(object):
                     'distance_threshold']
             #
             if self.global_config['matching_algorithm'] == 'global': 
-                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.1 * self.global_config['distance_threshhold']
+                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.2 * self.global_config['distance_threshold']
+                if len(measurements) >= len(prediction_values):
+                    distance_matrix_a = 10000 * np.ones([len(measurements), len(prediction_values) + len(measurements)])
+                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)])
+                    distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=1)
+                    distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=0)
+                else:
+                    distance_matrix_a = 10000 * np.ones([len(prediction_values) + len(measurements), len(prediction_values)])
+                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)])
+                    distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=0)
+                    distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=1)
             #
-            #print('before matching')
+            #if self.global_config['verbos'] > 0: print('before matching')
             #code.interact(local=dict(globals(), **locals()))
             if self.global_config['matching_algorithm'] == 'local':
                 measurement_idxs, prediction_idxs = nearest_neighbour(distance_matrix)
@@ -115,7 +125,7 @@ class DataAssociation(object):
             old_measurements = {}
             for idx in range(len(measurement_idxs)):
                 if measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] < len(prediction_values):
-                    # print('realreal')
+                    # if self.global_config['verbos'] > 0: print('realreal')
                     counts[0] += 1
                     prediction_id = prediction_ids[prediction_idxs[idx]]
                     #
@@ -124,10 +134,10 @@ class DataAssociation(object):
                     #
                     line = np.stack((measurements[measurement_idxs[idx]], prediction_values[prediction_idxs[idx]]),
                                     axis=0)
-                    plt.plot(line[:, 0], line[:, 1], c='green')
+                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 #
                 elif measurement_idxs[idx] >= len(measurements) and prediction_idxs[idx] < len(prediction_values):
-                    # print('realpseudo')
+                    # if self.global_config['verbos'] > 0: print('realpseudo')
                     counts[1] += 1
                     # feed it back its own prediction as measurement
                     prediction_id = prediction_ids[prediction_idxs[idx]]
@@ -136,40 +146,40 @@ class DataAssociation(object):
                     if is_still_alive:
                         old_measurements[prediction_id] = (prediction, False)
                     else:
-                        print('track finished!')
-                        plt.scatter([prediction[0]], [prediction[1]], c='black')
+                        if self.global_config['verbos'] >= 2: print('track finished!')
+                        if self.global_config['visualize']: plt.scatter([prediction[0]], [prediction[1]], c='black')
                     #
-                    circle = plt.Circle(prediction, self.global_config['distance_threshold'], color='blue', fill=False)
-                    plt.gcf().gca().add_artist(circle)
+                    if self.global_config['visualize']: circle = plt.Circle(prediction, self.global_config['distance_threshold'], color='blue', fill=False)
+                    if self.global_config['visualize']: plt.gcf().gca().add_artist(circle)
                     # only for visualization purposes
                     pseudo_measurement = np.array(
                         [prediction[0] + self.global_config['distance_threshold'], prediction[1]])
                     line = np.stack((pseudo_measurement, prediction), axis=0)
-                    plt.plot(line[:, 0], line[:, 1], c='green')
+                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 #
                 elif measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] >= len(prediction_values):
-                    # print('pseudoreal')
+                    # if self.global_config['verbos'] > 0: print('pseudoreal')
                     counts[2] += 1
                     #
                     measurement = measurements[measurement_idxs[idx]]
                     prediction_id = self.track_manager.pseudo_track_real_measurement(measurement, time_step)
                     old_measurements[prediction_id] = (measurement, True)
                     #
-                    circle = plt.Circle(measurement, self.global_config['distance_threshold'], color='red', fill=False)
-                    plt.gcf().gca().add_artist(circle)
+                    if self.global_config['visualize']: circle = plt.Circle(measurement, self.global_config['distance_threshold'], color='red', fill=False)
+                    if self.global_config['visualize']: plt.gcf().gca().add_artist(circle)
                     #
                     pseudo_prediction = np.array(
                         [measurement[0] + self.global_config['distance_threshold'], measurement[1]])
                     line = np.stack((measurement, pseudo_prediction), axis=0)
-                    plt.plot(line[:, 0], line[:, 1], c='green')
+                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 else:
-                    # print('pseudopseudo')
+                    # if self.global_config['verbos'] > 0: print('pseudopseudo')
                     counts[3] += 1
-            print(list(counts))
-            plt.legend(loc="upper left")
-            plt.savefig(self.global_config['visualization_path'] + '{:05d}'.format(time_step))
-            plt.clf()
-        # print('in associate_data: ' + str(time_step))
+            if self.global_config['verbos'] > 0: print(list(counts))
+            if self.global_config['visualize']: plt.legend(loc="upper left")
+            if self.global_config['visualize']: plt.savefig(self.global_config['visualization_path'] + '{:05d}'.format(time_step))
+            if self.global_config['visualize']: plt.clf()
+        # if self.global_config['verbos'] > 0: print('in associate_data: ' + str(time_step))
         # code.interact(local=dict(globals(), **locals()))
         #
         return self.track_manager.tracks

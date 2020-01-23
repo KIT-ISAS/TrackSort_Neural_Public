@@ -21,7 +21,7 @@ class TrackManager(object):
             self.model_manager.update_by_id(global_track_id, measurement)
             return True
         else:
-            print('in real_track_pseudo_measurement')
+            # print('in real_track_pseudo_measurement')
             # code.interact(local=dict(globals(), **locals()))
             try:
                 self.active_ids.remove(global_track_id)
