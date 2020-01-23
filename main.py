@@ -18,7 +18,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, t
 parser.add_argument('--num_timesteps', type=int, default=359, help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
 parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
-parser.add_argument('--birth_rate_mean', type=float, default=1.0, help='The birth_rate_mean value, that is used by the DataManager')
+parser.add_argument('--birth_rate_mean', type=float, default=7.0, help='The birth_rate_mean value, that is used by the DataManager')
 parser.add_argument('--birth_rate_std', type=float, default=2.0, help='The birth_rate_std value, that is used by the DataManager')
 parser.add_argument('--min_number_detections', type=int, default=6, help='The min_number_detections value, that is used by the DataManager')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')

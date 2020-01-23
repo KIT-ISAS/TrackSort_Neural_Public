@@ -13,8 +13,9 @@ wget -P "./models/" -N "pollithy.com/rnn_model_fake_data.h5"
 # Load data
 mkdir data
 
-wget -P "./data/" -N "pollithy.com/DEM_Zylinder.csv"
-wget -P "./data/" -N "pollithy.com/DEM_holzkugeln.csv"
+# wrong files
+# wget -P "./data/" -N "pollithy.com/DEM_Zylinder.csv"
+# wget -P "./data/" -N "pollithy.com/DEM_holzkugeln.csv"
 
 DataSetsArray=("Zylinder"  "Pfeffer"  "Kugeln"  "Weizen")
 
