@@ -5,9 +5,9 @@ Quick starts are provided in the "/Notebook" folder.
 
 ## Download data + checkpoints, install the libraries and run it with only two commands with a Linux shell on the CPU
 
-'sh setup_cpu.sh'
+`sh setup_cpu.sh`
 
-'python main.py'
+`python main.py`
 
 You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing "python main.py --help"
 
