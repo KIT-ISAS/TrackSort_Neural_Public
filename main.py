@@ -9,7 +9,7 @@ from evaluator import Evaluator
 parser = argparse.ArgumentParser()
 
 # the possible arguments you can give to the model
-parser.add_argument('--is_loaded', type=bool, default=True, help='Whether the model is loaded or created + trained.')
+parser.add_argument('--is_loaded', type=bool, default=False, help='Whether the model is loaded or created + trained.')
 parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5', help='The path where the model is stored or loaded from.')
 parser.add_argument('--matching_algorithm', default='global', help='The algorithm, that is used for matching. Current options are: ["local","global"])')
 parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv', help='The directory of the data set. Only needed for CsvDataset.')
@@ -84,6 +84,10 @@ def run_global_config(global_config):
 	accuracy_of_the_second_kind = 1.0 - evaluator.error_of_second_kind()
 	score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (accuracy_of_the_first_kind + accuracy_of_the_second_kind)
 	return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
+
+run_global_config(global_config)
+quit()
+
 
 dt = global_config['distance_threshold']
 best_score = 0.0

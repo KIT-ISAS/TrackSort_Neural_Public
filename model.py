@@ -15,8 +15,8 @@ rnn_models = {
 
 
 def rnn_model_factory(
-        num_units_first_rnn=16, num_units_second_rnn=16, num_units_third_rnn=0, num_units_fourth_rnn=0,
-        num_units_first_dense=16, num_units_second_dense=0, num_units_third_dense=0, num_units_fourth_dense=0,
+        num_units_first_rnn=1024, num_units_second_rnn=16, num_units_third_rnn=0, num_units_fourth_rnn=0,
+        num_units_first_dense=0, num_units_second_dense=0, num_units_third_dense=0, num_units_fourth_dense=0,
         rnn_model_name='lstm',
         use_batchnorm_on_dense=True,
         num_time_steps=35, batch_size=128, nan_value=0, input_dim=2, output_dim=2,
@@ -310,7 +310,7 @@ class Model(object):
             self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
             # self.rnn_model.load_weights('weights_path')
         else:
-            self.rnn_model = rnn_model_factory()[0]
+            self.rnn_model = rnn_model_factory(batch_size=self.global_config['batch_size'])[0]
             print(self.rnn_model.summary())
             self.train()
 
