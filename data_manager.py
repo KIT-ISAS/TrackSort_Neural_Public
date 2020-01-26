@@ -126,10 +126,12 @@ class AbstractDataSet(ABC):
                     if not is_started and (
                             track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
                         is_started = True
-                        particles.append([[time_idx, track_data[track_idx][time_idx] / self.belt_width]]) # TODO careful if self.belt_width != self.belt_height
+                        particles.append([[time_idx, track_data[track_idx][
+                            time_idx] / self.belt_width]])  # TODO careful if self.belt_width != self.belt_height
                     elif is_started and not (
                             track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
-                        particles[-1].append([time_idx, track_data[track_idx][time_idx]  / self.belt_width]) # TODO careful if self.belt_width != self.belt_height
+                        particles[-1].append([time_idx, track_data[track_idx][
+                            time_idx] / self.belt_width])  # TODO careful if self.belt_width != self.belt_height
                     elif is_started and (
                             track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         break
@@ -162,11 +164,11 @@ class AbstractDataSet(ABC):
         axes = plt.gca()
         axes.set_aspect('equal')
         if not fit_scale_to_content:
-            axes.set_xlim([0, self.belt_width + 100])
-            axes.set_ylim([0, self.belt_height + 100])
+            axes.set_xlim([0, self.belt_width * 1.1])
+            axes.set_ylim([0, self.belt_height * 1.1])
 
-        plt.xlabel('x position [px]')
-        plt.ylabel('y position [px]')
+        plt.xlabel('x position')
+        plt.ylabel('y position')
 
         axes.scatter(track[:, 0], track[:, 1], color=color)
         axes.plot(track[:, 0], track[:, 1], color=color, label=label)
@@ -294,7 +296,7 @@ class AbstractDataSet(ABC):
         :return:
         """
         tracks[:, :, 0] /= self.belt_width
-        tracks[:, :, 1] /= self.belt_width # TODO shouldn't here self.belt_height be used???
+        tracks[:, :, 1] /= self.belt_width  # TODO shouldn't here self.belt_height be used???
 
         if is_seq2seq_data:
             tracks[:, :, 2] /= self.belt_width
@@ -398,12 +400,32 @@ class AbstractDataSet(ABC):
 
         return dataset_train, dataset_test, num_time_steps
 
-    def get_last_timestep_of_track(self, track):
-        i = None
-        for i in range(track.shape[0]):
-            if np.all(track[i] == [self.nan_value, self.nan_value]):
-                return i
-        return i
+    def get_last_timestep_of_track(self, track, use_nan=False, beginning=None):
+        if beginning is None:
+            beginning = self.get_first_timestep_of_track(track, use_nan=use_nan)
+
+        if use_nan:
+            for i in range(beginning, track.shape[0]):
+                if np.all(np.isnan(track[i])):
+                    return i
+            return i
+        else:
+            for i in range(beginning, track.shape[0]):
+                if np.all(track[i] == [self.nan_value, self.nan_value]):
+                    return i
+            return i
+
+    def get_first_timestep_of_track(self, track, use_nan=False):
+        if use_nan:
+            for i in range(track.shape[0]):
+                if not np.all(np.isnan(track[i])):
+                    return i
+            return i
+        else:
+            for i in range(track.shape[0]):
+                if not np.all(track[i] == [self.nan_value, self.nan_value]):
+                    return i
+            return i
 
     def get_longest_track(self):
         longest_track = 0
@@ -833,6 +855,7 @@ class FakeDataSet(AbstractDataSet):
 class CsvDataSet(AbstractDataSet):
     def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2,
                  timesteps=35, batch_size=128, global_config=None, data_is_aligned=True,
+                 rotate_columns=False, normalization_constant=None,
                  birth_rate_mean=6, birth_rate_std=2):
         self.global_config = global_config
         self.glob_file_pattern = glob_file_pattern
@@ -840,6 +863,7 @@ class CsvDataSet(AbstractDataSet):
         assert len(self.file_list) > 0, "No files found"
 
         self.min_number_detections = min_number_detections
+        self.rotate_columns = rotate_columns
 
         self.nan_value = nan_value
         self.input_dim = input_dim
@@ -848,7 +872,7 @@ class CsvDataSet(AbstractDataSet):
         # Set timesteps if wanted. Else: _load_tracks calculates the longest track length
         if timesteps is not None:
             self.timesteps = timesteps
-        self.tracks = self._load_tracks()
+        self.tracks = self._load_tracks(rotate_columns=self.rotate_columns)
 
         # csv data is aligned?
         self.data_is_aligned = data_is_aligned
@@ -868,10 +892,15 @@ class CsvDataSet(AbstractDataSet):
             self.artificial_tracks = self._expand_time_of_tracks(self.aligned_tracks)
 
         # normalize in all dimensions with the same factor
-        self.normalization_constant = np.nanmax(self.seq2seq_data) * 1.1  # this leaves room for tracks at the borders
+        if normalization_constant is None:
+            # this leaves room for tracks at the borders
+            self.normalization_constant = np.nanmax(self.seq2seq_data) * 1.1
+        else:
+            self.normalization_constant = normalization_constant
         self.belt_width = self.normalization_constant
+        self.belt_height = self.belt_width
 
-    def _load_tracks(self, data_is_aligned=True):
+    def _load_tracks(self, data_is_aligned=True, rotate_columns=False):
         tracks = []
 
         # total rows of all files -> number of timesteps
@@ -886,11 +915,14 @@ class CsvDataSet(AbstractDataSet):
             # iterate over all tracks: track_count=int((df.shape[1]) / 2)
             for track_number in range(int((df.shape[1]) / 2)):
                 track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
-                track_len = self.get_last_timestep_of_track(track) + 1
+                track_beginning = self.get_first_timestep_of_track(track, use_nan=True)
+                track_end = self.get_last_timestep_of_track(track, use_nan=True, beginning=track_beginning)
+                track_len = track_end + 1 - track_beginning
                 if track_len > longest_track:
                     longest_track = track_len
 
         print('timesteps={}'.format(timesteps))
+        print('longest_track={}'.format(longest_track))
         self.timesteps = timesteps
         self.longest_track = longest_track
 
@@ -916,7 +948,9 @@ class CsvDataSet(AbstractDataSet):
                 # **Attention:** the columns are ordered as (Y,X) and we turn it around to (X,Y)
                 track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
                 background = np.zeros([timesteps, self.input_dim])
-                background[t_step:t_step+track.shape[0], :track.shape[1]] = track
+                background[t_step:t_step + track.shape[0], :track.shape[1]] = track
+                if rotate_columns:
+                    background = np.roll(background, shift=1, axis=-1)
                 tracks.append(np.nan_to_num(background))
 
             if not data_is_aligned:
@@ -969,7 +1003,7 @@ class CsvDataSet(AbstractDataSet):
             n_new_tracks = max(round(n_new_tracks), 0)
 
             # add all new tracks. Or: only as many as possible at the end
-            for i in range(min(n_new_tracks, num_tracks-track_i)):
+            for i in range(min(n_new_tracks, num_tracks - track_i)):
                 tracks_beginning.append(time_step)
                 tracks_data.append(aligned_tracks[track_i])
                 track_i += 1
@@ -983,7 +1017,7 @@ class CsvDataSet(AbstractDataSet):
 
         for track_begin, track in zip(tracks_beginning, tracks_data):
             background = np.zeros([time_step, self.input_dim])
-            background[track_begin:track_begin+track.shape[0], :] = track
+            background[track_begin:track_begin + track.shape[0], :] = track
 
             expanded_tracks.append(background.copy())
 

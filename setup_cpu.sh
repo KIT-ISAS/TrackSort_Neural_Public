@@ -17,7 +17,7 @@ mkdir data
 # wget -P "./data/" -N "pollithy.com/DEM_Zylinder.csv"
 # wget -P "./data/" -N "pollithy.com/DEM_holzkugeln.csv"
 
-DataSetsArray=("Zylinder"  "Pfeffer"  "Kugeln"  "Weizen")
+DataSetsArray=("Zylinder"  "Pfeffer"  "Kugeln"  "Weizen", "DEM_Cylinder_115")
 
 for datasetname in ${DataSetsArray[*]}; do
      echo $datasetname

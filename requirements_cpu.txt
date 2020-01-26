@@ -45,3 +45,4 @@ urllib3==1.25.7
 Werkzeug==0.16.0
 wrapt==1.11.2
 moviepy
+h5py
