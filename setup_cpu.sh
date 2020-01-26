@@ -8,6 +8,7 @@ pip install -r requirements_cpu.txt
 # Load models
 mkdir models
 wget -P "./models/" -N "pollithy.com/rnn_model_fake_data.h5"
+wget -P "./models/" -N "pollithy.com/DEM_model.h5"
 
 
 # Load data
