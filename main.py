@@ -24,7 +24,7 @@ def str2bool(v):
 parser.add_argument('--is_loaded', type=str2bool, default=False, help='Whether the model is loaded or created + trained.')
 parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
-parser.add_argument('--matching_algorithm', default='global',
+parser.add_argument('--matching_algorithm', default='local',
                     help='The algorithm, that is used for matching. Current options are: ["local","global"])')
 parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv',
                     help='The directory of the data set. Only needed for CsvDataset.')
@@ -33,7 +33,7 @@ parser.add_argument('--dataset_type', default='CsvDataset',
 parser.add_argument('--distance_threshold', type=float, default=0.01,
                     help='The threshhold, that is used for the matching with the artificial measurements and predictions')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
-parser.add_argument('--num_timesteps', type=int, default=15,
+parser.add_argument('--num_timesteps', type=int, default=10000,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
 parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
@@ -87,8 +87,8 @@ global_config = {
     'best_visualization_video_path': 'visualizations/best_matching_visualization_vid.mp4',
     'state_overwriting_started': False,
     'overwriting_activated': False,
-    'verbos': 0,
-    'visualize': False,
+    'verbos': 2,
+    'visualize': True,
     'run_hyperparameter_search': True,
     'debug': False
 }
@@ -113,7 +113,7 @@ def run_global_config(global_config):
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
 
 
-run_global_config(global_config)
+score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
 quit()
 
 dt = global_config['distance_threshold']
