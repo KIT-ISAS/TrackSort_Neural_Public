@@ -285,8 +285,9 @@ def set_state(rnn_model, batch_state):
 def get_state(rnn_model):
     rnn_layer_states = []
     # get all layers in ascending order
-    # ToDo: Replace this with while-true with break condition
-    for i in range(1000):
+    i = -1
+    while True:
+        i += 1
         # Not asking for permission but handling the error is faster in python
         try:
             layer = rnn_model.get_layer(index=i)
@@ -308,6 +309,7 @@ class Model(object):
         self.data_source = data_source
         if self.global_config['is_loaded']:
             self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
+            self.rnn_model.reset_states()
             # self.rnn_model.load_weights('weights_path')
         else:
             self.rnn_model = rnn_model_factory(batch_size=self.global_config['batch_size'])[0]

@@ -15,6 +15,7 @@ class ModelManager(object):
         self.global_config = global_config
         self.model = Model(self.global_config, data_source)
         self.zero_state = self.model.get_zero_state()
+        self.model.rnn_model.reset_states()
         self.current_states = []  # stored as numpy array for easier access
         self.current_inputs = []
         self.current_ids = []
@@ -71,10 +72,6 @@ class ModelManager(object):
                             not self.global_config['state_overwrinting_started']:
                         self.global_config['state_overwriting_started'] = True
                         if self.global_config['verbos'] >= 2: print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
-                        if self.global_config['verbos'] >= 2: print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
-                        if self.global_config['verbos'] >= 2: print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
-                        if self.global_config['verbos'] >= 2: print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
-                        if self.global_config['verbos'] >= 2: print('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
                         # code.interact(local=dict(globals(), **locals()))
                     return
         # create new entry of the lists
@@ -87,9 +84,5 @@ class ModelManager(object):
         self.current_ids[-1][0] = global_track_id
         self.current_inputs[-1][0] = measurement
         if len(self.current_states) > 1:
-            if self.global_config['verbos'] >= 2: print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
-            if self.global_config['verbos'] >= 2: print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
-            if self.global_config['verbos'] >= 2: print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
-            if self.global_config['verbos'] >= 2: print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
             if self.global_config['verbos'] >= 2: print('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
             # code.interact(local=dict(globals(), **locals()))

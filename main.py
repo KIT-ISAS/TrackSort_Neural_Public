@@ -41,6 +41,8 @@ parser.add_argument('--birth_rate_mean', type=float, default=5.0,
                     help='The birth_rate_mean value, that is used by the DataManager')
 parser.add_argument('--birth_rate_std', type=float, default=2.0,
                     help='The birth_rate_std value, that is used by the DataManager')
+parser.add_argument('--normalization_constant', type=float, default=None,
+                    help='Normalization value')
 parser.add_argument('--min_number_detections', type=int, default=6,
                     help='The min_number_detections value, that is used by the DataManager')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
@@ -77,7 +79,8 @@ global_config = {
         'data_is_aligned': args.data_is_aligned,
         'birth_rate_mean': args.birth_rate_mean,
         'birth_rate_std': args.birth_rate_std,
-        'rotate_columns': args.rotate_columns
+        'rotate_columns': args.rotate_columns,
+        'normalization_constant': args.normalization_constant
     },
     #
     'num_train_epochs': args.num_train_epochs,
