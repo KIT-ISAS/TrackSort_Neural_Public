@@ -1,7 +1,7 @@
 import math
 import tensorflow as tf
 import numpy as np
-import code  # code.interact(local=dict(globals(), **locals()))
+import matplotlib.pyplot as plt
 
 from tensorflow.keras import backend as K
 
@@ -311,7 +311,7 @@ class Model(object):
             self.rnn_model.reset_states()
             # self.rnn_model.load_weights('weights_path')
         else:
-            self.rnn_model, _ = rnn_model_factory(batch_size=self.global_config['batch_size'],
+            self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
                                                   num_time_steps=self.data_source.longest_track,
                                                   **self.global_config['rnn_model_factory'])
             print(self.rnn_model.summary())
@@ -333,7 +333,7 @@ class Model(object):
         return prediction, new_state
 
     def train(self):
-        dataset_train, _ = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+        dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
 
         optimizer = tf.keras.optimizers.Adam()
         train_step_fn = train_step_generator(self.rnn_model, optimizer)
@@ -354,8 +354,49 @@ class Model(object):
 
             print("{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], loss))
 
-        self.rnn_model.save_weights(self.global_config['weights_path'])
         self.rnn_model.save(self.global_config['model_path'])
+
+        self._evaluate_model(dataset_test)
+
+    def _evaluate_model(self, dataset_test):
+        maes = np.array([])
+
+        mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
+        normalization_factor = self.data_source.normalization_constant
+
+        for input_batch, target_batch in dataset_test:
+            # reset state
+            hidden = self.rnn_model.reset_states()
+
+            batch_predictions = self.rnn_model(input_batch)
+
+            # Calculate the mask
+            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
+            mask = 1 - K.cast(mask, tf.float64)
+            mask = K.cast(mask, tf.float64)
+
+            target_batch_unnormalized = target_batch * normalization_factor
+            pred_batch_unnormalized = batch_predictions * normalization_factor
+
+            batch_loss = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
+            batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
+
+            maes = np.concatenate((maes, batch_loss_per_track.numpy().reshape([-1])))
+
+        print("Mean={}".format(np.mean(maes)))
+
+        plt.rc('grid', linestyle=":")
+        fig1, ax1 = plt.subplots()
+        ax1.yaxis.grid(True)
+        ax1.set_ylim([0, 4.0])
+
+        ax1.set_title('NextStep-RNN ({})'.format(self.model_hash))
+        prop = dict(linewidth=2.5)
+        ax1.boxplot(maes, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
+        plt.savefig(self.global_config['diagrams_path'] + 'NextStep-RNN.png')
+        plt.cla()
+        plt.clf()
 
     def predict_final(self, states, y_targetline):
         raise NotImplementedError

@@ -115,6 +115,8 @@ def run_global_config(global_config):
     date_values = [str(x) for x in time.gmtime()]
     experiment_name = '_'.join(date_values)
     global_config['experiment_name'] = experiment_name
+    # ToDo: refactor with path join
+    global_config['diagrams_path'] = 'visualizations/' + experiment_name + '/diagrams/'
     global_config['visualization_path'] = 'visualizations/' + experiment_name + '/matching_visualization/'
     global_config['visualization_video_path'] = 'visualizations/' + experiment_name + '/matching_visualization_vid.mp4'
     #
