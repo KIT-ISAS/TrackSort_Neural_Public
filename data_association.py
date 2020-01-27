@@ -35,7 +35,7 @@ class DataAssociation(object):
             self.data_source = CsvDataSet(global_config=global_config, **global_config['CsvDataSet'])
             self.global_config['num_timesteps'] = self.data_source.get_num_timesteps()
         else:
-            if self.global_config['verbos'] > 0: print(self.global_config['dataset_type'] + ' is no valid data source!')
+            if self.global_config['verbose'] > 0: print(self.global_config['dataset_type'] + ' is no valid data source!')
             code.interact(local=dict(globals(), **locals()))
         self.track_manager = TrackManager(global_config, self.data_source)
 
@@ -44,13 +44,13 @@ class DataAssociation(object):
         shutil.rmtree(self.global_config['visualization_path'], ignore_errors=True)
         os.makedirs(self.global_config['visualization_path'])
         for time_step in range(self.global_config['num_timesteps']):
-            if self.global_config['verbos'] >= 1: print('')
-            if self.global_config['verbos'] >= 1: print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
+            if self.global_config['verbose'] >= 1: print('')
+            if self.global_config['verbose'] >= 1: print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
             if self.global_config['visualize']: plt.title('Time step: {}'.format(time_step))
-            #if self.global_config['visualize']: plt.xlim((-0.1, 1.3))
-            #if self.global_config['visualize']: plt.ylim((-0.1, 1.1))
-            if self.global_config['visualize']: plt.xlim((0.3, 0.8))
-            if self.global_config['visualize']: plt.ylim((0.0, 0.2))
+            if self.global_config['visualize']: plt.xlim((-0.1, 1.3))
+            if self.global_config['visualize']: plt.ylim((-0.1, 1.1))
+            #if self.global_config['visualize']: plt.xlim((0.3, 0.8))
+            #if self.global_config['visualize']: plt.ylim((0.0, 0.2))
             self.global_config['current_time_step'] = time_step
             #
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
@@ -61,7 +61,7 @@ class DataAssociation(object):
             #
             if old_measurements is not None:
                 if len(old_measurements) != len(prediction_values):
-                    if self.global_config['verbos'] > 0: print('number old_measurements different from number predictions!')
+                    if self.global_config['verbose'] > 0: print('number old_measurements different from number predictions!')
                     code.interact(local=dict(globals(), **locals()))
                 for idx, prediction_id in enumerate(prediction_ids):
                     if old_measurements[prediction_id][1]:
@@ -74,7 +74,7 @@ class DataAssociation(object):
                     end = predictions[prediction_id]
                     line = np.stack((start, end), axis=0)
                     if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='purple')
-            # if self.global_config['verbos'] > 0: print('in associate_data')
+            # if self.global_config['verbose'] > 0: print('in associate_data')
             # code.interact(local=dict(globals(), **locals()))
             if len(measurements) != 0:
                 if self.global_config['visualize']: plt.scatter(np.array(measurements)[:, 0], np.array(measurements)[:, 1], c='blue', label='measurement')
@@ -118,7 +118,7 @@ class DataAssociation(object):
                     distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=0)
                     distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=1)
             #
-            #if self.global_config['verbos'] > 0: print('before matching')
+            #if self.global_config['verbose'] > 0: print('before matching')
             #code.interact(local=dict(globals(), **locals()))
             if self.global_config['matching_algorithm'] == 'local':
                 measurement_idxs, prediction_idxs = nearest_neighbour(distance_matrix)
@@ -129,7 +129,7 @@ class DataAssociation(object):
             old_measurements = {}
             for idx in range(len(measurement_idxs)):
                 if measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] < len(prediction_values):
-                    # if self.global_config['verbos'] > 0: print('realreal')
+                    # if self.global_config['verbose'] > 0: print('realreal')
                     counts[0] += 1
                     prediction_id = prediction_ids[prediction_idxs[idx]]
                     #
@@ -141,7 +141,7 @@ class DataAssociation(object):
                     if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 #
                 elif measurement_idxs[idx] >= len(measurements) and prediction_idxs[idx] < len(prediction_values):
-                    # if self.global_config['verbos'] > 0: print('realpseudo')
+                    # if self.global_config['verbose'] > 0: print('realpseudo')
                     counts[1] += 1
                     # feed it back its own prediction as measurement
                     prediction_id = prediction_ids[prediction_idxs[idx]]
@@ -150,7 +150,7 @@ class DataAssociation(object):
                     if is_still_alive:
                         old_measurements[prediction_id] = (prediction, False)
                     else:
-                        if self.global_config['verbos'] >= 2: print('track finished!')
+                        if self.global_config['verbose'] >= 2: print('track finished!')
                         if self.global_config['visualize']: plt.scatter([prediction[0]], [prediction[1]], c='black')
                     #
                     if self.global_config['visualize']: circle = plt.Circle(prediction, self.global_config['distance_threshold'], color='blue', fill=False)
@@ -162,7 +162,7 @@ class DataAssociation(object):
                     if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 #
                 elif measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] >= len(prediction_values):
-                    # if self.global_config['verbos'] > 0: print('pseudoreal')
+                    # if self.global_config['verbose'] > 0: print('pseudoreal')
                     counts[2] += 1
                     #
                     measurement = measurements[measurement_idxs[idx]]
@@ -177,13 +177,13 @@ class DataAssociation(object):
                     line = np.stack((measurement, pseudo_prediction), axis=0)
                     if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 else:
-                    # if self.global_config['verbos'] > 0: print('pseudopseudo')
+                    # if self.global_config['verbose'] > 0: print('pseudopseudo')
                     counts[3] += 1
-            if self.global_config['verbos'] > 0: print(list(counts))
+            if self.global_config['verbose'] > 0: print(list(counts))
             if self.global_config['visualize']: plt.legend(loc="upper left")
             if self.global_config['visualize']: plt.savefig(self.global_config['visualization_path'] + '{:05d}'.format(time_step))
             if self.global_config['visualize']: plt.clf()
-        # if self.global_config['verbos'] > 0: print('in associate_data: ' + str(time_step))
+        # if self.global_config['verbose'] > 0: print('in associate_data: ' + str(time_step))
         # code.interact(local=dict(globals(), **locals()))
         #
         return self.track_manager.tracks

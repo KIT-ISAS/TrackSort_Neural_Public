@@ -14,6 +14,7 @@ then
 	wget -P "./models/" -N "pollithy.com/DEM_model.h5"
 fi
 
+mkdir experiments
 # Load the data
 DataSetsArray=(
 	"Zylinder"
