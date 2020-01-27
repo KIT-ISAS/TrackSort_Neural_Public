@@ -1,6 +1,8 @@
 import code  # code.interact(local=dict(globals(), **locals()))
 import shutil
 import argparse
+import json
+import time
 
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
@@ -21,7 +23,7 @@ def str2bool(v):
 
 
 # the possible arguments you can give to the model
-parser.add_argument('--is_loaded', type=str2bool, default=False, help='Whether the model is loaded or created + trained.')
+parser.add_argument('--is_loaded', type=str2bool, default=True, help='Whether the model is loaded or created + trained.')
 parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
 parser.add_argument('--matching_algorithm', default='local',
@@ -50,6 +52,8 @@ parser.add_argument('--data_is_aligned', type=str2bool, default=True,
                     help='Whether the data used by the DataManger is aligned or not.')
 parser.add_argument('--rotate_columns', type=str2bool, default=False,
                     help='Set this to true if the order of columns in your csv is (x, y). Default is (y, x)')
+parser.add_argument('--run_hyperparameter_search', type=str2bool, default=True,
+                    help='Whether to run the hyperparameter search or not')
 
 args = parser.parse_args()
 
@@ -90,9 +94,9 @@ global_config = {
     'best_visualization_video_path': 'visualizations/best_matching_visualization_vid.mp4',
     'state_overwriting_started': False,
     'overwriting_activated': False,
-    'verbos': 2,
-    'visualize': True,
-    'run_hyperparameter_search': True,
+    'verbose': 1,
+    'visualize': False,
+    'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False
 }
 
@@ -115,9 +119,10 @@ def run_global_config(global_config):
             accuracy_of_the_first_kind + accuracy_of_the_second_kind)
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
 
-
-score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
-quit()
+if not global_config['run_hyperparameter_search']:
+	score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+	code.interact(local=dict(globals(), **locals()))
+	quit()
 
 dt = global_config['distance_threshold']
 best_score = 0.0
@@ -128,6 +133,14 @@ for dtc in distance_threshold_candidates:
     print('run distance_threshhold ' + str(dtc))
     global_config['distance_threshold'] = dtc
     current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+    # save the current config
+    global_config['current_score'] = current_score
+    global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
+    global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
+    date_values = [str(x) for x in time.gmtime()]
+    config_name = '_'.join(date_values)
+    json.dump(global_config, open('experiments/' + config_name, 'w'))
+    #
     dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
     print(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
     if current_score > best_score:

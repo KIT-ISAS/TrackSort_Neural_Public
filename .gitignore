@@ -11,6 +11,7 @@ Pfeffer.zip
 __pycache__
 cpu_env
 gpu_env
+experiments
 
 # IDE
 .idea
