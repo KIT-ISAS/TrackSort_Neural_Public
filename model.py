@@ -394,8 +394,8 @@ class Model(object):
         ax1.set_title('NextStep-RNN ({})'.format(self.model_hash))
         prop = dict(linewidth=2.5)
         ax1.boxplot(maes, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
-        plt.savefig(self.global_config['diagrams_path'] + 'NextStep-RNN.png')
-        plt.cla()
+        # plt.savefig(self.global_config['diagrams_path'] + 'NextStep-RNN.png')
+        plt.savefig('NextStep-RNN.png')
         plt.clf()
 
     def predict_final(self, states, y_targetline):
