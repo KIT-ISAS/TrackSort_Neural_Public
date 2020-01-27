@@ -51,8 +51,10 @@ class Evaluator(object):
 				track_timestep = track.initial_timestep + it
 				timestep = track_timestep # TODO fix particle timestep extraction
 				if track_timestep == timestep and track_measurement[0] == measurement[0] and track_measurement[1] == measurement[1]:
+					if self.global_config['verbose'] > 0: print(str(timestep) + ' - ' + str(measurement) + ' - measurement found match in particles! - ' + str(idx))
 					return idx
 		else:
+			if self.global_config['verbose'] > 0: print(str(timestep) + ' - ' + str(measurement) + ' - measurement found no match in particles! Probably a artificial measurement.')
 			# if self.global_config['verbose'] > 0: print('measurement found no match in tracks!')
 			# code.interact(local=dict(globals(), **locals()))
 			return -1
@@ -61,8 +63,8 @@ class Evaluator(object):
 	def error_of_second_kind(self):
 		num_errors_of_second_kind = 0
 		for particle_id, particle_list in enumerate(self.particles):
-			if particle_id > 100:
-				break  # TODO remove this again!
+			'''if particle_id > 100:
+				break  # TODO remove this again!'''
 			track_id = self.assigment_of_measurement_in_track(particle_list[0][0], particle_list[0][1])
 			def correct_condition(x):
 				track_id_current = self.assigment_of_measurement_in_track(x[0], x[1])
@@ -74,7 +76,7 @@ class Evaluator(object):
 
 
 		#ratio_error_of_second_kind = num_errors_of_second_kind / len(self.particles)
-		ratio_error_of_second_kind = num_errors_of_second_kind / 100 # TODO remove this again!
+		ratio_error_of_second_kind = num_errors_of_second_kind / len(self.particles) # TODO remove this again!
 		if self.global_config['verbose'] > 0: print('ratio_error_of_second_kind: ' + str(ratio_error_of_second_kind))
 		return ratio_error_of_second_kind
 

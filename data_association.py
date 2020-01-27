@@ -47,10 +47,10 @@ class DataAssociation(object):
             if self.global_config['verbose'] >= 1: print('')
             if self.global_config['verbose'] >= 1: print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
             if self.global_config['visualize']: plt.title('Time step: {}'.format(time_step))
-            if self.global_config['visualize']: plt.xlim((-0.1, 1.3))
-            if self.global_config['visualize']: plt.ylim((-0.1, 1.1))
-            #if self.global_config['visualize']: plt.xlim((0.3, 0.8))
-            #if self.global_config['visualize']: plt.ylim((0.0, 0.2))
+            #if self.global_config['visualize']: plt.xlim((-0.1, 1.3))
+            #if self.global_config['visualize']: plt.ylim((-0.1, 1.1))
+            if self.global_config['visualize']: plt.xlim((0.3, 0.8))
+            if self.global_config['visualize']: plt.ylim((0.0, 0.2))
             self.global_config['current_time_step'] = time_step
             #
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
