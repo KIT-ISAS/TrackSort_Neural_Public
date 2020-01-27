@@ -1,3 +1,7 @@
+#!/bin/bash
+
+apt install wget python3-pip virtualenv
+
 # create the python environment
 if [ -f cpu_env ]
 then

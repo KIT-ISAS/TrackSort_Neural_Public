@@ -44,13 +44,15 @@ class DataAssociation(object):
         shutil.rmtree(self.global_config['visualization_path'], ignore_errors=True)
         os.makedirs(self.global_config['visualization_path'])
         for time_step in range(self.global_config['num_timesteps']):
+            if time_step == 278:
+                code.interact(local=dict(globals(), **locals()))
             if self.global_config['verbose'] >= 1: print('')
             if self.global_config['verbose'] >= 1: print('step ' + str(time_step) + ' / ' + str(self.global_config['num_timesteps']))
             if self.global_config['visualize']: plt.title('Time step: {}'.format(time_step))
-            if self.global_config['visualize'] and not self.global_config['rotate_columns']: plt.xlim((-0.1, 1.3)) # TODO more sophisticated solution to this problem???
-            if self.global_config['visualize'] and not self.global_config['rotate_columns']: plt.ylim((-0.1, 1.1))
-            if self.global_config['visualize'] and self.global_config['rotate_columns']: plt.xlim((0.3, 0.8))
-            if self.global_config['visualize'] and self.global_config['rotate_columns']: plt.ylim((0.0, 0.2))
+            if self.global_config['visualize'] and not self.global_config['CsvDataSet']['rotate_columns']: plt.xlim((-0.1, 1.3)) # TODO more sophisticated solution to this problem???
+            if self.global_config['visualize'] and not self.global_config['CsvDataSet']['rotate_columns']: plt.ylim((-0.1, 1.1))
+            if self.global_config['visualize'] and self.global_config['CsvDataSet']['rotate_columns']: plt.xlim((0.3, 0.8))
+            if self.global_config['visualize'] and self.global_config['CsvDataSet']['rotate_columns']: plt.ylim((0.0, 0.2))
             self.global_config['current_time_step'] = time_step
             #
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)

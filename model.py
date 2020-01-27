@@ -304,7 +304,6 @@ def get_state(rnn_model):
 
 class Model(object):
     def __init__(self, global_config, data_source):
-        # TODO one might want to encode the hyperparams for the RNN in the global config
         self.global_config = global_config
         self.data_source = data_source
         if self.global_config['is_loaded']:
@@ -312,7 +311,9 @@ class Model(object):
             self.rnn_model.reset_states()
             # self.rnn_model.load_weights('weights_path')
         else:
-            self.rnn_model = rnn_model_factory(batch_size=self.global_config['batch_size'])[0]
+            self.rnn_model, _ = rnn_model_factory(batch_size=self.global_config['batch_size'],
+                                                  num_time_steps=self.data_source.longest_track,
+                                                  **self.global_config['rnn_model_factory'])
             print(self.rnn_model.summary())
             self.train()
 
@@ -326,8 +327,6 @@ class Model(object):
         predictions = []
         current_input = np.expand_dims(current_input, axis=1)
         set_state(self.rnn_model, state)
-        #print('in predict')
-        #code.interact(local=dict(globals(), **locals()))
         prediction = self.rnn_model(current_input)
         prediction = np.squeeze(prediction)
         new_state = get_state(self.rnn_model)
@@ -342,12 +341,13 @@ class Model(object):
         # Train model
         for epoch in range(self.global_config['num_train_epochs']):
             # learning rate decay after 100 epochs
-            if (epoch + 1) % 150 == 0:
+            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
                 old_lr = K.get_value(optimizer.lr)
-                new_lr = old_lr * 0.1
+                new_lr = old_lr * self.global_config['lr_decay_factor']
                 print("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
                 K.set_value(optimizer.lr, new_lr)
 
+            loss = None
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 _ = self.rnn_model.reset_states()
                 loss = train_step_fn(inp, target)

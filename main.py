@@ -85,8 +85,22 @@ global_config = {
         'rotate_columns': args.rotate_columns,
         'normalization_constant': args.normalization_constant
     },
+    'rnn_model_factory': {
+        'num_units_first_rnn': 1024,
+        'num_units_second_rnn': 16,
+        'num_units_third_rnn': 0,
+        'num_units_fourth_rnn': 0,
+        'num_units_first_dense': 0,
+        'num_units_second_dense': 0,
+        'num_units_third_dense': 0,
+        'num_units_fourth_dense': 0,
+        'rnn_model_name': 'lstm',
+        'use_batchnorm_on_dense': True,
+    },
     #
     'num_train_epochs': args.num_train_epochs,
+    'lr_decay_after_epochs': 80,
+    'lr_decay_factor': 0.1,
     'state_overwriting_started': False,
     'overwriting_activated': False,
     'verbose': 1,
