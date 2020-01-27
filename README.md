@@ -7,15 +7,11 @@ Quick starts are provided in the "/Notebook" folder.
 
 `sh setup_cpu.sh`
 
-`python main.py`
+ - defaults: `python main.py`
+ - DEM: `python main.py --model_path "models/DEM_model.h5" --dataset_dir "data/DEM_cylinder.csv" --data_is_aligned False --is_loaded True  --rotate_columns True  --normalization_constant 1.0`
+
 
 You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing "python main.py --help"
-
-## Installation of the requirements alone
-
-`apt-get -q install wget`
-
-`python3 -m pip install -r requirements.txt`
 
 ## Notebook
 
