@@ -56,6 +56,7 @@ parser.add_argument('--rotate_columns', type=str2bool, default=False,
                     help='Set this to true if the order of columns in your csv is (x, y). Default is (y, x)')
 parser.add_argument('--run_hyperparameter_search', type=str2bool, default=False,
                     help='Whether to run the hyperparameter search or not')
+parser.add_argument('--verbosity', default='DEBUG', choices=logging._nameToLevel.keys())
 
 args = parser.parse_args()
 
@@ -106,19 +107,13 @@ global_config = {
     'state_overwriting_started': False,
     'overwriting_activated': False,
     'verbose': 1,
-    'logging_level': 'DEBUG',
     'visualize': True,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False
 }
 
-if global_config['logging_level'] == 'DEBUG':
-    logging.basicConfig(filename='main', level=logging.DEBUG)
-elif global_config['logging_level'] == 'INFO':
-    logging.basicConfig(filename='main', level=logging.INFO)
-else:
-    logging.basicConfig(filename='main', level=logging.WARN)
-
+log_level = logging._nameToLevel[args.verbosity]
+logging.basicConfig(filename='main', level=log_level)
 
 
 def run_global_config(global_config):
