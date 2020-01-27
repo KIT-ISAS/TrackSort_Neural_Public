@@ -3,7 +3,7 @@ import os
 import shutil
 import argparse
 import json
-import time
+import datetime
 
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
@@ -112,9 +112,8 @@ global_config = {
 
 
 def run_global_config(global_config):
-    #
-    date_values = [str(x) for x in time.gmtime()]
-    experiment_name = '_'.join(date_values)
+    now = datetime.datetime.now()
+    experiment_name = now.strftime("%Y_%m_%d__%H_%M_%S")
     global_config['experiment_name'] = experiment_name
     # ToDo: refactor with path join
     global_config['diagrams_path'] = 'visualizations/' + experiment_name + '/diagrams/'
