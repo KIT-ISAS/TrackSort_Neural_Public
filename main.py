@@ -1,4 +1,5 @@
 import code  # code.interact(local=dict(globals(), **locals()))
+import os
 import shutil
 import argparse
 import json
@@ -117,6 +118,7 @@ def run_global_config(global_config):
     global_config['experiment_name'] = experiment_name
     # ToDo: refactor with path join
     global_config['diagrams_path'] = 'visualizations/' + experiment_name + '/diagrams/'
+    os.makedirs(global_config['diagrams_path'])
     global_config['visualization_path'] = 'visualizations/' + experiment_name + '/matching_visualization/'
     global_config['visualization_video_path'] = 'visualizations/' + experiment_name + '/matching_visualization_vid.mp4'
     #
