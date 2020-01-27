@@ -4,6 +4,7 @@ import shutil
 import argparse
 import json
 import datetime
+import logging
 
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
@@ -105,10 +106,19 @@ global_config = {
     'state_overwriting_started': False,
     'overwriting_activated': False,
     'verbose': 1,
+    'logging_level': 'DEBUG',
     'visualize': True,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False
 }
+
+if global_config['logging_level'] == 'DEBUG':
+    logging.basicConfig(filename='main', level=logging.DEBUG)
+elif global_config['logging_level'] == 'INFO':
+    logging.basicConfig(filename='main', level=logging.INFO)
+else:
+    logging.basicConfig(filename='main', level=logging.WARN)
+
 
 
 def run_global_config(global_config):
@@ -155,16 +165,16 @@ distance_threshold_candidates = [0.5 * dt, dt, 2.0 * dt, 4.0 * dt]
 dtc_scores = []
 best_dtc = distance_threshold_candidates[0]
 for dtc in distance_threshold_candidates:
-    print('run distance_threshhold ' + str(dtc))
+    logging.debug('run distance_threshhold %s', str(dtc))
     global_config['distance_threshold'] = dtc
     current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
     #
     dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
-    print(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
+    logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
     if current_score > best_score:
         best_score = current_score
         best_dtc = dtc
 global_config['distance_threshold'] = best_dtc
 
-print('data association finished!')
+logging.info('data association finished!')
 code.interact(local=dict(globals(), **locals()))

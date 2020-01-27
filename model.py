@@ -1,3 +1,4 @@
+import logging
 import math
 import tensorflow as tf
 import numpy as np
@@ -314,7 +315,7 @@ class Model(object):
             self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
                                                   num_time_steps=self.data_source.longest_track,
                                                   **self.global_config['rnn_model_factory'])
-            print(self.rnn_model.summary())
+            logging.info(self.rnn_model.summary())
             self.train()
 
     def get_zero_state(self):
@@ -344,7 +345,7 @@ class Model(object):
             if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
                 old_lr = K.get_value(optimizer.lr)
                 new_lr = old_lr * self.global_config['lr_decay_factor']
-                print("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
                 K.set_value(optimizer.lr, new_lr)
 
             loss = None
@@ -352,7 +353,12 @@ class Model(object):
                 _ = self.rnn_model.reset_states()
                 loss = train_step_fn(inp, target)
 
-            print("{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], loss))
+            log_string = "{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], loss)
+
+            if (epoch + 1) % 10:
+                logging.info(log_string)
+            else:
+                logging.debug(log_string)
 
         self.rnn_model.save(self.global_config['model_path'])
 
@@ -384,7 +390,7 @@ class Model(object):
 
             maes = np.concatenate((maes, batch_loss_per_track.numpy().reshape([-1])))
 
-        print("Mean={}".format(np.mean(maes)))
+        logging.info("Mean={}".format(np.mean(maes)))
 
         plt.rc('grid', linestyle=":")
         fig1, ax1 = plt.subplots()

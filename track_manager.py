@@ -1,3 +1,5 @@
+import logging
+
 from model_manager import ModelManager
 from track import Track
 import code  # code.interact(local=dict(globals(), **locals()))
@@ -21,12 +23,10 @@ class TrackManager(object):
             self.model_manager.update_by_id(global_track_id, measurement)
             return True
         else:
-            # print('in real_track_pseudo_measurement')
-            # code.interact(local=dict(globals(), **locals()))
             try:
                 self.active_ids.remove(global_track_id)
             except Exception:
-                print('error in real_track_pseudo_measurement')
+                logging.error('error in real_track_pseudo_measurement')
                 code.interact(local=dict(globals(), **locals()))
             self.model_manager.delete_by_id(global_track_id)
             return False
@@ -44,6 +44,6 @@ class TrackManager(object):
     def get_predictions(self):
         predictions = self.model_manager.predict_all()
         if len(self.active_ids) != len(predictions.keys()):
-            print("something with the id management doesnt work in get_predictions!")
+            logging.error("something with the id management doesnt work in get_predictions!")
             code.interact(local=dict(globals(), **locals()))
         return predictions

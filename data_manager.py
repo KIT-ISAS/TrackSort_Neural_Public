@@ -8,6 +8,7 @@ import io
 import glob
 import random
 import code
+import logging
 
 import tensorflow as tf
 import numpy as np
@@ -136,11 +137,8 @@ class AbstractDataSet(ABC):
                             track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         break
                 except Exception as exp:
-                    print('error in get_particles')
+                    logging.error('error in get_particles')
                     code.interact(local=dict(globals(), **locals()))
-            '''if not is_started: # TODO apparently there are empty tracks!!!
-                print('something went wrong in get_particles')
-                code.interact(local=dict(globals(), **locals()))'''
         return particles
 
     def get_measurement_at_timestep(self, timestep):
@@ -443,7 +441,7 @@ class AbstractDataSet(ABC):
 
     def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
         assert self.longest_track is not None, "self.longest_track not set"
-        print("longest_track=", self.longest_track)
+        logging.info("longest_track=".format(self.longest_track))
         seq2seq_data = []
 
         # for every track we create:
@@ -879,8 +877,9 @@ class CsvDataSet(AbstractDataSet):
         if data_is_aligned:
             self.aligned_tracks = self.tracks[:, :self.longest_track, :]
         else:
-            print("align data")
+            logging.info("align data")
             self.aligned_tracks = self._convert_tracks_to_aligned_tracks(self.tracks)
+            logging.info("data is aligned")
 
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_tracks)
 
@@ -921,8 +920,8 @@ class CsvDataSet(AbstractDataSet):
                 if track_len > longest_track:
                     longest_track = track_len
 
-        print('timesteps={}'.format(timesteps))
-        print('longest_track={}'.format(longest_track))
+        logging.info('timesteps={}'.format(timesteps))
+        logging.info('longest_track={}'.format(longest_track))
         self.timesteps = timesteps
         self.longest_track = longest_track
 
