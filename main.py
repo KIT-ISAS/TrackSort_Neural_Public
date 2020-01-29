@@ -112,7 +112,8 @@ global_config = {
     'visualize': True,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
-    'is_alive_probability_weighting' : 1.0
+    'is_alive_probability_weighting' : 1.0,
+    'test_noise_robustness' : True
 }
 
 
@@ -160,44 +161,54 @@ def run_global_config(global_config):
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
 
 if not global_config['run_hyperparameter_search']:
-    score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
-    print('data association finished!')
-    code.interact(local=dict(globals(), **locals()))
-    quit()
+    if not global_config['test_noise_robustness']:
+        score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        print('data association finished!')
+        code.interact(local=dict(globals(), **locals()))
+    else:
+        print('test robustness against noise!')
+        result_list = []
+        for noise in [0.0, 0.0003, 0.0005, 0.0008, 0.001]:
+            global_config['CsvDataSet']['additive_noise_stddev'] = noise
+            score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+            result_list.append([score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+        print(result_list)
+        print('robustness test finished!')
+        code.interact(local=dict(globals(), **locals()))
 
-dt = global_config['distance_threshold']
-best_score = 0.0
-distance_threshold_candidates = [0.25 * dt, 0.5 * dt, dt, 2.0 * dt, 4.0 * dt]
-dtc_scores = []
-best_dtc = distance_threshold_candidates[0]
-for dtc in distance_threshold_candidates:
-    logging.debug('run distance_threshhold %s', str(dtc))
-    global_config['distance_threshold'] = dtc
-    current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
-    #
-    dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
-    logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
-    if current_score > best_score:
-        best_score = current_score
-        best_dtc = dtc
-global_config['distance_threshold'] = best_dtc
+else:
+    dt = global_config['distance_threshold']
+    best_score = 0.0
+    distance_threshold_candidates = [0.25 * dt, 0.5 * dt, dt, 2.0 * dt, 4.0 * dt]
+    dtc_scores = []
+    best_dtc = distance_threshold_candidates[0]
+    for dtc in distance_threshold_candidates:
+        logging.debug('run distance_threshhold %s', str(dtc))
+        global_config['distance_threshold'] = dtc
+        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        #
+        dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+        logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
+        if current_score > best_score:
+            best_score = current_score
+            best_dtc = dtc
+    global_config['distance_threshold'] = best_dtc
 
-pw = global_config['is_alive_probability_weighting']
-best_score = 0.0
-pb_candidates = [0.25 * pw, 0.5 * pw, pw, 2.0 * pw, 4.0 * pw]
-dtc_scores = []
-best_dtc = pb_candidates[0]
-for dtc in pb_candidates:
-    logging.debug('run distance_threshhold %s', str(dtc))
-    global_config['distance_threshold'] = dtc
-    current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
-    #
-    dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
-    logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
-    if current_score > best_score:
-        best_score = current_score
-        best_dtc = dtc
-global_config['distance_threshold'] = best_dtc
+    pw = global_config['is_alive_probability_weighting']
+    best_score = 0.0
+    pb_candidates = [0.25 * pw, 0.5 * pw, pw, 2.0 * pw, 4.0 * pw]
+    best_dtc = pb_candidates[0]
+    for dtc in pb_candidates:
+        logging.debug('run distance_threshhold %s', str(dtc))
+        global_config['distance_threshold'] = dtc
+        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        #
+        dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+        logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
+        if current_score > best_score:
+            best_score = current_score
+            best_dtc = dtc
+    global_config['distance_threshold'] = best_dtc
 
 logging.info('data association finished!')
 code.interact(local=dict(globals(), **locals()))
