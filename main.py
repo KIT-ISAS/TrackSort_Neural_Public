@@ -35,7 +35,7 @@ parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffe
 parser.add_argument('--dataset_type', default='CsvDataset',
                     help='The type of the dataset. Current options are: ["FakeDataset","CsvDataset"].')
 parser.add_argument('--distance_threshold', type=float, default=0.01,
-                    help='The threshhold, that is used for the matching with the artificial measurements and predictions')
+                    help='The threshold used for the matching with the artificial measurements and predictions')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--num_timesteps', type=int, default=10000,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
@@ -112,8 +112,17 @@ global_config = {
     'debug': False
 }
 
-log_level = logging._nameToLevel[args.verbosity]
-logging.basicConfig(filename='main', level=log_level)
+
+# setup logging
+log_level = int(logging._nameToLevel[args.verbosity])
+logger = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(log_level)
+
+logging.log(logging.INFO, "LOG LEVEL: %s", log_level)
 
 
 def run_global_config(global_config):
