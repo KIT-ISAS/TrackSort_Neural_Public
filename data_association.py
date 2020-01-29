@@ -53,7 +53,7 @@ class DataAssociation(object):
                 plt.title('Time step: {}'.format(time_step))
                 if not self.global_config['CsvDataSet']['rotate_columns']:
                     plt.xlim((-0.1, 1.3))  # TODO more sophisticated solution to this problem???
-                    plt.ylim((-0.1, 1.1))
+                    plt.ylim((-0.1, 1.5))
 
                 if self.global_config['CsvDataSet']['rotate_columns']:
                     plt.xlim((0.3, 0.8))
@@ -75,14 +75,14 @@ class DataAssociation(object):
                 for idx, prediction_id in enumerate(prediction_ids):
                     if old_measurements[prediction_id][1]:
                         if self.global_config['visualize']: plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
-                                    c='cyan')  # , label='old measurement')
+                                    c='cyan', label='old measurement')
                     else:
                         if self.global_config['visualize']: plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
-                                    c='yellow')  # , label='old measurement artificial')
+                                    c='yellow', label='old measurement artificial')
                     start = old_measurements[prediction_id][0]
                     end = predictions[prediction_id]
                     line = np.stack((start, end), axis=0)
-                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='purple')
+                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='purple', label='prediction step')
 
             if len(measurements) != 0:
                 if self.global_config['visualize']: plt.scatter(np.array(measurements)[:, 0], np.array(measurements)[:, 1], c='blue', label='measurement')
@@ -159,9 +159,9 @@ class DataAssociation(object):
                         old_measurements[prediction_id] = (prediction, False)
                     else:
                         logging.debug('track finished!')
-                        if self.global_config['visualize']: plt.scatter([prediction[0]], [prediction[1]], c='black')
+                        if self.global_config['visualize']: plt.scatter([prediction[0]], [prediction[1]], c='black', label='track end')
                     #
-                    if self.global_config['visualize']: circle = plt.Circle(prediction, self.global_config['distance_threshold'], color='blue', fill=False)
+                    if self.global_config['visualize']: circle = plt.Circle(prediction, self.global_config['distance_threshold'], color='blue', fill=False, label='artificial track')
                     if self.global_config['visualize']: plt.gcf().gca().add_artist(circle)
                     # only for visualization purposes
                     pseudo_measurement = np.array(
@@ -176,19 +176,21 @@ class DataAssociation(object):
                     prediction_id = self.track_manager.pseudo_track_real_measurement(measurement, time_step)
                     old_measurements[prediction_id] = (measurement, True)
                     #
-                    if self.global_config['visualize']: circle = plt.Circle(measurement, self.global_config['distance_threshold'], color='red', fill=False)
+                    if self.global_config['visualize']: circle = plt.Circle(measurement, self.global_config['distance_threshold'], color='red', fill=False, label='artificial track')
                     if self.global_config['visualize']: plt.gcf().gca().add_artist(circle)
                     #
                     pseudo_prediction = np.array(
                         [measurement[0] + self.global_config['distance_threshold'], measurement[1]])
                     line = np.stack((measurement, pseudo_prediction), axis=0)
-                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
+                    if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green', label='matching')
                 else:
                     counts[3] += 1
             logging.debug(list(counts))
 
             if self.global_config['visualize']:
-                plt.legend(loc="upper left")
+                handles, labels = plt.gca().get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                plt.legend(by_label.values(), by_label.keys(), loc="upper left", ncol=2)
                 plt.savefig(self.global_config['visualization_path'] + '{:05d}'.format(time_step))
                 plt.clf()
         #
