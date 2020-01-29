@@ -497,6 +497,7 @@ class Model(object):
         plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
         plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
         plt.legend(loc="upper right")
+        plt.yscale('log')
         plt.savefig(self.global_config['diagrams_path'] + 'MSE.png')
         plt.clf()
 
@@ -599,6 +600,7 @@ class Model(object):
         plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
         plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
         plt.legend(loc="upper right")
+        plt.yscale('log')
         plt.savefig(self.global_config['diagrams_path'] + 'MSE.png')
         plt.clf()
 
@@ -724,9 +726,9 @@ class Model(object):
         logging.info("Evaluate: Mean Sep Time Error = {}".format(test_time_loss))
         logging.info("Evaluate: Sum of Error = {}".format(test_loss))
 
-        self._box_plot(test_pred_loss, [0, 4.0], 'Next-Step', epoch, 'MAE [px]')
-        self._box_plot(test_spatial_loss, [-59, 59], 'Separation-Spatial', epoch, 'Spatial error [px]')
-        self._box_plot(100 * test_time_loss, None, 'Separation-Temporal', epoch, 'Temporal error [1/100 Frames]')
+        self._box_plot(prediction_maes, [0, 4.0], 'Next-Step', epoch, 'MAE [px]')
+        self._box_plot(spatial_errors, [-59, 59], 'Separation-Spatial', epoch, 'Spatial error [px]')
+        self._box_plot(100 * time_errors, None, 'Separation-Temporal', epoch, 'Temporal error [1/100 Frames]')
 
         return test_loss, test_pred_loss, test_spatial_loss, test_time_loss
 
