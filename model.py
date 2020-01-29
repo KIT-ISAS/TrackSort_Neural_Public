@@ -597,18 +597,27 @@ class Model(object):
         self.rnn_model.save(self.global_config['model_path'])
 
         # Visualize loss curve
+        # columns: epoch, mse, mae, pred_mse, pred_mae, spatial_mse, spatial_mae, temporal_mse, temporal_mae
         train_losses = np.array(train_losses)
         test_losses = np.array(test_losses)
 
         # MSEs
-        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
-        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
+        plt.plot(train_losses[:, 0], train_losses[:, 1], c='navy', label="Training MSE")
+        plt.plot(train_losses[:, 0], train_losses[:, 3], c='blue', label="Training MSE (prediction)")
+        plt.plot(train_losses[:, 0], train_losses[:, 5], c='cornflowerblue', label="Training MSE (sep. spatial)")
+        plt.plot(train_losses[:, 0], train_losses[:, 7], c='deepskyblue', label="Training MSE (sep. temporal)")
+
+        plt.plot(test_losses[:, 0], test_losses[:, 1], c='maroon', label="Test MSE")
+        plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test MSE (prediction)")
+        plt.plot(test_losses[:, 0], test_losses[:, 5], c='tomato', label="Test MSE (sep. spatial)")
+        plt.plot(test_losses[:, 0], test_losses[:, 7], c='orange', label="Test MSE (sep. temporal)")
         plt.legend(loc="upper right")
         plt.yscale('log')
         plt.savefig(self.global_config['diagrams_path'] + 'MSE.png')
         plt.clf()
 
         # MAEs
+        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
         plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE")
         plt.legend(loc="upper right")
