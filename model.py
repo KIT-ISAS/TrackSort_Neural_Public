@@ -167,6 +167,107 @@ def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
     return f
 
 
+def train_step_separation_prediction_generator(model,
+                                               optimizer, batch_size, num_time_steps, nan_value=0,
+                         time_normalization=22., only_last_timestep_additional_loss=True,
+                                               apply_gradients=True):
+    # the placeholder character used for padding
+    mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
+
+    input_dim = 2
+
+    no_loss_mask_np = np.ones([batch_size, num_time_steps])
+    # no_loss_mask_np[:, :7] = 0
+    no_loss_mask = tf.constant(no_loss_mask_np)
+
+    # time label should be relative not absolute: instead of predicting the
+    #  frame number when the particle crosses the bar, we make a countdown.
+    #  example: time_label = [4, 4, 4, 4, 4, 4]
+    #  new_time_label = [4, 3, 2, 1, 0, -1]
+    # -> calc like this: range = [0, 1, 2, 3, 4, 5 ...]
+    #     new_time_label = time_label - range
+    range_np = np.array(list(range(num_time_steps))) / time_normalization
+    range_np_batch = np.tile(range_np, (batch_size, 1)).reshape([batch_size, num_time_steps, 1])
+    range_np_batch_2 = np.tile(range_np, (batch_size, 1)).reshape([batch_size, num_time_steps])
+    range_ = K.variable(range_np_batch)
+    range_2 = K.variable(range_np_batch_2)
+
+    @tf.function
+    def train_step(inp, target):
+        with tf.GradientTape() as tape:
+            target = K.cast(target, tf.float64)
+            predictions = model(inp)
+
+            mask = K.all(K.equal(inp, mask_value), axis=-1)
+            mask = 1 - K.cast(mask, tf.float64)
+            mask = K.cast(mask, tf.float64)
+
+            pred_mse = tf.keras.losses.mean_squared_error(target[:, :, :2], predictions[:, :, :2]) * mask
+            pred_mse = K.sum(pred_mse) / K.sum(mask)
+
+            pred_mae = tf.keras.losses.mean_absolute_error(target[:, :, :2], predictions[:, :, :2]) * mask
+            pred_mae = K.sum(pred_mae) / K.sum(mask)
+
+            # find the last timestep for every track
+            # 1. find timesteps which equal [0,0]
+            # 2. get the first timestep for every track
+            # 2.1 [0,0,0,1,1,1]
+            # 2.2 [1,1,1,0,0,0] * length**2 + [0,0,0,1,1,1] * range(length)
+            # 2.3 argmin
+            # 3 Create a mask from that
+
+            if only_last_timestep_additional_loss:
+                any_zero_element = K.equal(inp, [nan_value])
+                any_zero_element = K.cast_to_floatx(any_zero_element)
+                count_zeros_per_timestep = K.sum(any_zero_element, axis=-1)
+                two_zeros_per_timestep = K.equal(count_zeros_per_timestep, [input_dim])
+                is_zero = K.cast_to_floatx(two_zeros_per_timestep)
+                not_zero = (-1 * is_zero + 1) * (inp.shape[1] ** 2)
+                search_space = is_zero * range_2 + not_zero
+                last_timesteps = K.argmin(search_space, axis=1) - 1
+
+                mask_last_step = tf.one_hot(last_timesteps, depth=inp.shape[1], dtype=tf.bool, on_value=True,
+                                            off_value=False)
+                mask_last_step = K.cast(mask_last_step, tf.float64)
+
+            start = None
+            end = None
+
+            spatial_mse = tf.keras.losses.mean_squared_error(target[:, start:end, 2:3], predictions[:, start:end, 2:3]) * mask
+            spatial_mae = tf.keras.losses.mean_absolute_error(target[:, start:end, 2:3], predictions[:, start:end, 2:3]) * mask
+
+            if only_last_timestep_additional_loss:
+                spatial_mse = K.sum(spatial_mse * mask_last_step)
+                spatial_mae = K.sum(spatial_mae * mask_last_step)
+            else:
+                spatial_mse = K.sum(spatial_mse) / K.sum(mask)
+                spatial_mae = K.sum(spatial_mae) / K.sum(mask)
+
+            # new_time_target is like a countdown
+            new_time_target = (target[:, :, 3:4] - range_)
+
+            temporal_mse = tf.keras.losses.mean_squared_error(new_time_target[:, start:end], predictions[:, start:end, 3:4]) * mask
+            temporal_mae = tf.keras.losses.mean_squared_error(new_time_target[:, start:end], predictions[:, start:end, 3:4]) * mask
+
+            if only_last_timestep_additional_loss:
+                temporal_mse = K.sum(temporal_mse * mask_last_step)
+                temporal_mae = K.sum(temporal_mae * mask_last_step)
+            else:
+                temporal_mse = K.sum(temporal_mse) / K.sum(mask)
+                temporal_mae = K.sum(temporal_mae) / K.sum(mask)
+
+            mse = pred_mse + spatial_mse + temporal_mse
+            mae = pred_mae + spatial_mae + temporal_mae
+
+        if apply_gradients:
+            grads = tape.gradient(mse, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        return mse, mae, pred_mse, pred_mae, spatial_mse, spatial_mae, temporal_mse, temporal_mae
+
+    return train_step
+
+
 def train_step_generator(model, optimizer, nan_value=0):
     """
     Build a function which returns a computational graph for tensorflow.
@@ -187,9 +288,9 @@ def train_step_generator(model, optimizer, nan_value=0):
         >>> for epoch in range(100):
         >>>     for (batch_n, (inp, target)) in enumerate(dataset_train):
         >>>         # _ = keras_model.reset_states()
-        >>>         loss = train_step(inp, target)
+        >>>         mse, mae = train_step(inp, target)
         >>>         step += batch_size
-        >>>     tf.summary.scalar('loss', loss, step=step)
+        >>>     tf.summary.scalar('loss', mse, step=step)
 
     :return: function which can be called to train the given model with the given optimizer
     """
@@ -206,15 +307,17 @@ def train_step_generator(model, optimizer, nan_value=0):
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            loss = tf.keras.losses.mean_squared_error(target, predictions) * mask
+            mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
+            mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
 
             # take average w.r.t. the number of unmasked entries
-            loss = K.sum(loss) / K.sum(mask)
+            mse = K.sum(mse) / K.sum(mask)
+            mae = K.sum(mae) / K.sum(mask)
 
-        grads = tape.gradient(loss, model.trainable_variables)
+        grads = tape.gradient(mse, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        return loss
+        return mse, mae
 
     return train_step
 
@@ -307,16 +410,18 @@ class Model(object):
     def __init__(self, global_config, data_source):
         self.global_config = global_config
         self.data_source = data_source
+
+        self._label_dim = 4 if self.global_config['separation_prediction'] else 2
+
         if self.global_config['is_loaded']:
             self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
-            self.rnn_model.reset_states()
-            # self.rnn_model.load_weights('weights_path')
-        else:
-            self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
-                                                  num_time_steps=self.data_source.longest_track,
-                                                  **self.global_config['rnn_model_factory'])
             logging.info(self.rnn_model.summary())
-            self.train()
+            self.rnn_model.reset_states()
+        else:
+            if self.global_config['separation_prediction']:
+                self.train_separation_prediction()
+            else:
+                self.train()
 
     def get_zero_state(self):
         self.rnn_model.reset_states()
@@ -334,6 +439,12 @@ class Model(object):
         return prediction, new_state
 
     def train(self):
+        self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
+                                                            num_time_steps=self.data_source.longest_track,
+                                                            output_dim=self._label_dim,
+                                                            **self.global_config['rnn_model_factory'])
+        logging.info(self.rnn_model.summary())
+
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
 
         optimizer = tf.keras.optimizers.Adam()
@@ -353,30 +464,153 @@ class Model(object):
                 K.set_value(optimizer.lr, new_lr)
 
             # Train for one batch
-            loss_in_one_batch = []
+            mae_batch = []
+            mse_batch = []
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 # Mini-Batches
                 _ = self.rnn_model.reset_states()
-                loss_in_one_batch.append(train_step_fn(inp, target))
-            loss = np.mean(loss_in_one_batch)
-            train_losses.append([epoch, loss])
+                mse, mae = train_step_fn(inp, target)
+                mse_batch.append(mse)
+                mae_batch.append(mae)
+            mse = np.mean(mse_batch)
+            mae = np.mean(mae_batch)
+            train_losses.append([epoch, mse, mae * self.data_source.normalization_constant])
 
-            log_string = "{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], loss)
+            log_string = "{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], mse)
 
             # Evaluate
             if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
                     or (epoch+1) == self.global_config['num_train_epochs']:
                 logging.info(log_string)
-                test_loss = self._evaluate_model(dataset_test, epoch)
-                test_losses.append([epoch, test_loss])
+                test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
+                test_losses.append([epoch, test_mse, test_mae])
             else:
                 logging.debug(log_string)
 
+        self.rnn_model.save(self.global_config['model_path'])
+
+        # Visualize loss curve
+        train_losses = np.array(train_losses)
+        test_losses = np.array(test_losses)
+
+        # MSE
+        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
+        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
+        plt.legend(loc="upper right")
+        plt.savefig(self.global_config['diagrams_path'] + 'MSE.png')
+        plt.clf()
+
+        # MAE
+        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
+        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
+        plt.legend(loc="upper right")
+        plt.savefig(self.global_config['diagrams_path'] + 'MAE.png')
+        plt.clf()
+
+    def train_separation_prediction(self):
+        dataset_train, dataset_test, num_time_steps = self.data_source.get_tf_data_sets_seq2seq_with_separation_data(
+            normalized=True,
+            time_normalization=self.global_config['time_normalization_constant'],
+            virtual_belt_edge_x_position=self.global_config['virtual_belt_edge_x_position'],
+            virtual_nozzle_array_x_position=self.global_config['virtual_nozzle_array_x_position']
+            )
+
+        self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
+                                                            num_time_steps=num_time_steps,
+                                                            output_dim=self._label_dim,
+                                                            **self.global_config['rnn_model_factory'])
+        logging.info(self.rnn_model.summary())
+
+        optimizer = tf.keras.optimizers.Adam()
+        train_step_fn = train_step_separation_prediction_generator(self.rnn_model, optimizer,
+                                                                   batch_size=self.global_config['batch_size'],
+                                                                   num_time_steps=num_time_steps,
+                                                                   time_normalization=self.global_config['time_normalization_constant'],
+                                                                   only_last_timestep_additional_loss=self.global_config['only_last_timestep_additional_loss'],
+                                                                   apply_gradients=True
+                                                                   )
+
+        test_step_fn = train_step_separation_prediction_generator(self.rnn_model, optimizer,
+                                                                   batch_size=self.global_config['batch_size'],
+                                                                   num_time_steps=num_time_steps,
+                                                                   time_normalization=self.global_config[
+                                                                       'time_normalization_constant'],
+                                                                   only_last_timestep_additional_loss=
+                                                                   self.global_config['only_last_timestep_additional_loss'],
+                                                                  apply_gradients=False
+                                                                   )
+
+        # dict(epoch->float)
+        train_losses = []
+        test_losses = []
+
+        # Train model
+        epoch = 0
+        for epoch in range(self.global_config['num_train_epochs']):
+            # learning rate decay after 100 epochs
+            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
+                old_lr = K.get_value(optimizer.lr)
+                new_lr = old_lr * self.global_config['lr_decay_factor']
+                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+                K.set_value(optimizer.lr, new_lr)
+
+            # Train for one batch
+            errors_in_one_batch = []
+
+            for (batch_n, (inp, target)) in enumerate(dataset_train):
+                # Mini-Batches
+                _ = self.rnn_model.reset_states()
+                errors = train_step_fn(inp, target)
+                errors_in_one_batch.append(errors)
+
+            error_list = np.mean(errors_in_one_batch, axis=0).tolist()
+            train_losses.append([epoch] + error_list)
+
+            log_string = "{}/{}: \t MSE={}".format(epoch, self.global_config['num_train_epochs'], error_list[0])
+
+            # Evaluate
+            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
+                    or (epoch + 1) == self.global_config['num_train_epochs']:
+                logging.info(log_string)
+
+                errors_in_one_batch = []
+
+                for (batch_n, (inp, target)) in enumerate(dataset_test):
+                    # Mini-Batches
+                    _ = self.rnn_model.reset_states()
+                    errors = test_step_fn(inp, target)
+                    errors_in_one_batch.append(errors)
+
+                error_list = np.mean(errors_in_one_batch, axis=0).tolist()
+                test_losses.append([epoch] + error_list)
+            else:
+                logging.debug(log_string)
+
+        self._evaluate_separation_model(dataset_test, epoch)
+
         # Store meta info
         self.rnn_model.save(self.global_config['model_path'])
-        self._store_loss_diagram(train_losses, test_losses)
+
+        # Visualize loss curve
+        train_losses = np.array(train_losses)
+        test_losses = np.array(test_losses)
+
+        # MSEs
+        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
+        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
+        plt.legend(loc="upper right")
+        plt.savefig(self.global_config['diagrams_path'] + 'MSE.png')
+        plt.clf()
+
+        # MAEs
+        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
+        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE")
+        plt.legend(loc="upper right")
+        plt.savefig(self.global_config['diagrams_path'] + 'MAE.png')
+        plt.clf()
 
     def _evaluate_model(self, dataset_test, epoch):
+        mses = np.array([])
         maes = np.array([])
 
         mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
@@ -384,7 +618,7 @@ class Model(object):
 
         for input_batch, target_batch in dataset_test:
             # reset state
-            hidden = self.rnn_model.reset_states()
+            _ = self.rnn_model.reset_states()
 
             batch_predictions = self.rnn_model(input_batch)
 
@@ -393,18 +627,24 @@ class Model(object):
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            target_batch_unnormalized = target_batch * normalization_factor
-            pred_batch_unnormalized = batch_predictions * normalization_factor
+            target_batch_unnormalized = target_batch
+            pred_batch_unnormalized = batch_predictions
 
-            batch_loss = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
             num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
             batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
 
-            maes = np.concatenate((maes, batch_loss_per_track.numpy().reshape([-1])))
+            batch_mae = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            batch_mae_per_track = tf.reduce_sum(batch_mae, axis=-1) / num_time_steps_per_track
 
-        test_loss = np.mean(maes)
+            mses = np.concatenate((mses, batch_loss_per_track.numpy().reshape([-1])))
+            maes = np.concatenate((maes, batch_mae_per_track.numpy().reshape([-1])))
 
-        logging.info("Evaluate: Mean={}".format(test_loss))
+        test_mae = np.mean(maes) * normalization_factor
+        test_mse = np.mean(mses)
+
+        logging.info("Evaluate: MSE={}".format(test_mse))
+        logging.info("Evaluate: MAE={}".format(test_mae))
 
         plt.rc('grid', linestyle=":")
         fig1, ax1 = plt.subplots()
@@ -418,7 +658,91 @@ class Model(object):
         plt.savefig(self.global_config['diagrams_path'] + name + '.png')
         plt.clf()
 
-        return test_loss
+        return test_mse, test_mae
+
+    def _evaluate_separation_model(self, dataset_test, epoch):
+        prediction_maes = np.array([])
+        spatial_errors = np.array([])
+        time_errors = np.array([])
+
+        mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
+        normalization_factor = self.data_source.normalization_constant
+
+        for input_batch, target_batch in dataset_test:
+            # reset state
+            hidden = self.rnn_model.reset_states()
+
+            batch_predictions = self.rnn_model(input_batch)
+            batch_predictions_np = batch_predictions.numpy()
+
+            # Calculate the mask
+            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
+            mask = 1 - K.cast(mask, tf.float64)
+            mask = K.cast(mask, tf.float64)
+
+            target_batch_unnormalized = target_batch * normalization_factor
+            pred_batch_unnormalized = batch_predictions[:, :, :2] * normalization_factor
+
+            batch_loss = tf.keras.losses.mean_absolute_error(target_batch_unnormalized[:, :, :2], pred_batch_unnormalized) * mask
+            num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
+            batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
+
+            # Spatial and temporal error
+
+            # signed error
+            # taken from the last timestep (this is correct due to masking which copies
+            #   the last values until the end)
+            batch_difference = (batch_predictions - target_batch).numpy()
+            spatial_diff = (batch_difference[:, -1, 2] * self.data_source.normalization_constant).flatten()
+
+            # temporal diff:
+            #   example: label=17.3
+            #    -> get prediction of timestep 17 -> could be 0.9
+            #    => 0.9 - (17.3 - 17)
+            temporal_diff = []
+            for track_i in range(target_batch.shape[0]):
+                track_input = input_batch[track_i]
+                last_time_step = self.data_source.get_last_timestep_of_track(track_input) - 1
+                target_sep_time = target_batch[track_i, 0, 3] - last_time_step / self.global_config['time_normalization_constant']
+                pred_sep_time = batch_predictions[track_i, -1, 3]
+                time_error = self.global_config['time_normalization_constant'] * (pred_sep_time - target_sep_time)
+                temporal_diff.append(time_error)
+            temporal_diff = np.array(temporal_diff)
+
+            spatial_errors = np.concatenate((spatial_errors, spatial_diff))
+            time_errors = np.concatenate((time_errors, temporal_diff))
+            prediction_maes = np.concatenate((prediction_maes, batch_loss_per_track.numpy().reshape([-1])))
+
+        test_pred_loss = np.mean(prediction_maes)
+        test_spatial_loss = np.mean(spatial_errors)
+        test_time_loss = np.mean(time_errors)
+        test_loss = test_pred_loss + test_time_loss + test_spatial_loss
+
+        logging.info("Evaluate: Mean Next Step Error = {}".format(test_pred_loss))
+        logging.info("Evaluate: Mean Sep Spatial Error = {}".format(test_spatial_loss))
+        logging.info("Evaluate: Mean Sep Time Error = {}".format(test_time_loss))
+        logging.info("Evaluate: Sum of Error = {}".format(test_loss))
+
+        self._box_plot(test_pred_loss, [0, 4.0], 'Next-Step', epoch, 'MAE [px]')
+        self._box_plot(test_spatial_loss, [-59, 59], 'Separation-Spatial', epoch, 'Spatial error [px]')
+        self._box_plot(100 * test_time_loss, None, 'Separation-Temporal', epoch, 'Temporal error [1/100 Frames]')
+
+        return test_loss, test_pred_loss, test_spatial_loss, test_time_loss
+
+    def _box_plot(self, errors, y_lim, name, epoch, ylabel):
+        plt.rc('grid', linestyle=":")
+        fig1, ax1 = plt.subplots()
+        ax1.yaxis.grid(True)
+        if y_lim is not None:
+            ax1.set_ylim(y_lim)
+
+        file_name = '{:05d}epoch-{} ({})'.format(epoch, name, self.model_hash)
+        ax1.set_title(name)
+        plt.ylabel(ylabel)
+        prop = dict(linewidth=2.5)
+        ax1.boxplot(errors, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
+        plt.savefig(self.global_config['diagrams_path'] + file_name + '.png')
+        plt.clf()
 
     def predict_final(self, states, y_targetline):
         raise NotImplementedError
@@ -426,12 +750,6 @@ class Model(object):
     def train_final(self, x_data, y_data, pred_point):
         raise NotImplementedError
 
-    def _store_loss_diagram(self, train_losses, test_losses):
-        train_losses = np.array(train_losses)
-        test_losses = np.array(test_losses)
 
-        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training Loss")
-        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test Loss")
-        plt.legend(loc="upper right")
-        plt.savefig(self.global_config['diagrams_path'] + 'Losses' + '.png')
-        plt.clf()
+
+

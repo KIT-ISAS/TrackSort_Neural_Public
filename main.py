@@ -47,6 +47,7 @@ parser.add_argument('--birth_rate_std', type=float, default=2.0,
                     help='The birth_rate_std value, that is used by the DataManager')
 parser.add_argument('--normalization_constant', type=float, default=None,
                     help='Normalization value')
+parser.add_argument('--time_normalization_constant', type=float, default=22.0, help='Normalization for time prediction')
 parser.add_argument('--min_number_detections', type=int, default=6,
                     help='The min_number_detections value, that is used by the DataManager')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
@@ -56,11 +57,19 @@ parser.add_argument('--rotate_columns', type=str2bool, default=False,
                     help='Set this to true if the order of columns in your csv is (x, y). Default is (y, x)')
 parser.add_argument('--run_hyperparameter_search', type=str2bool, default=False,
                     help='Whether to run the hyperparameter search or not')
+parser.add_argument('--separation_prediction', type=str2bool, default=False,
+                    help='Should the RNN also predict the separation?')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
 
 args = parser.parse_args()
 
 global_config = {
+    'separation_prediction': args.separation_prediction,
+    'time_normalization_constant': args.time_normalization_constant,
+    'virtual_belt_edge_x_position': 800,
+    'virtual_nozzle_array_x_position': 1550,
+    'only_last_timestep_additional_loss': True,
+
     'is_loaded': args.is_loaded,
     'model_path': args.model_path,
     'distance_threshold': args.distance_threshold,
@@ -106,13 +115,14 @@ global_config = {
     'evaluate_every_n_epochs': 1,
     'lr_decay_after_epochs': 80,
     'lr_decay_factor': 0.1,
+
     'state_overwriting_started': False,
     'overwriting_activated': False,
     'verbose': 1,
     'visualize': True,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
-    'is_alive_probability_weighting' : 1.0
+    'is_alive_probability_weighting': 1.0
 }
 
 
@@ -155,9 +165,11 @@ def run_global_config(global_config):
     global_config['current_score'] = current_score
     global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
     global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
-    json.dump(global_config, open('experiments/' + global_config['experiment_name'], 'w'))
+    with open('experiments/' + global_config['experiment_name'], 'w') as file_:
+        json.dump(global_config, file_)
     #
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
+
 
 if not global_config['run_hyperparameter_search']:
     score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)

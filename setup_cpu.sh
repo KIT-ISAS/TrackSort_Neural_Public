@@ -31,7 +31,7 @@ if [ ! -f data ]
 then
 	mkdir data
 	for datasetname in ${DataSetsArray[*]}; do
-	     echo $datasetname
+	     echo "$datasetname"
 	     dataurl="pollithy.com/${datasetname}.zip"
 	     zipname="${datasetname}.zip"
 	     wget -P "./data/" -N "${dataurl}"
