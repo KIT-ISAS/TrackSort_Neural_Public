@@ -483,7 +483,7 @@ class Model(object):
                     or (epoch+1) == self.global_config['num_train_epochs']:
                 logging.info(log_string)
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
-                test_losses.append([epoch, test_mse, test_mae])
+                test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
             else:
                 logging.debug(log_string)
 
@@ -654,7 +654,8 @@ class Model(object):
         name = '{:05d}epoch-NextStep-RNN ({})'.format(epoch, self.model_hash)
         ax1.set_title(name)
         prop = dict(linewidth=2.5)
-        ax1.boxplot(maes, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
+        ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
+                    medianprops=prop, capprops=prop)
         plt.savefig(self.global_config['diagrams_path'] + name + '.png')
         plt.clf()
 
