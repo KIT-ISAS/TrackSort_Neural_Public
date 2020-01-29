@@ -103,6 +103,7 @@ global_config = {
     },
     #
     'num_train_epochs': args.num_train_epochs,
+    'evaluate_every_n_epochs': 1,
     'lr_decay_after_epochs': 80,
     'lr_decay_factor': 0.1,
     'state_overwriting_started': False,
@@ -122,8 +123,7 @@ formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(log_level)
-
-logging.log(logging.INFO, "LOG LEVEL: %s", log_level)
+logging.log(log_level, "LOG LEVEL: %s", log_level)
 
 
 def run_global_config(global_config):

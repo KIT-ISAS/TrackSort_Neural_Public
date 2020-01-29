@@ -339,6 +339,10 @@ class Model(object):
         optimizer = tf.keras.optimizers.Adam()
         train_step_fn = train_step_generator(self.rnn_model, optimizer)
 
+        # dict(epoch->float)
+        train_losses = []
+        test_losses = []
+
         # Train model
         for epoch in range(self.global_config['num_train_epochs']):
             # learning rate decay after 100 epochs
@@ -348,23 +352,31 @@ class Model(object):
                 logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
                 K.set_value(optimizer.lr, new_lr)
 
-            loss = None
+            # Train for one batch
+            loss_in_one_batch = []
             for (batch_n, (inp, target)) in enumerate(dataset_train):
+                # Mini-Batches
                 _ = self.rnn_model.reset_states()
-                loss = train_step_fn(inp, target)
+                loss_in_one_batch.append(train_step_fn(inp, target))
+            loss = np.mean(loss_in_one_batch)
+            train_losses.append([epoch, loss])
 
             log_string = "{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], loss)
 
-            if (epoch + 1) % 10:
+            # Evaluate
+            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
+                    or (epoch+1) == self.global_config['num_train_epochs']:
                 logging.info(log_string)
+                test_loss = self._evaluate_model(dataset_test, epoch)
+                test_losses.append([epoch, test_loss])
             else:
                 logging.debug(log_string)
 
+        # Store meta info
         self.rnn_model.save(self.global_config['model_path'])
+        self._store_loss_diagram(train_losses, test_losses)
 
-        self._evaluate_model(dataset_test)
-
-    def _evaluate_model(self, dataset_test):
+    def _evaluate_model(self, dataset_test, epoch):
         maes = np.array([])
 
         mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
@@ -390,21 +402,36 @@ class Model(object):
 
             maes = np.concatenate((maes, batch_loss_per_track.numpy().reshape([-1])))
 
-        logging.info("Mean={}".format(np.mean(maes)))
+        test_loss = np.mean(maes)
+
+        logging.info("Evaluate: Mean={}".format(test_loss))
 
         plt.rc('grid', linestyle=":")
         fig1, ax1 = plt.subplots()
         ax1.yaxis.grid(True)
         ax1.set_ylim([0, 4.0])
 
-        ax1.set_title('NextStep-RNN ({})'.format(self.model_hash))
+        name = '{:05d}epoch-NextStep-RNN ({})'.format(epoch, self.model_hash)
+        ax1.set_title(name)
         prop = dict(linewidth=2.5)
         ax1.boxplot(maes, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
-        plt.savefig(self.global_config['diagrams_path'] + 'NextStep-RNN.png')
+        plt.savefig(self.global_config['diagrams_path'] + name + '.png')
         plt.clf()
+
+        return test_loss
 
     def predict_final(self, states, y_targetline):
         raise NotImplementedError
 
     def train_final(self, x_data, y_data, pred_point):
         raise NotImplementedError
+
+    def _store_loss_diagram(self, train_losses, test_losses):
+        train_losses = np.array(train_losses)
+        test_losses = np.array(test_losses)
+
+        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training Loss")
+        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test Loss")
+        plt.legend(loc="upper right")
+        plt.savefig(self.global_config['diagrams_path'] + 'Losses' + '.png')
+        plt.clf()
