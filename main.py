@@ -68,9 +68,9 @@ parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
 parser.add_argument('--virtual_nozzle_array_x_position', type=float, default=1550,
                     help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_first_rnn', type=float, default=1024,
+parser.add_argument('--num_units_first_rnn', type=int, default=1024,
                     help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_second_rnn', type=float, default=16,
+parser.add_argument('--num_units_second_rnn', type=int, default=16,
                     help='Where should the virtual nozzle array be?')
 
 
