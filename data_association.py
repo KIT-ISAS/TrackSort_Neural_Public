@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 import code  # code.interact(local=dict(globals(), **locals()))
 import shutil
+import math
 import os
 import logging
 
@@ -65,6 +66,7 @@ class DataAssociation(object):
             predictions = self.track_manager.get_predictions()
             prediction_ids = list(predictions.keys())
             prediction_values = list(predictions.values())
+            prediction_is_alive_probabilities = list(map(lambda x: self.track_manager.get_alive_probability(x), prediction_ids))
             #
             if old_measurements is not None:
                 if len(old_measurements) != len(prediction_values):
@@ -104,23 +106,27 @@ class DataAssociation(object):
                 distance_matrix[len(measurements) + len(prediction_values) + measurement_nr][
                     len(prediction_values) + measurement_nr] = 1.1 * self.global_config['distance_threshold']
             #
-            for prediction_nr in range(len(prediction_values)):
-                distance_matrix[len(measurements) + prediction_nr][prediction_nr] = self.global_config[
-                    'distance_threshold']
+            for prediction_nr, _ in enumerate(prediction_values):
+                # code.interact(local=dict(globals(), **locals()))
+                distance_matrix[len(measurements) + prediction_nr][prediction_nr] = self.global_config[ \
+                    'distance_threshold'] * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.global_config['is_alive_probability_weighting'])
                 distance_matrix[len(measurements) + prediction_nr][
                     len(measurements) + len(prediction_values) + prediction_nr] = 1.1 * self.global_config[
-                    'distance_threshold']
+                    'distance_threshold'] * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.global_config['is_alive_probability_weighting'])
             #
             if self.global_config['matching_algorithm'] == 'global': 
-                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.2 * self.global_config['distance_threshold']
+                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.2 * self.global_config['distance_threshold'] \
+                        * math.pow(2.0, self.global_config['is_alive_probability_weighting'])
                 if len(measurements) >= len(prediction_values):
                     distance_matrix_a = 10000 * np.ones([len(measurements), len(prediction_values) + len(measurements)])
-                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)])
+                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)]) \
+                        * math.pow(2.0, self.global_config['is_alive_probability_weighting'])
                     distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=1)
                     distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=0)
                 else:
                     distance_matrix_a = 10000 * np.ones([len(prediction_values) + len(measurements), len(prediction_values)])
-                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)])
+                    distance_matrix_b = 1.2 * self.global_config['distance_threshold'] * np.ones([len(measurements), len(prediction_values)]) \
+                        * math.pow(2.0, self.global_config['is_alive_probability_weighting'])
                     distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=0)
                     distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=1)
             #
