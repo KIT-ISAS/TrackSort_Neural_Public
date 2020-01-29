@@ -40,6 +40,9 @@ parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, t
 parser.add_argument('--num_timesteps', type=int, default=10000,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
+parser.add_argument('--lr_decay_after_epochs', type=int, default=80, help='When to decrease the lr by lr_decay_factor')
+parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='When learning rate should be decreased, '
+                                                                       'multiply with this')
 parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
 parser.add_argument('--birth_rate_mean', type=float, default=5.0,
                     help='The birth_rate_mean value, that is used by the DataManager')
@@ -47,6 +50,7 @@ parser.add_argument('--birth_rate_std', type=float, default=2.0,
                     help='The birth_rate_std value, that is used by the DataManager')
 parser.add_argument('--normalization_constant', type=float, default=None,
                     help='Normalization value')
+parser.add_argument('--evaluate_every_n_epochs', type=int, default=20)
 parser.add_argument('--time_normalization_constant', type=float, default=22.0, help='Normalization for time prediction')
 parser.add_argument('--min_number_detections', type=int, default=6,
                     help='The min_number_detections value, that is used by the DataManager')
@@ -61,13 +65,19 @@ parser.add_argument('--separation_prediction', type=str2bool, default=False,
                     help='Should the RNN also predict the separation?')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
 
+parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
+                    help='Where does the virtual belt end?')
+parser.add_argument('--virtual_nozzle_array_x_position', type=float, default=1550,
+                    help='Where should the virtual nozzle array be?')
+
+
 args = parser.parse_args()
 
 global_config = {
     'separation_prediction': args.separation_prediction,
     'time_normalization_constant': args.time_normalization_constant,
-    'virtual_belt_edge_x_position': 800,
-    'virtual_nozzle_array_x_position': 1550,
+    'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
+    'virtual_nozzle_array_x_position': args.virtual_nozzle_array_x_position,
     'only_last_timestep_additional_loss': True,
 
     'is_loaded': args.is_loaded,
@@ -112,9 +122,9 @@ global_config = {
     },
     #
     'num_train_epochs': args.num_train_epochs,
-    'evaluate_every_n_epochs': 1,
-    'lr_decay_after_epochs': 80,
-    'lr_decay_factor': 0.1,
+    'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
+    'lr_decay_after_epochs': args.lr_decay_after_epochs,
+    'lr_decay_factor': args.lr_decay_factor,
 
     'state_overwriting_started': False,
     'overwriting_activated': False,
