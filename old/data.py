@@ -393,8 +393,6 @@ class AbstractDataSet(ABC):
 
         self.longest_track = longest_track
 
-        print(longest_track)
-
         return np.array(seq2seq_data)[:, :longest_track + 1, :]
 
     def get_box_plot(self, model, dataset):

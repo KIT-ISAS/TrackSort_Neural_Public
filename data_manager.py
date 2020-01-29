@@ -441,7 +441,7 @@ class AbstractDataSet(ABC):
 
     def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
         assert self.longest_track is not None, "self.longest_track not set"
-        logging.info("longest_track=".format(self.longest_track))
+        logging.info("longest_track={}".format(self.longest_track))
         seq2seq_data = []
 
         # for every track we create:

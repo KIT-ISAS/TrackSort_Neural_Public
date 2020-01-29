@@ -40,7 +40,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, t
 parser.add_argument('--num_timesteps', type=int, default=10000,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
-parser.add_argument('--lr_decay_after_epochs', type=int, default=80, help='When to decrease the lr by lr_decay_factor')
+parser.add_argument('--lr_decay_after_epochs', type=int, default=150, help='When to decrease the lr by lr_decay_factor')
 parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='When learning rate should be decreased, '
                                                                        'multiply with this')
 parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
@@ -48,8 +48,7 @@ parser.add_argument('--birth_rate_mean', type=float, default=5.0,
                     help='The birth_rate_mean value, that is used by the DataManager')
 parser.add_argument('--birth_rate_std', type=float, default=2.0,
                     help='The birth_rate_std value, that is used by the DataManager')
-parser.add_argument('--normalization_constant', type=float, default=None,
-                    help='Normalization value')
+parser.add_argument('--normalization_constant', type=float, default=None, help='Normalization value')
 parser.add_argument('--evaluate_every_n_epochs', type=int, default=20)
 parser.add_argument('--time_normalization_constant', type=float, default=22.0, help='Normalization for time prediction')
 parser.add_argument('--min_number_detections', type=int, default=6,
@@ -68,6 +67,10 @@ parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.
 parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
 parser.add_argument('--virtual_nozzle_array_x_position', type=float, default=1550,
+                    help='Where should the virtual nozzle array be?')
+parser.add_argument('--num_units_first_rnn', type=float, default=1024,
+                    help='Where should the virtual nozzle array be?')
+parser.add_argument('--num_units_second_rnn', type=float, default=16,
                     help='Where should the virtual nozzle array be?')
 
 
@@ -109,8 +112,8 @@ global_config = {
         'additive_noise_stddev': 0.0
     },
     'rnn_model_factory': {
-        'num_units_first_rnn': 1024,
-        'num_units_second_rnn': 16,
+        'num_units_first_rnn': args.num_units_first_rnn,
+        'num_units_second_rnn': args.num_units_second_rnn,
         'num_units_third_rnn': 0,
         'num_units_fourth_rnn': 0,
         'num_units_first_dense': 0,

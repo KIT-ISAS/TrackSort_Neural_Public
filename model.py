@@ -618,7 +618,6 @@ class Model(object):
 
         # MAEs
         plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
-        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE")
         plt.legend(loc="upper right")
         plt.savefig(self.global_config['diagrams_path'] + 'MAE.png')
