@@ -47,3 +47,6 @@ class TrackManager(object):
             logging.error("something with the id management doesnt work in get_predictions!")
             code.interact(local=dict(globals(), **locals()))
         return predictions
+
+    def get_alive_probability(self, track_id):
+        return self.tracks[track_id].is_alive_probability

@@ -3,7 +3,7 @@
 apt install wget python3-pip virtualenv
 
 # create the python environment
-if [ -f cpu_env ]
+if [ ! -f cpu_env ]
 then
 	virtualenv -p python3 cpu_env
 	. cpu_env/bin/activate
