@@ -152,7 +152,7 @@ def run_global_config(global_config):
     score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (
             accuracy_of_the_first_kind + accuracy_of_the_second_kind)
     # save the current config
-    global_config['current_score'] = current_score
+    global_config['score'] = score
     global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
     global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
     json.dump(global_config, open('experiments/' + global_config['experiment_name'], 'w'))
