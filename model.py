@@ -434,6 +434,10 @@ class Model(object):
         current_input = np.expand_dims(current_input, axis=1)
         set_state(self.rnn_model, state)
         prediction = self.rnn_model(current_input)
+
+        # ToDo: use the separation predictions! Currently I just drop them.
+        prediction = np.copy(prediction.numpy()[:, :, :2])
+
         prediction = np.squeeze(prediction)
         new_state = get_state(self.rnn_model)
         return prediction, new_state
@@ -747,11 +751,6 @@ class Model(object):
         plt.savefig(self.global_config['diagrams_path'] + file_name + '.png')
         plt.clf()
 
-    def predict_final(self, states, y_targetline):
-        raise NotImplementedError
-
-    def train_final(self, x_data, y_data, pred_point):
-        raise NotImplementedError
 
 
 
