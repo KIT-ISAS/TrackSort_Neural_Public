@@ -141,7 +141,7 @@ def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
             batch_predictions = model(input_batch)
 
             # Calculate the mask
-            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
+            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
@@ -623,7 +623,7 @@ class Model(object):
             batch_predictions = self.rnn_model(input_batch)
 
             # Calculate the mask
-            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
+            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
@@ -677,7 +677,7 @@ class Model(object):
             batch_predictions_np = batch_predictions.numpy()
 
             # Calculate the mask
-            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
+            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
