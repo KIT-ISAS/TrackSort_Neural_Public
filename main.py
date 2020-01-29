@@ -199,7 +199,7 @@ if not global_config['run_hyperparameter_search']:
             global_config['CsvDataSet']['additive_noise_stddev'] = noise
             score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
             result_list.append([score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
-        logging.info(str(result_list))
+        logging.debug(str(result_list))
         logging.info('robustness test finished!')
         code.interact(local=dict(globals(), **locals()))
 
