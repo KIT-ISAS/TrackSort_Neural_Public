@@ -218,10 +218,10 @@ def train_step_separation_prediction_generator(model,
 
             if only_last_timestep_additional_loss:
                 any_zero_element = K.equal(inp, [nan_value])
-                any_zero_element = K.cast_to_floatx(any_zero_element)
+                any_zero_element = K.cast(any_zero_element, tf.float64)
                 count_zeros_per_timestep = K.sum(any_zero_element, axis=-1)
                 two_zeros_per_timestep = K.equal(count_zeros_per_timestep, [input_dim])
-                is_zero = K.cast_to_floatx(two_zeros_per_timestep)
+                is_zero = K.cast(two_zeros_per_timestep, tf.float64)
                 not_zero = (-1 * is_zero + 1) * (inp.shape[1] ** 2)
                 search_space = is_zero * range_2 + not_zero
                 last_timesteps = K.argmin(search_space, axis=1) - 1
