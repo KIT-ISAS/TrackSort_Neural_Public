@@ -854,7 +854,8 @@ class CsvDataSet(AbstractDataSet):
     def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2,
                  timesteps=35, batch_size=128, global_config=None, data_is_aligned=True,
                  rotate_columns=False, normalization_constant=None,
-                 birth_rate_mean=6, birth_rate_std=2):
+                 birth_rate_mean=6, birth_rate_std=2,
+                 additive_noise_stddev=0):
         self.global_config = global_config
         self.glob_file_pattern = glob_file_pattern
         self.file_list = sorted(glob.glob(glob_file_pattern))
@@ -871,6 +872,12 @@ class CsvDataSet(AbstractDataSet):
         if timesteps is not None:
             self.timesteps = timesteps
         self.tracks = self._load_tracks(rotate_columns=self.rotate_columns)
+
+        # Add normally distributed noise to the tracks
+        self.additive_noise_stddev = additive_noise_stddev
+        if self.additive_noise_stddev > 0.0:
+            logging.info("Add normal noise with std={}".format(self.additive_noise_stddev))
+            self.tracks += np.random.normal(loc=0.0, scale=self.additive_noise_stddev, size=self.tracks.shape)
 
         # csv data is aligned?
         self.data_is_aligned = data_is_aligned

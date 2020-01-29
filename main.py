@@ -56,7 +56,7 @@ parser.add_argument('--rotate_columns', type=str2bool, default=False,
                     help='Set this to true if the order of columns in your csv is (x, y). Default is (y, x)')
 parser.add_argument('--run_hyperparameter_search', type=str2bool, default=False,
                     help='Whether to run the hyperparameter search or not')
-parser.add_argument('--verbosity', default='DEBUG', choices=logging._nameToLevel.keys())
+parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
 
 args = parser.parse_args()
 
@@ -86,7 +86,8 @@ global_config = {
         'birth_rate_mean': args.birth_rate_mean,
         'birth_rate_std': args.birth_rate_std,
         'rotate_columns': args.rotate_columns,
-        'normalization_constant': args.normalization_constant
+        'normalization_constant': args.normalization_constant,
+        'additive_noise_stddev': 0.0
     },
     'rnn_model_factory': {
         'num_units_first_rnn': 1024,
