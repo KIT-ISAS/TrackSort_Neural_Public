@@ -181,20 +181,21 @@ def run_global_config(global_config):
     #
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
 
+
 if not global_config['run_hyperparameter_search']:
     if not global_config['test_noise_robustness']:
         score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
-        print('data association finished!')
+        logging.info('data association finished!')
         code.interact(local=dict(globals(), **locals()))
     else:
-        print('test robustness against noise!')
+        logging.info('test robustness against noise!')
         result_list = []
         for noise in [0.0, 0.0003, 0.0005, 0.0008, 0.001]:
             global_config['CsvDataSet']['additive_noise_stddev'] = noise
             score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
             result_list.append([score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
-        print(result_list)
-        print('robustness test finished!')
+        logging.info(str(result_list))
+        logging.info('robustness test finished!')
         code.interact(local=dict(globals(), **locals()))
 
 else:
