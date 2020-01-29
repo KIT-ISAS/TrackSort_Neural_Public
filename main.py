@@ -60,6 +60,8 @@ parser.add_argument('--rotate_columns', type=str2bool, default=False,
                     help='Set this to true if the order of columns in your csv is (x, y). Default is (y, x)')
 parser.add_argument('--run_hyperparameter_search', type=str2bool, default=False,
                     help='Whether to run the hyperparameter search or not')
+parser.add_argument('--test_noise_robustness', type=str2bool, default=False,
+                    help='Should the Dataset be tested with multiple noise values?')
 parser.add_argument('--separation_prediction', type=str2bool, default=False,
                     help='Should the RNN also predict the separation?')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
@@ -136,7 +138,7 @@ global_config = {
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
     'is_alive_probability_weighting': 1.0,
-    'test_noise_robustness': True
+    'test_noise_robustness': args.test_noise_robustness
 }
 
 

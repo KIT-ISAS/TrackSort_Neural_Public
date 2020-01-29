@@ -491,7 +491,7 @@ class Model(object):
             else:
                 logging.debug(log_string)
 
-        self.rnn_model.save(self.global_config['model_path'])
+        self.rnn_model.save(self.global_config['diagrams_path'] + 'model.h5')
 
         # Visualize loss curve
         train_losses = np.array(train_losses)
@@ -594,7 +594,7 @@ class Model(object):
         self._evaluate_separation_model(dataset_test, epoch)
 
         # Store meta info
-        self.rnn_model.save(self.global_config['model_path'])
+        self.rnn_model.save(self.global_config['diagrams_path'] + 'model.h5')
 
         # Visualize loss curve
         # columns: epoch, mse, mae, pred_mse, pred_mae, spatial_mse, spatial_mae, temporal_mse, temporal_mae
