@@ -1,5 +1,7 @@
 import logging
 import math
+import os
+
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
@@ -169,7 +171,7 @@ def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
 
 def train_step_separation_prediction_generator(model,
                                                optimizer, batch_size, num_time_steps, nan_value=0,
-                         time_normalization=22., only_last_timestep_additional_loss=True,
+                                               time_normalization=22., only_last_timestep_additional_loss=True,
                                                apply_gradients=True):
     # the placeholder character used for padding
     mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
@@ -233,8 +235,10 @@ def train_step_separation_prediction_generator(model,
             start = None
             end = None
 
-            spatial_mse = tf.keras.losses.mean_squared_error(target[:, start:end, 2:3], predictions[:, start:end, 2:3]) * mask
-            spatial_mae = tf.keras.losses.mean_absolute_error(target[:, start:end, 2:3], predictions[:, start:end, 2:3]) * mask
+            spatial_mse = tf.keras.losses.mean_squared_error(target[:, start:end, 2:3],
+                                                             predictions[:, start:end, 2:3]) * mask
+            spatial_mae = tf.keras.losses.mean_absolute_error(target[:, start:end, 2:3],
+                                                              predictions[:, start:end, 2:3]) * mask
 
             if only_last_timestep_additional_loss:
                 spatial_mse = K.sum(spatial_mse * mask_last_step)
@@ -246,8 +250,10 @@ def train_step_separation_prediction_generator(model,
             # new_time_target is like a countdown
             new_time_target = (target[:, :, 3:4] - range_)
 
-            temporal_mse = tf.keras.losses.mean_squared_error(new_time_target[:, start:end], predictions[:, start:end, 3:4]) * mask
-            temporal_mae = tf.keras.losses.mean_squared_error(new_time_target[:, start:end], predictions[:, start:end, 3:4]) * mask
+            temporal_mse = tf.keras.losses.mean_squared_error(new_time_target[:, start:end],
+                                                              predictions[:, start:end, 3:4]) * mask
+            temporal_mae = tf.keras.losses.mean_squared_error(new_time_target[:, start:end],
+                                                              predictions[:, start:end, 3:4]) * mask
 
             if only_last_timestep_additional_loss:
                 temporal_mse = K.sum(temporal_mse * mask_last_step)
@@ -484,14 +490,14 @@ class Model(object):
 
             # Evaluate
             if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
-                    or (epoch+1) == self.global_config['num_train_epochs']:
+                    or (epoch + 1) == self.global_config['num_train_epochs']:
                 logging.info(log_string)
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
             else:
                 logging.debug(log_string)
 
-        self.rnn_model.save(self.global_config['diagrams_path'] + 'model.h5')
+        self.rnn_model.save(os.path.join(self.global_config['diagrams_path'], 'model.h5'))
 
         # Visualize loss curve
         train_losses = np.array(train_losses)
@@ -502,14 +508,14 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(self.global_config['diagrams_path'] + 'MSE.png')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
         plt.clf()
 
         # MAE
         plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
         plt.legend(loc="upper right")
-        plt.savefig(self.global_config['diagrams_path'] + 'MAE.png')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
         plt.clf()
 
     def train_separation_prediction(self):
@@ -518,7 +524,7 @@ class Model(object):
             time_normalization=self.global_config['time_normalization_constant'],
             virtual_belt_edge_x_position=self.global_config['virtual_belt_edge_x_position'],
             virtual_nozzle_array_x_position=self.global_config['virtual_nozzle_array_x_position']
-            )
+        )
 
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
                                                             num_time_steps=num_time_steps,
@@ -530,20 +536,24 @@ class Model(object):
         train_step_fn = train_step_separation_prediction_generator(self.rnn_model, optimizer,
                                                                    batch_size=self.global_config['batch_size'],
                                                                    num_time_steps=num_time_steps,
-                                                                   time_normalization=self.global_config['time_normalization_constant'],
-                                                                   only_last_timestep_additional_loss=self.global_config['only_last_timestep_additional_loss'],
+                                                                   time_normalization=self.global_config[
+                                                                       'time_normalization_constant'],
+                                                                   only_last_timestep_additional_loss=
+                                                                   self.global_config[
+                                                                       'only_last_timestep_additional_loss'],
                                                                    apply_gradients=True
                                                                    )
 
         test_step_fn = train_step_separation_prediction_generator(self.rnn_model, optimizer,
-                                                                   batch_size=self.global_config['batch_size'],
-                                                                   num_time_steps=num_time_steps,
-                                                                   time_normalization=self.global_config[
-                                                                       'time_normalization_constant'],
-                                                                   only_last_timestep_additional_loss=
-                                                                   self.global_config['only_last_timestep_additional_loss'],
+                                                                  batch_size=self.global_config['batch_size'],
+                                                                  num_time_steps=num_time_steps,
+                                                                  time_normalization=self.global_config[
+                                                                      'time_normalization_constant'],
+                                                                  only_last_timestep_additional_loss=
+                                                                  self.global_config[
+                                                                      'only_last_timestep_additional_loss'],
                                                                   apply_gradients=False
-                                                                   )
+                                                                  )
 
         # dict(epoch->float)
         train_losses = []
@@ -594,7 +604,7 @@ class Model(object):
         self._evaluate_separation_model(dataset_test, epoch)
 
         # Store meta info
-        self.rnn_model.save(self.global_config['diagrams_path'] + 'model.h5')
+        self.rnn_model.save(os.path.join(self.global_config['diagrams_path'], 'model.h5'))
 
         # Visualize loss curve
         # columns: epoch, mse, mae, pred_mse, pred_mae, spatial_mse, spatial_mae, temporal_mse, temporal_mae
@@ -613,14 +623,14 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 7], c='orange', label="Test MSE (sep. temporal)")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(self.global_config['diagrams_path'] + 'MSE.png')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
         plt.clf()
 
         # MAEs
         plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE")
         plt.legend(loc="upper right")
-        plt.savefig(self.global_config['diagrams_path'] + 'MAE.png')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
         plt.clf()
 
     def _evaluate_model(self, dataset_test, epoch):
@@ -670,7 +680,7 @@ class Model(object):
         prop = dict(linewidth=2.5)
         ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
                     medianprops=prop, capprops=prop)
-        plt.savefig(self.global_config['diagrams_path'] + name + '.png')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.png'))
         plt.clf()
 
         return test_mse, test_mae
@@ -698,7 +708,8 @@ class Model(object):
             target_batch_unnormalized = target_batch * normalization_factor
             pred_batch_unnormalized = batch_predictions[:, :, :2] * normalization_factor
 
-            batch_loss = tf.keras.losses.mean_absolute_error(target_batch_unnormalized[:, :, :2], pred_batch_unnormalized) * mask
+            batch_loss = tf.keras.losses.mean_absolute_error(target_batch_unnormalized[:, :, :2],
+                                                             pred_batch_unnormalized) * mask
             num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
             batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
 
@@ -718,7 +729,8 @@ class Model(object):
             for track_i in range(target_batch.shape[0]):
                 track_input = input_batch[track_i]
                 last_time_step = self.data_source.get_last_timestep_of_track(track_input) - 1
-                target_sep_time = target_batch[track_i, 0, 3] - last_time_step / self.global_config['time_normalization_constant']
+                target_sep_time = target_batch[track_i, 0, 3] - last_time_step / self.global_config[
+                    'time_normalization_constant']
                 pred_sep_time = batch_predictions[track_i, -1, 3]
                 time_error = self.global_config['time_normalization_constant'] * (pred_sep_time - target_sep_time)
                 temporal_diff.append(time_error)
@@ -756,10 +768,5 @@ class Model(object):
         plt.ylabel(ylabel)
         prop = dict(linewidth=2.5)
         ax1.boxplot(errors, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
-        plt.savefig(self.global_config['diagrams_path'] + file_name + '.png')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
-
-
-
-
-

@@ -25,6 +25,7 @@ class AbstractDataSet(ABC):
     #       assert belt_width == belt_height
     belt_width = 2000
     belt_height = 2000
+    normalization_constant = 2000
 
     # the nan_value is used for padding and must not appear in the data
     nan_value = 0
@@ -128,11 +129,11 @@ class AbstractDataSet(ABC):
                             track_data[track_idx][time_idx] != np.array([self.nan_value, self.nan_value])).all():
                         is_started = True
                         particles.append([[time_idx, track_data[track_idx][
-                            time_idx] / self.belt_width]])  # TODO careful if self.belt_width != self.belt_height
+                            time_idx] / self.normalization_constant]])
                     elif is_started and not (
                             track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         particles[-1].append([time_idx, track_data[track_idx][
-                            time_idx] / self.belt_width])  # TODO careful if self.belt_width != self.belt_height
+                            time_idx] / self.normalization_constant])
                     elif is_started and (
                             track_data[track_idx][time_idx] == np.array([self.nan_value, self.nan_value])).all():
                         break
@@ -293,21 +294,19 @@ class AbstractDataSet(ABC):
         :param is_seq2seq_data:
         :return:
         """
-        tracks[:, :, 0] /= self.belt_width
-        tracks[:, :, 1] /= self.belt_width  # TODO shouldn't here self.belt_height be used???
+        tracks[:, :, :2] /= self.normalization_constant
 
         if is_seq2seq_data:
-            tracks[:, :, 2] /= self.belt_width
-            tracks[:, :, 3] /= self.belt_width
+            tracks[:, :, 2] /= self.normalization_constant
+            tracks[:, :, 3] /= self.normalization_constant
         return tracks
 
     def denormalize_tracks(self, tracks, is_seq2seq_data=False):
-        tracks[:, :, 0] *= self.belt_width
-        tracks[:, :, 1] *= self.belt_width
+        tracks[:, :, :2] *= self.normalization_constant
 
         if is_seq2seq_data:
-            tracks[:, :, 2] *= self.belt_width
-            tracks[:, :, 3] *= self.belt_width
+            tracks[:, :, 2] *= self.normalization_constant
+            tracks[:, :, 3] *= self.normalization_constant
         return tracks
 
     def split_train_test(self, tracks, test_ratio=0.1):
@@ -371,9 +370,9 @@ class AbstractDataSet(ABC):
         )
 
         if normalized:
-            tracks[:, :, [0, 1, 2, 3]] /= self.belt_width
+            tracks[:, :, [0, 1, 2, 3]] /= self.normalization_constant
             # normalize spatial prediction
-            tracks[:, :, [4]] /= self.belt_width
+            tracks[:, :, [4]] /= self.normalization_constant
             # normalize temporal prediction
             tracks[:, :, [5]] /= time_normalization
 
@@ -483,7 +482,8 @@ class AbstractDataSet(ABC):
             for track_id in range(batch_predictions.shape[0]):
                 last_id = self.get_last_timestep_of_track(input_batch[track_id])
                 mae_per_timestep = np.sum(
-                    ((target_batch[track_id][:last_id] - batch_predictions[track_id][:last_id]) * self.belt_width) ** 2,
+                    ((target_batch[track_id][:last_id] - batch_predictions[track_id][
+                                                         :last_id]) * self.normalization_constant) ** 2,
                     axis=1)
                 mean_mae_per_track = np.mean(np.sqrt(mae_per_timestep))
                 maes.append(mean_mae_per_track)

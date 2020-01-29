@@ -37,7 +37,7 @@ Follow these instructions to run notebooks on the gpu pc at the institute.
 This is the main starting point and it has a lot of settings.
 See: `python main.py --help`
 
-### Quickstarts for main.py
+### Trainings with main.py
 
  - DEM Zylinder: `python main.py --model_path "models/DEM_model.h5" --dataset_dir "data/DEM_cylinder.csv" --data_is_aligned False --is_loaded True  --rotate_columns True  --normalization_constant 1.0`
- - CSV Pfeffer ...
+ - CSV Pfeffer `python main.py --is_loaded False --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv --data_is_aligned False --is_loaded True  --rotate_columns True --run_hyperparameter_search False  --normalization_constant 1.0`

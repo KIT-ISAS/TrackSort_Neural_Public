@@ -25,7 +25,8 @@ def str2bool(v):
 
 
 # the possible arguments you can give to the model
-parser.add_argument('--is_loaded', type=str2bool, default=True, help='Whether the model is loaded or created + trained.')
+parser.add_argument('--is_loaded', type=str2bool, default=True,
+                    help='Whether the model is loaded or created + trained.')
 parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
 parser.add_argument('--matching_algorithm', default='global',
@@ -74,7 +75,6 @@ parser.add_argument('--num_units_first_rnn', type=int, default=1024,
                     help='Where should the virtual nozzle array be?')
 parser.add_argument('--num_units_second_rnn', type=int, default=16,
                     help='Where should the virtual nozzle array be?')
-
 
 args = parser.parse_args()
 
@@ -141,7 +141,6 @@ global_config = {
     'test_noise_robustness': args.test_noise_robustness
 }
 
-
 # setup logging
 log_level = int(logging._nameToLevel[args.verbosity])
 logger = logging.getLogger()
@@ -154,11 +153,11 @@ logging.log(log_level, "LOG LEVEL: %s", log_level)
 
 
 def run_global_config(global_config):
+    # Create paths for run
     now = datetime.datetime.now()
     experiment_name = now.strftime("%Y_%m_%d__%H_%M_%S")
     global_config['experiment_name'] = experiment_name
-    # ToDo: refactor with path join
-    global_config['diagrams_path'] = 'visualizations/' + experiment_name + '/diagrams/'
+    global_config['diagrams_path'] = os.path.join('visualizations', experiment_name, 'diagrams')
     os.makedirs(global_config['diagrams_path'])
     global_config['visualization_path'] = 'visualizations/' + experiment_name + '/matching_visualization/'
     global_config['visualization_video_path'] = 'visualizations/' + experiment_name + '/matching_visualization_vid.mp4'

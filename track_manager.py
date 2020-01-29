@@ -2,7 +2,7 @@ import logging
 
 from model_manager import ModelManager
 from track import Track
-import code  # code.interact(local=dict(globals(), **locals()))
+import code
 
 
 class TrackManager(object):
