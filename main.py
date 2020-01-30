@@ -75,11 +75,14 @@ parser.add_argument('--num_units_first_rnn', type=int, default=1024,
                     help='Where should the virtual nozzle array be?')
 parser.add_argument('--num_units_second_rnn', type=int, default=16,
                     help='Where should the virtual nozzle array be?')
+parser.add_argument('--clear_state', type=str2bool, default=True,
+                    help='Whether a new track should be initialized with empty state?')
 
 args = parser.parse_args()
 
 global_config = {
     'separation_prediction': args.separation_prediction,
+    'clear_state': args.clear_state,
     'time_normalization_constant': args.time_normalization_constant,
     'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
     'virtual_nozzle_array_x_position': args.virtual_nozzle_array_x_position,

@@ -104,71 +104,6 @@ def rnn_model_factory(
     return model, hash_
 
 
-def tf_error(model, dataset, normalization_factor, squared=True, nan_value=0):
-    """
-    Build a function which returns a computational graph for tensorflow.
-
-    :param model: keras model api
-    :param dataset: iterable with shape [batch_size, time_steps, num_dims*2]
-    :param normalization_factor: all floats get multiplied by this (usually belt_width)
-    :param squared: if true, return MSE. Else: MAE
-    :param nan_value: the value which was used for padding (usually 0)
-
-    Example:
-        >>> import data
-        >>> keras_model = rnn_model_factory()
-        >>> _, dataset_test = data.FakeDataSet().get_tf_data_sets_seq2seq_data()
-        >>> calc_mse_test = model.tf_error(keras_model, dataset_test, normalization_factor, squared=True)
-        >>> mse = calc_mse_test()
-        >>> print("MSE: {}".format(mse))
-
-    :return: method that constructs the graph. The result of the method can be called to calc the error
-    """
-    # the placeholder character used for padding
-    mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
-    norm_factor = tf.constant(normalization_factor, dtype=tf.float64)
-
-    @tf.function
-    def f():
-        # AutoGraph has special support for safely converting for loops when y is a tensor or tf.data.Dataset.
-        # https://www.tensorflow.org/tutorials/customization/performance
-
-        loss = tf.constant(0, dtype=tf.float64)
-        step_counter = tf.constant(0, dtype=tf.float64)
-
-        for input_batch, target_batch in dataset:
-            # reset state
-            hidden = model.reset_states()
-
-            batch_predictions = model(input_batch)
-
-            # Calculate the mask
-            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
-            mask = 1 - K.cast(mask, tf.float64)
-            mask = K.cast(mask, tf.float64)
-
-            # Revert the normalization
-            # ToDo: Replace this hacky solution with same normalization in both directions
-            #    with usage of x_max and y_max   with tf.scatter_nd_update(...)
-            target_batch_unnormalized = target_batch * norm_factor
-            pred_batch_unnormalized = batch_predictions * norm_factor
-
-            if squared:
-                batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized,
-                                                                pred_batch_unnormalized) * mask
-            else:
-                batch_loss = tf.keras.losses.mean_absolute_error(target_batch_unnormalized,
-                                                                 pred_batch_unnormalized) * mask
-
-            # take average w.r.t. the number of unmasked entries
-            loss += K.sum(batch_loss)
-            step_counter += K.sum(mask)
-
-        return loss / step_counter
-
-    return f
-
-
 def train_step_separation_prediction_generator(model,
                                                optimizer, batch_size, num_time_steps, nan_value=0,
                                                time_normalization=22., only_last_timestep_additional_loss=True,
@@ -476,9 +411,12 @@ class Model(object):
             # Train for one batch
             mae_batch = []
             mse_batch = []
+
+            _ = self.rnn_model.reset_states()
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 # Mini-Batches
-                _ = self.rnn_model.reset_states()
+                if self.global_config['clear_state']:
+                    _ = self.rnn_model.reset_states()
                 mse, mae = train_step_fn(inp, target)
                 mse_batch.append(mse)
                 mae_batch.append(mae)
@@ -572,9 +510,11 @@ class Model(object):
             # Train for one batch
             errors_in_one_batch = []
 
+            _ = self.rnn_model.reset_states()
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 # Mini-Batches
-                _ = self.rnn_model.reset_states()
+                if self.global_config['clear_state']:
+                    _ = self.rnn_model.reset_states()
                 errors = train_step_fn(inp, target)
                 errors_in_one_batch.append(errors)
 
@@ -590,9 +530,11 @@ class Model(object):
 
                 errors_in_one_batch = []
 
+                _ = self.rnn_model.reset_states()
                 for (batch_n, (inp, target)) in enumerate(dataset_test):
                     # Mini-Batches
-                    _ = self.rnn_model.reset_states()
+                    if self.global_config['clear_state']:
+                        _ = self.rnn_model.reset_states()
                     errors = test_step_fn(inp, target)
                     errors_in_one_batch.append(errors)
 
@@ -640,9 +582,10 @@ class Model(object):
         mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
         normalization_factor = self.data_source.normalization_constant
 
+        _ = self.rnn_model.reset_states()
         for input_batch, target_batch in dataset_test:
-            # reset state
-            _ = self.rnn_model.reset_states()
+            if self.global_config['clear_state']:
+                _ = self.rnn_model.reset_states()
 
             batch_predictions = self.rnn_model(input_batch)
 
@@ -693,9 +636,10 @@ class Model(object):
         mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
         normalization_factor = self.data_source.normalization_constant
 
+        hidden = self.rnn_model.reset_states()
         for input_batch, target_batch in dataset_test:
-            # reset state
-            hidden = self.rnn_model.reset_states()
+            if self.global_config['clear_state']:
+                _ = self.rnn_model.reset_states()
 
             batch_predictions = self.rnn_model(input_batch)
             batch_predictions_np = batch_predictions.numpy()
