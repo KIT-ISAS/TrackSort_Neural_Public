@@ -10,6 +10,7 @@ import logging
 from track_manager import TrackManager
 from data_manager import FakeDataSet, CsvDataSet
 
+
 # definition of my own nearest neighbour method
 def nearest_neighbour(weight_matrix):
     num_rows = weight_matrix.shape[0]
@@ -176,8 +177,13 @@ class DataAssociation(object):
                     prediction_id = self.track_manager.pseudo_track_real_measurement(measurement, time_step)
                     old_measurements[prediction_id] = (measurement, True)
                     #
-                    if self.global_config['visualize']: circle = plt.Circle(measurement, self.global_config['distance_threshold'], color='red', fill=False, label='artificial track')
-                    if self.global_config['visualize']: plt.gcf().gca().add_artist(circle)
+                    if self.global_config['visualize']:
+                        circle = plt.Circle(measurement,
+                                            self.global_config['distance_threshold'],
+                                            color='red',
+                                            fill=False,
+                                            label='artificial track')
+                        plt.gcf().gca().add_artist(circle)
                     #
                     pseudo_prediction = np.array(
                         [measurement[0] + self.global_config['distance_threshold'], measurement[1]])
