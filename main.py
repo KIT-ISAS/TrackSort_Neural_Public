@@ -162,7 +162,7 @@ def run_global_config(global_config):
     global_config['experiment_name'] = experiment_name
     global_config['diagrams_path'] = os.path.join('visualizations', experiment_name, 'diagrams')
     os.makedirs(global_config['diagrams_path'])
-    os.makedirs('experiments')
+    os.makedirs('experiments', exist_ok=True)
     global_config['visualization_path'] = 'visualizations/' + experiment_name + '/matching_visualization/'
     global_config['visualization_video_path'] = 'visualizations/' + experiment_name + '/matching_visualization_vid.mp4'
     #
