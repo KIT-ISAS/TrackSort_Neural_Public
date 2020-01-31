@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt install wget python3-pip virtualenv
+apt install wget python3-pip virtualenv openssh-server  # openssh-server for sftp
 
 
 
