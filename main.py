@@ -6,12 +6,14 @@ import json
 import datetime
 import logging
 
+import tensorflow as tf
+
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
 from evaluator import Evaluator
 
+tf.get_logger().setLevel('ERROR')
 parser = argparse.ArgumentParser()
-
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -138,6 +140,7 @@ global_config = {
     'lr_decay_after_epochs': args.lr_decay_after_epochs,
     'lr_decay_factor': args.lr_decay_factor,
 
+    'state_overwriting_started': False,
     'overwriting_activated': args.overwriting_activated,
     'verbose': 1,
     'visualize': True,
