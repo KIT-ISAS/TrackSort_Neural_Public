@@ -162,6 +162,7 @@ def run_global_config(global_config):
     global_config['experiment_name'] = experiment_name
     global_config['diagrams_path'] = os.path.join('visualizations', experiment_name, 'diagrams')
     os.makedirs(global_config['diagrams_path'])
+    os.makedirs('experiments')
     global_config['visualization_path'] = 'visualizations/' + experiment_name + '/matching_visualization/'
     global_config['visualization_video_path'] = 'visualizations/' + experiment_name + '/matching_visualization_vid.mp4'
     #
@@ -183,7 +184,7 @@ def run_global_config(global_config):
     global_config['score'] = score
     global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
     global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
-    with open('experiments/' + global_config['experiment_name'], 'w') as file_:
+    with open('experiments/' + global_config['experiment_name'] + '.json', 'w') as file_:
         json.dump(global_config, file_, sort_keys=True, indent=4)
     #
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
