@@ -68,7 +68,7 @@ class ModelManager(object):
                         state_buffers.append(state_buffer)
                     self.current_states[batch_nr] = state_buffers
                     if self.global_config['overwriting_activated'] and self.global_config['highest_id'] > idx + self.global_config['batch_size'] * batch_nr and \
-                            not self.global_config['state_overwrinting_started']:
+                            not self.global_config['state_overwriting_started']:
                         self.global_config['state_overwriting_started'] = True
                         logging.warning('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
                         # code.interact(local=dict(globals(), **locals()))
