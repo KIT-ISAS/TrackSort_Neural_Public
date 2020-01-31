@@ -15,7 +15,7 @@ You can find the visualizations (step wise and as video) in the visualizations f
 
 ## Run with GPU (Docker)
 
-1. Pull docker image `docker pull tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
+1. Pull docker image `docker pull tensorflow/tensorflow:2.1.0-gpu-py3`
 2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
 3. Run docker with mounted dir: `docker run -it -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3`
 4. Inside the container: `cd next_step_rnn`
@@ -80,14 +80,6 @@ See: `python main.py --help`
      --normalization_constant 1.0 \
      --rotate_columns True
   ```
-  
-- Train on different Pfeffer data
-    ```shell script
-    python main.py --is_loaded False --num_train_epochs 1000 --evaluate_every_n_epochs 10 \
-                --num_units_first_rnn 16 --lr_decay_after_epochs 150 \
-                --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackLabels_NaN4_BW3_NotShifted.csv" \
-                --normalization_constant 2000.0
-    ```
 
 ### Hyperparameter search with `python main.py`
 
