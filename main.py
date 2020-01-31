@@ -69,15 +69,16 @@ parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.
 
 parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
-parser.add_argument('--virtual_nozzle_array_x_position', type=float, default=1550,
-                    help='Where should the virtual nozzle array be?')
+parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
+                    help='Where does the virtual belt end?')
+parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
 parser.add_argument('--num_units_first_rnn', type=int, default=1024,
                     help='Where should the virtual nozzle array be?')
 parser.add_argument('--num_units_second_rnn', type=int, default=16,
                     help='Where should the virtual nozzle array be?')
 parser.add_argument('--clear_state', type=str2bool, default=True,
                     help='Whether a new track should be initialized with empty state?')
-parser.add_argument('--overwriting_activated', type=str2bool, default=False,
+parser.add_argument('--overwriting_activated', type=str2bool, default=True,
                     help='Whether batches of the RNN are reused')
 
 args = parser.parse_args()
@@ -116,7 +117,7 @@ global_config = {
         'birth_rate_std': args.birth_rate_std,
         'rotate_columns': args.rotate_columns,
         'normalization_constant': args.normalization_constant,
-        'additive_noise_stddev': 0.0
+        'additive_noise_stddev': args.additive_noise_stddev
     },
     'rnn_model_factory': {
         'num_units_first_rnn': args.num_units_first_rnn,
