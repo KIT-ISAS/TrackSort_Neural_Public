@@ -77,6 +77,8 @@ parser.add_argument('--num_units_second_rnn', type=int, default=16,
                     help='Where should the virtual nozzle array be?')
 parser.add_argument('--clear_state', type=str2bool, default=True,
                     help='Whether a new track should be initialized with empty state?')
+parser.add_argument('--overwriting_activated', type=str2bool, default=False,
+                    help='Whether batches of the RNN are reused')
 
 args = parser.parse_args()
 
@@ -134,8 +136,7 @@ global_config = {
     'lr_decay_after_epochs': args.lr_decay_after_epochs,
     'lr_decay_factor': args.lr_decay_factor,
 
-    'state_overwriting_started': False,
-    'overwriting_activated': False,
+    'overwriting_activated': args.overwriting_activated,
     'verbose': 1,
     'visualize': True,
     'run_hyperparameter_search': args.run_hyperparameter_search,
