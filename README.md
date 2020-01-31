@@ -5,39 +5,120 @@
 - Using a RNN to predict next measurement of tracks.
 - Using a RNN to make separation predictions
 - Python implementation of data assocation (local and global nearest neighbour)
-Quick starts are provided in the "/Notebook" folder.
 
 ## Run with CPU
 
-1. `sh setup_cpu.sh`
+1. `sh setup_cpu.sh` (creates a virtualenv and sources it)
 2. `python main.py`
 
-You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing "python main.py --help"
+You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing `python main.py --help`
 
 ## Run with GPU (Docker)
 
 1. Pull docker image `docker pull tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
-2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn ~/next_step_rnn`
-3. Run docker with mounted home dir: `docker run -it -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3`
+2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
+3. Run docker with mounted dir: `docker run -it -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3`
 4. Inside the container: `cd next_step_rnn && bash setup_gpu.sh`
 5. Inside the container: `source gpu_env/bin/activate`
 6. Inside the container: `python main.py ...`
 
-## Notebooks:  Run with GPU (Docker)
-
-Follow these instructions to run notebooks on the gpu pc at the institute.
-
-1. `docker pull tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
-2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn ~/next_step_rnn`
-3. `docker run -it -p 8888:8888 -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
-4. (ssh tunneling on remote machine: `ssh -L 8888:127.0.0.1:8888 proprak7@i81-gpu-server`)
-
-## python main.py ...
+## `python main.py`
 
 This is the main starting point and it has a lot of settings.
 See: `python main.py --help`
 
-### Trainings with main.py
+### Example configurations for ` python main.py`
 
- - DEM Zylinder: `python main.py --model_path "models/DEM_model.h5" --dataset_dir "data/DEM_cylinder.csv" --data_is_aligned False --is_loaded True  --rotate_columns True  --normalization_constant 1.0`
- - CSV Pfeffer `python main.py --is_loaded False --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv --data_is_aligned False --is_loaded True  --rotate_columns True --run_hyperparameter_search False  --normalization_constant 1.0`
+- Evaluate a pretrained model on the DEM dataset
+
+  ```shell script
+  python main.py \
+    --is_loaded True \
+    --model_path "models/DEM_model.h5" \
+    --dataset_dir "data/DEM_cylinder.csv" \
+    --data_is_aligned False \
+    --rotate_columns True \
+    --normalization_constant 1.0
+  ```
+
+- Evaluate a pretrained model on the Pfeffer data
+
+  ```shell script
+  python main.py \
+     --is_loaded True \
+     --model_path "models/rnn_model_fake_data.h5" \
+     --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv" \
+     --data_is_aligned True \
+     --normalization_constant 2000.0 
+  ```
+
+- Train a lstm-16-16 on the Pfeffer data
+  ```shell script
+  python main.py \
+     --is_loaded False \
+     --num_train_epochs 1000 \
+     --evaluate_every_n_epochs 10 \
+     --num_units_first_rnn 16 \
+     --num_units_second_rnn 16 \
+     --lr_decay_after_epochs 150 \
+     --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv" \
+     --data_is_aligned True \
+     --normalization_constant 2000.0 
+  ```
+  
+- Train a lstm-16-16 on the DEM data
+  ```shell script
+  python main.py \
+     --is_loaded False \
+     --num_train_epochs 1000 \
+     --evaluate_every_n_epochs 10 \
+     --num_units_first_rnn 16 \
+     --num_units_second_rnn 16 \
+     --lr_decay_after_epochs 150 \
+     --dataset_dir "data/DEM_cylinders.csv" \
+     --data_is_aligned False \
+     --normalization_constant 1.0 \
+     --rotate_columns True
+  ```
+  
+- Train on different Pfeffer data
+    ```shell script
+    python main.py --is_loaded False --num_train_epochs 1000 --evaluate_every_n_epochs 10 \
+                --num_units_first_rnn 16 --lr_decay_after_epochs 150 \
+                --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackLabels_NaN4_BW3_NotShifted.csv" \
+                --normalization_constant 2000.0
+    ```
+
+### Hyperparameter search with `python main.py`
+
+ToDo: Explain --run_hyperparameter_search
+
+## Notebooks:  Run with GPU (Docker)
+
+Before implementing a functionality in the main code, we have tested and experimented in jupyter
+notebooks. 
+
+The `Notebook/`-folder contains short code samples to_
+
+- train a NextStep-RNN
+- Use the ModelManager
+- Load FakeData
+- Load CsvData
+- Experiments with curriculum learning
+- Experiments with Bayesian learning
+- The broader line of the data association
+- Gridsearch for models
+- Evaluation of separation models
+
+Follow these instructions to run notebooks on the gpu pc at the institute.
+
+1. `docker pull tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
+2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
+3. `docker run -it -p 8888:8888 -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
+4. (ssh tunneling on remote machine: `ssh -L 8888:127.0.0.1:8888 proprak7@i81-gpu-server`)
+
+## Data store
+
+The files are downloaded either from:
+- private server  or
+- ISAS i81server (you have to be in the institute's network)
