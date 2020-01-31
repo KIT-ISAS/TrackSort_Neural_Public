@@ -453,6 +453,7 @@ class Model(object):
         plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
         plt.legend(loc="upper right")
+        plt.yscale('log')
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
         plt.clf()
 
@@ -607,7 +608,7 @@ class Model(object):
             mses = np.concatenate((mses, batch_loss_per_track.numpy().reshape([-1])))
             maes = np.concatenate((maes, batch_mae_per_track.numpy().reshape([-1])))
 
-        test_mae = np.mean(maes) * normalization_factor
+        test_mae = np.mean(maes)
         test_mse = np.mean(mses)
 
         logging.info("Evaluate: MSE={}".format(test_mse))
