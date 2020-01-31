@@ -17,7 +17,7 @@ You can find the visualizations (step wise and as video) in the visualizations f
 
 1. Pull docker image `docker pull tensorflow/tensorflow:2.1.0-gpu-py3`
 2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
-3. Run docker with mounted dir: `docker run -it -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3`
+3. Run docker with mounted dir: `docker run -it -v $PWD:/tf -w /tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3`
 4. Inside the container: `cd next_step_rnn`
 5. Inside: `. setup.sh`
 6. Inside: `python main.py ...`
