@@ -2,13 +2,13 @@
 
 **Content:**
 
-- Using a RNN to predict next measurement of tracks.
+- Using a RNN to predict next measurement of tracks
 - Using a RNN to make separation predictions
 - Python implementation of data assocation (local and global nearest neighbour)
 
 ## Run with CPU
 
-1. `sh setup_cpu.sh` (creates a virtualenv and sources it)
+1. `. setup.sh` (creates a virtualenv and sources it -> `.` in the beginning is necessary)
 2. `python main.py`
 
 You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing `python main.py --help`
@@ -18,9 +18,9 @@ You can find the visualizations (step wise and as video) in the visualizations f
 1. Pull docker image `docker pull tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
 2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
 3. Run docker with mounted dir: `docker run -it -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3`
-4. Inside the container: `cd next_step_rnn && bash setup_gpu.sh`
-5. Inside the container: `source gpu_env/bin/activate`
-6. Inside the container: `python main.py ...`
+4. Inside the container: `cd next_step_rnn`
+5. Inside: `. setup.sh`
+6. Inside: `python main.py ...`
 
 ## `python main.py`
 
