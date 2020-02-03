@@ -144,10 +144,10 @@ global_config = {
     'visualize': True,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
-    'is_alive_probability_weighting': 1.0,
     'test_noise_robustness': args.test_noise_robustness,
     'experiment_series' : 'independent',
-    'positional_probabilities' : 1.0
+    'is_alive_probability_weighting': 0.0,
+    'positional_probabilities' : 0.0
 }
 
 # setup logging
