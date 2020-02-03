@@ -102,18 +102,21 @@ class DataAssociation(object):
                         measurements[measurement_nr] - prediction_values[prediction_nr])
             #
             for measurement_nr in range(len(measurements)):
-                distance_matrix[measurement_nr][len(prediction_values) + measurement_nr] = self.global_config[
-                    'distance_threshold']
+                distance_matrix[measurement_nr][len(prediction_values) + measurement_nr] = self.global_config['distance_threshold'] \
+                    * math.pow(1.0 + (1.0 - measurements[measurement_nr][0]), self.global_config['positional_probabilities'])
                 distance_matrix[len(measurements) + len(prediction_values) + measurement_nr][
-                    len(prediction_values) + measurement_nr] = 1.1 * self.global_config['distance_threshold']
+                    len(prediction_values) + measurement_nr] = 1.1 * self.global_config['distance_threshold']\
+                    * math.pow(1.0 + (1.0 - measurements[measurement_nr][0]), self.global_config['positional_probabilities'])
             #
             for prediction_nr, _ in enumerate(prediction_values):
                 # code.interact(local=dict(globals(), **locals()))
-                distance_matrix[len(measurements) + prediction_nr][prediction_nr] = self.global_config[ \
-                    'distance_threshold'] * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.global_config['is_alive_probability_weighting'])
+                distance_matrix[len(measurements) + prediction_nr][prediction_nr] = self.global_config['distance_threshold'] \
+                    * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.global_config['is_alive_probability_weighting']) \
+                    * math.pow(1.0 + prediction_values[prediction_nr][0], self.global_config['positional_probabilities'])
                 distance_matrix[len(measurements) + prediction_nr][
-                    len(measurements) + len(prediction_values) + prediction_nr] = 1.1 * self.global_config[
-                    'distance_threshold'] * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.global_config['is_alive_probability_weighting'])
+                    len(measurements) + len(prediction_values) + prediction_nr] = 1.1 * self.global_config['distance_threshold'] \
+                    * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.global_config['is_alive_probability_weighting']) \
+                    * math.pow(1.0 + prediction_values[prediction_nr][0], self.global_config['positional_probabilities'])
             #
             if self.global_config['matching_algorithm'] == 'global': 
                 distance_matrix[-len(measurements):,-len(prediction_values)] = 1.2 * self.global_config['distance_threshold'] \
