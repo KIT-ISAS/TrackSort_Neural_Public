@@ -145,7 +145,9 @@ global_config = {
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
     'is_alive_probability_weighting': 1.0,
-    'test_noise_robustness': args.test_noise_robustness
+    'test_noise_robustness': args.test_noise_robustness,
+    'experiment_series' : 'independent',
+    'positional_probabilities' : 1.0
 }
 
 # setup logging
@@ -188,7 +190,7 @@ def run_global_config(global_config):
     global_config['score'] = score
     global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
     global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
-    with open('experiments/' + global_config['experiment_name'] + '.json', 'w') as file_:
+    with open('experiments/' + global_config['experiment_series'] + '/' + global_config['experiment_name'] + '.json', 'w') as file_:
         json.dump(global_config, file_, sort_keys=True, indent=4)
     #
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
@@ -201,48 +203,87 @@ if not global_config['run_hyperparameter_search']:
         code.interact(local=dict(globals(), **locals()))
     else:
         logging.info('test robustness against noise!')
+        now = datetime.datetime.now()
+        experiment_series = 'noise_robustness_' + now.strftime("%Y_%m_%d__%H_%M_%S")
+        global_config['experiment_series'] = experiment_series
         result_list = []
         for noise in [0.0, 0.0003, 0.0005, 0.0008, 0.001]:
             global_config['CsvDataSet']['additive_noise_stddev'] = noise
             score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
-            result_list.append([score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+            result_list.append([noise, score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
         logging.debug(str(result_list))
+        try:
+            A = np.array(result_list)
+            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/noise_robustness.csv", A)
+        except Exception:
+            pass
         logging.info('robustness test finished!')
         code.interact(local=dict(globals(), **locals()))
 
 else:
+    now = datetime.datetime.now()
+    experiment_series = 'hyperparamsearch_' + now.strftime("%Y_%m_%d__%H_%M_%S")
+    global_config['experiment_series'] = experiment_series
     dt = global_config['distance_threshold']
     best_score = 0.0
     distance_threshold_candidates = [0.25 * dt, 0.5 * dt, dt, 2.0 * dt, 4.0 * dt]
-    dtc_scores = []
-    best_dtc = distance_threshold_candidates[0]
-    for dtc in distance_threshold_candidates:
-        logging.debug('run distance_threshhold %s', str(dtc))
-        global_config['distance_threshold'] = dtc
+    candidate_scores = []
+    best_candidate = distance_threshold_candidates[0]
+    for candidate in distance_threshold_candidates:
+        logging.debug('run distance_threshhold %s', str(candidate))
+        global_config['distance_threshold'] = candidate
         current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
         #
-        dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+        candidate_scores.append([global_config['distance_threshold'], global_config['is_alive_probability_weighting'], \
+            global_config['positional_probabilities'], \
+            current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
         if current_score > best_score:
             best_score = current_score
-            best_dtc = dtc
-    global_config['distance_threshold'] = best_dtc
+            best_candidate = candidate
+    global_config['distance_threshold'] = best_candidate
 
     pw = global_config['is_alive_probability_weighting']
     best_score = 0.0
-    pb_candidates = [0.25 * pw, 0.5 * pw, pw, 2.0 * pw, 4.0 * pw]
-    best_dtc = pb_candidates[0]
-    for dtc in pb_candidates:
-        logging.debug('run distance_threshhold %s', str(dtc))
-        global_config['distance_threshold'] = dtc
+    candidates = [0.0, 0.5 * pw, pw, 2.0 * pw]
+    best_candidate = candidates[0]
+    for candidate in candidates:
+        logging.debug('run distance_threshhold %s', str(candidate))
+        global_config['is_alive_probability_weighting'] = candidate
         current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
         #
-        dtc_scores.append([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+        candidate_scores.append([global_config['distance_threshold'], global_config['is_alive_probability_weighting'], \
+            global_config['positional_probabilities'], \
+            current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
         if current_score > best_score:
             best_score = current_score
-            best_dtc = dtc
-    global_config['distance_threshold'] = best_dtc
+            best_candidate = candidate
+    global_config['is_alive_probability_weighting'] = best_candidate
+
+    pw = global_config['positional_probabilities']
+    best_score = 0.0
+    candidates = [0.0, 0.5 * pw, pw, 2.0 * pw]
+    best_candidate = candidates[0]
+    for candidate in candidates:
+        logging.debug('run positional_probabilities %s', str(candidate))
+        global_config['positional_probabilities'] = candidate
+        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        #
+        candidate_scores.append([global_config['distance_threshold'], global_config['is_alive_probability_weighting'], \
+            global_config['positional_probabilities'], \
+            current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+        logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
+        if current_score > best_score:
+            best_score = current_score
+            best_candidate = candidate
+    global_config['positional_probabilities'] = best_candidate
+
+    try:
+        A = np.array(result_list)
+        numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+    except Exception:
+        pass
 
 logging.info('data association finished!')
 code.interact(local=dict(globals(), **locals()))
