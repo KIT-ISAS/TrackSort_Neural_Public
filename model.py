@@ -635,7 +635,8 @@ class Model(object):
         time_errors = np.array([])
 
         mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
-        normalization_factor = self.data_source.normalization_constant
+        normalization_factor = self.global_config['CsvDataSet']['normalization_constant']
+        time_normalization_constant = self.global_config['time_normalization_constant']
 
         hidden = self.rnn_model.reset_states()
         for input_batch, target_batch in dataset_test:
@@ -650,11 +651,7 @@ class Model(object):
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            target_batch_unnormalized = target_batch * normalization_factor
-            pred_batch_unnormalized = batch_predictions[:, :, :2] * normalization_factor
-
-            batch_loss = tf.keras.losses.mean_absolute_error(target_batch_unnormalized[:, :, :2],
-                                                             pred_batch_unnormalized) * mask
+            batch_loss = tf.keras.losses.mean_absolute_error(target_batch[:, :, :2], batch_predictions[:, :, :2]) * mask * normalization_factor
             num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
             batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
 
@@ -663,8 +660,7 @@ class Model(object):
             # signed error
             # taken from the last timestep (this is correct due to masking which copies
             #   the last values until the end)
-            batch_difference = (batch_predictions - target_batch).numpy()
-            spatial_diff = (batch_difference[:, -1, 2] * self.data_source.normalization_constant).flatten()
+            spatial_diff = (batch_predictions[:, -1, 2:3] - target_batch[:, -1, 2:3]).numpy().flatten() * normalization_factor
 
             # temporal diff:
             #   example: label=17.3

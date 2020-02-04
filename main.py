@@ -209,6 +209,11 @@ def run_global_config(global_config, experiment_series_names=''):
     with open(global_config['json_file'], 'w') as file_:
         json.dump(global_config, file_, sort_keys=True, indent=4)
 
+    del data_association
+    del particles
+    del tracks
+    del global_config
+
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
 
 
@@ -236,7 +241,6 @@ if not global_config['run_hyperparameter_search']:
                     worked = True
                 except ValueError as value_error:
                     logging.warning(str(value_error))
-
 
         logging.debug(str(result_list))
 
