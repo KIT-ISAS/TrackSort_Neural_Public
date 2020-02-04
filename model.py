@@ -176,8 +176,8 @@ def train_step_separation_prediction_generator(model,
                                                               predictions[:, start:end, 2:3]) * mask
 
             if only_last_timestep_additional_loss:
-                spatial_mse = K.sum(spatial_mse * mask_last_step)
-                spatial_mae = K.sum(spatial_mae * mask_last_step)
+                spatial_mse = K.sum(spatial_mse * mask_last_step) / batch_size
+                spatial_mae = K.sum(spatial_mae * mask_last_step) / batch_size
             else:
                 spatial_mse = K.sum(spatial_mse) / K.sum(mask)
                 spatial_mae = K.sum(spatial_mae) / K.sum(mask)
@@ -191,8 +191,8 @@ def train_step_separation_prediction_generator(model,
                                                               predictions[:, start:end, 3:4]) * mask
 
             if only_last_timestep_additional_loss:
-                temporal_mse = K.sum(temporal_mse * mask_last_step)
-                temporal_mae = K.sum(temporal_mae * mask_last_step)
+                temporal_mse = K.sum(temporal_mse * mask_last_step) / batch_size
+                temporal_mae = K.sum(temporal_mae * mask_last_step) / batch_size
             else:
                 temporal_mse = K.sum(temporal_mse) / K.sum(mask)
                 temporal_mae = K.sum(temporal_mae) / K.sum(mask)
