@@ -227,6 +227,7 @@ if not global_config['run_hyperparameter_search']:
             worked = False
             while not worked:
                 try:
+                    tf.keras.backend.clear_session()
                     current_config = global_config.copy()
                     current_config['CsvDataSet']['additive_noise_stddev'] = noise
                     score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(
@@ -235,6 +236,8 @@ if not global_config['run_hyperparameter_search']:
                     worked = True
                 except ValueError as value_error:
                     logging.warning(str(value_error))
+
+
         logging.debug(str(result_list))
 
         A = np.array(result_list)
