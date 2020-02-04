@@ -48,7 +48,7 @@ class DataAssociation(object):
         shutil.rmtree(self.global_config['visualization_path'], ignore_errors=True)
         os.makedirs(self.global_config['visualization_path'])
         for time_step in range(self.global_config['num_timesteps']):
-            logging.info('\n step {} / {}'.format(time_step, self.global_config['num_timesteps']))
+            logging.info('step {} / {}'.format(time_step, self.global_config['num_timesteps']))
 
             if self.global_config['visualize']:
                 plt.title('Time step: {}'.format(time_step))
@@ -200,7 +200,7 @@ class DataAssociation(object):
                 handles, labels = plt.gca().get_legend_handles_labels()
                 by_label = dict(zip(labels, handles))
                 plt.legend(by_label.values(), by_label.keys(), loc="upper left", ncol=2)
-                plt.savefig(self.global_config['visualization_path'] + '{:05d}'.format(time_step))
+                plt.savefig(os.path.join(self.global_config['visualization_path'], '{:05d}'.format(time_step)))
                 plt.clf()
         #
         return self.track_manager.tracks

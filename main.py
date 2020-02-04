@@ -7,6 +7,7 @@ import datetime
 import logging
 
 import tensorflow as tf
+import numpy as np
 
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
@@ -148,9 +149,9 @@ global_config = {
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
     'test_noise_robustness': args.test_noise_robustness,
-    'experiment_series' : 'independent',
+    'experiment_series': 'independent',
     'is_alive_probability_weighting': 0.0,
-    'positional_probabilities' : 0.0
+    'positional_probabilities': 0.0
 }
 
 # setup logging
@@ -164,38 +165,50 @@ logger.setLevel(log_level)
 logging.log(log_level, "LOG LEVEL: %s", log_level)
 
 
-def run_global_config(global_config):
+def run_global_config(global_config, experiment_series_names=''):
     # Create paths for run
     now = datetime.datetime.now()
     experiment_name = now.strftime("%Y_%m_%d__%H_%M_%S")
     global_config['experiment_name'] = experiment_name
-    global_config['diagrams_path'] = os.path.join('visualizations', experiment_name, 'diagrams')
-    os.makedirs(global_config['diagrams_path'])
-    os.makedirs('experiments', exist_ok=True)
-    global_config['visualization_path'] = 'visualizations/' + experiment_name + '/matching_visualization/'
-    global_config['visualization_video_path'] = 'visualizations/' + experiment_name + '/matching_visualization_vid.mp4'
-    #
+
+    # create directories
+    global_config['results_path'] = os.path.join("results", experiment_series_names, experiment_name)
+    global_config['experiment_path'] = os.path.join(global_config['results_path'], 'experiments')
+    global_config['diagrams_path'] = os.path.join(global_config['results_path'], 'visualizations', 'diagrams')
+    global_config['visualization_path'] = os.path.join(global_config['results_path'], 'visualizations',
+                                                       'matching_visualization')
+
+    for config_key in ['results_path', 'experiment_path', 'diagrams_path', 'visualization_path']:
+        os.makedirs(global_config[config_key], exist_ok=True)
+
+    # file paths
+    global_config['visualization_video_path'] = os.path.join(global_config['visualization_path'],
+                                                             'matching_visualization_vid.mp4')
+    global_config['json_file'] = os.path.join(global_config['experiment_path'], 'config.json')
+
     data_association = DataAssociation(global_config)
     particles = data_association.data_source.get_particles()
     tracks = data_association.associate_data()
-    #
+
     if global_config['visualize']:
         shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
         clip = ImageSequenceClip(global_config['visualization_path'], fps=4)
         clip.write_videofile(global_config['visualization_video_path'], fps=4)
-    #
+
     evaluator = Evaluator(global_config, particles, tracks)
     accuracy_of_the_first_kind = 1.0 - evaluator.error_of_first_kind()
     accuracy_of_the_second_kind = 1.0 - evaluator.error_of_second_kind()
     score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (
             accuracy_of_the_first_kind + accuracy_of_the_second_kind)
+
     # save the current config
     global_config['score'] = score
     global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
     global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
-    with open('experiments/' + global_config['experiment_series'] + '/' + global_config['experiment_name'] + '.json', 'w') as file_:
+
+    with open(global_config['json_file'], 'w') as file_:
         json.dump(global_config, file_, sort_keys=True, indent=4)
-    #
+
     return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
 
 
@@ -211,15 +224,22 @@ if not global_config['run_hyperparameter_search']:
         global_config['experiment_series'] = experiment_series
         result_list = []
         for noise in [0.0, 0.0003, 0.0005, 0.0008, 0.001]:
-            global_config['CsvDataSet']['additive_noise_stddev'] = noise
-            score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
-            result_list.append([noise, score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+            worked = False
+            while not worked:
+                try:
+                    current_config = global_config.copy()
+                    current_config['CsvDataSet']['additive_noise_stddev'] = noise
+                    score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(
+                        current_config, experiment_series_names=experiment_series)
+                    result_list.append([noise, score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
+                    worked = True
+                except ValueError as value_error:
+                    logging.warning(str(value_error))
         logging.debug(str(result_list))
-        try:
-            A = np.array(result_list)
-            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/noise_robustness.csv", A)
-        except Exception:
-            pass
+
+        A = np.array(result_list)
+        np.savetxt(os.path.join("results", experiment_series, "noise_robustness.csv"), A)
+
         logging.info('robustness test finished!')
         code.interact(local=dict(globals(), **locals()))
 
@@ -282,11 +302,11 @@ else:
             best_candidate = candidate
     global_config['positional_probabilities'] = best_candidate
 
-    try:
-        A = np.array(result_list)
-        numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
-    except Exception:
-        pass
+    # try:
+    #     A = np.array(result_list)
+    #     numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+    # except Exception:
+    #     pass
 
 logging.info('data association finished!')
 code.interact(local=dict(globals(), **locals()))

@@ -31,7 +31,7 @@ class Evaluator(object):
         for idx in list(self.tracks.keys()):
             track = self.tracks[idx]
             for it, track_measurement in enumerate(track.measurements):
-                hash_ = str(track_measurement)
+                hash_ = str(track_measurement)+"|"+str(it + track.initial_timestep)
                 if hash_ in tracks_hash_map:
                     raise ValueError("Duplicate track measurements")
                 tracks_hash_map[hash_] = idx
@@ -47,7 +47,7 @@ class Evaluator(object):
 
     def assigment_of_measurement_in_track(self, timestep, measurement):
         try:
-            return self.tracks_hash_map[str(measurement)]
+            return self.tracks_hash_map[str(measurement)+"|"+str(timestep)]
         except KeyError:
             # logging.debug('Measurement not found in track hash map.')
             return -1
