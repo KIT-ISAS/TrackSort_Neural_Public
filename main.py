@@ -5,6 +5,7 @@ import argparse
 import json
 import datetime
 import logging
+import numpy as np
 
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
@@ -204,8 +205,8 @@ if not global_config['run_hyperparameter_search']:
     else:
         logging.info('test robustness against noise!')
         now = datetime.datetime.now()
-        experiment_series = 'noise_robustness_' + now.strftime("%Y_%m_%d__%H_%M_%S")
-        global_config['experiment_series'] = experiment_series
+        global_config['experiment_series'] = 'noise_robustness_' + now.strftime("%Y_%m_%d__%H_%M_%S")
+        os.makedirs('experiments/' + global_config['experiment_series'])
         result_list = []
         for noise in [0.0, 0.0003, 0.0005, 0.0008, 0.001]:
             global_config['CsvDataSet']['additive_noise_stddev'] = noise
@@ -214,7 +215,7 @@ if not global_config['run_hyperparameter_search']:
         logging.debug(str(result_list))
         try:
             A = np.array(result_list)
-            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/noise_robustness.csv", A)
+            np.savetxt("experiments/" + global_config['experiment_series'] + "/noise_robustness.csv", A)
         except Exception:
             pass
         logging.info('robustness test finished!')
@@ -222,8 +223,8 @@ if not global_config['run_hyperparameter_search']:
 
 else:
     now = datetime.datetime.now()
-    experiment_series = 'hyperparamsearch_' + now.strftime("%Y_%m_%d__%H_%M_%S")
-    global_config['experiment_series'] = experiment_series
+    global_config['experiment_series'] = 'hyperparamsearch_' + now.strftime("%Y_%m_%d__%H_%M_%S")
+    os.makedirs('experiments/' + global_config['experiment_series'])
     dt = global_config['distance_threshold']
     best_score = 0.0
     distance_threshold_candidates = [0.25 * dt, 0.5 * dt, dt, 2.0 * dt, 4.0 * dt]
@@ -243,7 +244,7 @@ else:
             best_candidate = candidate
     global_config['distance_threshold'] = best_candidate
 
-    pw = global_config['is_alive_probability_weighting']
+    pw = 1.0
     best_score = 0.0
     candidates = [0.0, 0.5 * pw, pw, 2.0 * pw]
     best_candidate = candidates[0]
@@ -261,7 +262,7 @@ else:
             best_candidate = candidate
     global_config['is_alive_probability_weighting'] = best_candidate
 
-    pw = global_config['positional_probabilities']
+    pw = 1.0
     best_score = 0.0
     candidates = [0.0, 0.5 * pw, pw, 2.0 * pw]
     best_candidate = candidates[0]
@@ -280,8 +281,8 @@ else:
     global_config['positional_probabilities'] = best_candidate
 
     try:
-        A = np.array(result_list)
-        numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+        A = np.array(candidate_scores)
+        np.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
     except Exception:
         pass
 
