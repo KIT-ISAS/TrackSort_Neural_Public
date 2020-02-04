@@ -80,6 +80,20 @@ See: `python main.py --help`
      --normalization_constant 1.0 \
      --rotate_columns True
   ```
+  
+- Evaluate the separation prediction on the DEM cuboids
+
+  ```shell script
+  python main.py \
+     --is_loaded False \
+     --dataset_dir "data/DEM_cuboids.csv" \
+     --data_is_aligned False \
+     --rotate_columns True \
+     --normalization_constant 1.0 \
+     --separation_prediction True \
+     --virtual_nozzle_array_x_position 0.7 \
+     --virtual_belt_edge_x_position 0.55
+  ```
 
 ### Hyperparameter search with `python main.py`
 
