@@ -7,10 +7,13 @@ import datetime
 import logging
 import numpy as np
 
+import tensorflow as tf
+
 from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
 from evaluator import Evaluator
 
+tf.get_logger().setLevel('ERROR')
 parser = argparse.ArgumentParser()
 
 
