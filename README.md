@@ -94,6 +94,20 @@ See: `python main.py --help`
      --virtual_nozzle_array_x_position 0.7 \
      --virtual_belt_edge_x_position 0.55
   ```
+  
+- Evaluate impact of noise
+
+  ```shell script
+  python main.py \
+    --is_loaded True \
+    --model_path "models/DEM_model.h5" \
+    --dataset_dir "data/DEM_cylinder.csv" \
+    --data_is_aligned False \
+    --rotate_columns True \
+    --normalization_constant 1.0 \
+    --test_noise_robustness True
+  ```
+    
 
 ### Hyperparameter search with `python main.py`
 
