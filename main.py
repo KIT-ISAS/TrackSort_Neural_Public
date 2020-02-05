@@ -240,7 +240,8 @@ if not global_config['run_hyperparameter_search']:
                     result_list.append([noise, score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
                     worked = True
                 except ValueError as value_error:
-                    logging.warning(str(value_error))
+                    logging.error("duplicate key values in evaluation")
+                    logging.error(str(value_error))
 
         logging.debug(str(result_list))
 

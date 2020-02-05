@@ -47,7 +47,8 @@ class Evaluator(object):
 
     def assigment_of_measurement_in_track(self, timestep, measurement):
         try:
-            return self.tracks_hash_map[str(measurement)+"|"+str(timestep)]
+            # return self.tracks_hash_map[str(measurement)+"|"+str(timestep)]
+            return self.tracks_hash_map[str(measurement)]
         except KeyError:
             # logging.debug('Measurement not found in track hash map.')
             return -1
