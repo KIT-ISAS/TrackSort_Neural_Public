@@ -262,16 +262,25 @@ else:
     for candidate in distance_threshold_candidates:
         logging.debug('run distance_threshhold %s', str(candidate))
         global_config['distance_threshold'] = candidate
-        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config, \
+            experiment_series_names=global_config['experiment_series'])
         #
         candidate_scores.append([global_config['distance_threshold'], global_config['is_alive_probability_weighting'], \
             global_config['positional_probabilities'], \
             current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
+        try:
+            A = np.array(result_list)
+            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+        except Exception:
+            pass
         if current_score > best_score:
             best_score = current_score
             best_candidate = candidate
     global_config['distance_threshold'] = best_candidate
+
+    logging.info('robustness test finished!')
+    code.interact(local=dict(globals(), **locals()))
 
     pw = 1.0
     best_score = 0.0
@@ -280,12 +289,18 @@ else:
     for candidate in candidates:
         logging.debug('run distance_threshhold %s', str(candidate))
         global_config['is_alive_probability_weighting'] = candidate
-        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config, \
+            experiment_series_names=global_config['experiment_series'])
         #
         candidate_scores.append([global_config['distance_threshold'], global_config['is_alive_probability_weighting'], \
             global_config['positional_probabilities'], \
             current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
+        try:
+            A = np.array(result_list)
+            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+        except Exception:
+            pass
         if current_score > best_score:
             best_score = current_score
             best_candidate = candidate
@@ -298,22 +313,28 @@ else:
     for candidate in candidates:
         logging.debug('run positional_probabilities %s', str(candidate))
         global_config['positional_probabilities'] = candidate
-        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config, \
+            experiment_series_names=global_config['experiment_series'])
         #
         candidate_scores.append([global_config['distance_threshold'], global_config['is_alive_probability_weighting'], \
             global_config['positional_probabilities'], \
             current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind])
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
+        try:
+            A = np.array(result_list)
+            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+        except Exception:
+            pass
         if current_score > best_score:
             best_score = current_score
             best_candidate = candidate
     global_config['positional_probabilities'] = best_candidate
 
-    # try:
-    #     A = np.array(result_list)
-    #     numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
-    # except Exception:
-    #     pass
+    try:
+        A = np.array(result_list)
+        numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+    except Exception:
+        pass
 
 logging.info('data association finished!')
 code.interact(local=dict(globals(), **locals()))
