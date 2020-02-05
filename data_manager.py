@@ -877,9 +877,9 @@ class CsvDataSet(AbstractDataSet):
         self.additive_noise_stddev = additive_noise_stddev
         if self.additive_noise_stddev > 0.0:
             logging.info("Add normal noise with std={}".format(self.additive_noise_stddev))
+            np.random.seed(0)
             noise = np.random.normal(loc=0.0, scale=self.additive_noise_stddev, size=self.tracks.shape) * (self.tracks != self.nan_value)
             self.tracks += noise
-
 
         # csv data is aligned?
         self.data_is_aligned = data_is_aligned
