@@ -31,7 +31,7 @@ class Evaluator(object):
         for idx in list(self.tracks.keys()):
             track = self.tracks[idx]
             for it, track_measurement in enumerate(track.measurements):
-                hash_ = str(track_measurement)+"|"+str(it + track.initial_timestep)
+                hash_ = str(track_measurement)
                 if hash_ in tracks_hash_map:
                     raise ValueError("Duplicate track measurements")
                 tracks_hash_map[hash_] = idx
@@ -39,6 +39,9 @@ class Evaluator(object):
         return tracks_hash_map
 
     def assigment_of_measurement_in_particle(self, timestep, measurement):
+        """
+        return particle_id of measurement
+        """
         try:
             return self.particles_hash_map[str(measurement)]
         except KeyError:
@@ -46,6 +49,9 @@ class Evaluator(object):
             return -1
 
     def assigment_of_measurement_in_track(self, timestep, measurement):
+        """
+        Return track_id of measurement
+        """
         try:
             # return self.tracks_hash_map[str(measurement)+"|"+str(timestep)]
             return self.tracks_hash_map[str(measurement)]
