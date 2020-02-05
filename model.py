@@ -657,7 +657,6 @@ class Model(object):
 
             # Spatial and temporal error
 
-            # signed error
             # taken from the last timestep (this is correct due to masking which copies
             #   the last values until the end)
             spatial_diff = (batch_predictions[:, -1, 2:3] - target_batch[:, -1, 2:3]).numpy().flatten() * normalization_factor
@@ -691,8 +690,10 @@ class Model(object):
         logging.info("Evaluate: Mean Sep Time Error = {}".format(test_time_loss))
         logging.info("Evaluate: Sum of Error = {}".format(test_loss))
 
-        self._box_plot(prediction_maes, [0, 4.0], 'Next-Step', epoch, 'MAE [px]')
-        self._box_plot(spatial_errors, [-59, 59], 'Separation-Spatial', epoch, 'Spatial error [px]')
+        #  [0, 4.0]
+        self._box_plot(prediction_maes, None, 'Next-Step', epoch, 'MAE')
+        # [-59, 59]
+        self._box_plot(spatial_errors, None, 'Separation-Spatial', epoch, 'Spatial error')
         self._box_plot(100 * time_errors, None, 'Separation-Temporal', epoch, 'Temporal error [1/100 Frames]')
 
         return test_loss, test_pred_loss, test_spatial_loss, test_time_loss
