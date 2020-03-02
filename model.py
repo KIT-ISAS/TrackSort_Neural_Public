@@ -616,8 +616,11 @@ class Model(object):
 
         plt.rc('grid', linestyle=":")
         fig1, ax1 = plt.subplots()
-        ax1.yaxis.grid(True)
-        ax1.set_ylim([0, 4.0])
+
+        if self.data_source.normalization_constant > 2.0:
+            # ToDo: make this an argument
+            ax1.yaxis.grid(True)
+            ax1.set_ylim([0, 4.0])
 
         name = '{:05d}epoch-NextStep-RNN ({})'.format(epoch, self.model_hash)
         ax1.set_title(name)
