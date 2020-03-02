@@ -855,7 +855,7 @@ class CsvDataSet(AbstractDataSet):
                  timesteps=35, batch_size=128, global_config=None, data_is_aligned=True,
                  rotate_columns=False, normalization_constant=None,
                  birth_rate_mean=6, birth_rate_std=2,
-                 additive_noise_stddev=0):
+                 additive_noise_stddev=0, augment_beginning=False):
         self.global_config = global_config
         self.glob_file_pattern = glob_file_pattern
         self.file_list = sorted(glob.glob(glob_file_pattern))
@@ -889,6 +889,15 @@ class CsvDataSet(AbstractDataSet):
             logging.info("align data")
             self.aligned_tracks = self._convert_tracks_to_aligned_tracks(self.tracks)
             logging.info("data is aligned")
+
+        # augment_beginning: if all tracks start at the same x_position, then the RNN tends to ignore measurements
+        #   which behave differently. If augment_beginning is set, then the existing tracks are copied and shifted a
+        #   a random number of time steps.
+        self.augment_beginning = augment_beginning
+        if augment_beginning:
+            logging.info("Augment beginning")
+            self.aligned_tracks = self._augment_beginning_tracks(self.aligned_tracks)
+            logging.info("Finished augment beginning")
 
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_tracks)
 
@@ -1032,6 +1041,37 @@ class CsvDataSet(AbstractDataSet):
         expanded_tracks = np.array(expanded_tracks)
 
         return expanded_tracks
+
+    def _augment_beginning_tracks(self, aligned_tracks):
+        """
+        Augments the track data. Duplicates the existing tracks and deletes points from the beginning.
+        -> Tracks begin later than in the data.
+
+        We use this function to reduce the correlation between
+        """
+
+        tracks_copy = np.copy(aligned_tracks)
+
+        n_timesteps = tracks_copy.shape[1]
+        new_random_track_beginnings = np.random.randint(0, self.longest_track - self.min_number_detections, tracks_copy.shape[0])
+
+        # ToDo: numpyify
+        for track_i in range(tracks_copy.shape[0]):
+            new_beginning = new_random_track_beginnings[track_i]
+            new_length = n_timesteps - new_beginning
+            tracks_copy[track_i, :, :] = 0
+
+            # shift the new track to the beginning
+            tracks_copy[track_i, :new_length, :] = aligned_tracks[track_i, new_beginning:, :]
+
+        # remove tracks which are zeros only
+        track_mask = (tracks_copy.sum(axis=2).sum(axis=-1) == 0)
+        logging.info('Augmentation created {} empty tracks which are not being used'.format(track_mask.sum()))
+        tracks_copy = tracks_copy[~track_mask]
+
+        all_tracks = np.concatenate((aligned_tracks, tracks_copy))
+        logging.info('Number of tracks increased from {} to {}.'.format(aligned_tracks.shape[0], all_tracks.shape[0]))
+        return all_tracks
 
 
 if __name__ == '__main__':

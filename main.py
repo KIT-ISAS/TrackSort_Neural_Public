@@ -85,6 +85,9 @@ parser.add_argument('--clear_state', type=str2bool, default=True,
                     help='Whether a new track should be initialized with empty state?')
 parser.add_argument('--overwriting_activated', type=str2bool, default=True,
                     help='Whether batches of the RNN are reused')
+parser.add_argument('--augment_beginning', type=str2bool, default=False,
+                    help='Augment the dataset by duplicating the tracks and removing initial measurements from the '
+                         'duplicates')
 
 args = parser.parse_args()
 
@@ -122,7 +125,8 @@ global_config = {
         'birth_rate_std': args.birth_rate_std,
         'rotate_columns': args.rotate_columns,
         'normalization_constant': args.normalization_constant,
-        'additive_noise_stddev': args.additive_noise_stddev
+        'additive_noise_stddev': args.additive_noise_stddev,
+        'augment_beginning': args.augment_beginning
     },
     'rnn_model_factory': {
         'num_units_first_rnn': args.num_units_first_rnn,
