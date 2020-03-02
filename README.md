@@ -75,7 +75,7 @@ See: `python main.py --help`
      --num_units_first_rnn 16 \
      --num_units_second_rnn 16 \
      --lr_decay_after_epochs 150 \
-     --dataset_dir "data/DEM_cylinders.csv" \
+     --dataset_dir "data/DEM_cylinder.csv" \
      --data_is_aligned False \
      --normalization_constant 1.0 \
      --rotate_columns True
