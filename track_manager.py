@@ -14,6 +14,9 @@ class TrackManager(object):
         self.currently_highest_id = 0
 
     def real_track_real_measurement(self, global_track_id, measurement):
+        """ 
+        Add the given measurement to an existing track
+        """
         self.tracks[global_track_id].add_measurement(measurement, is_artificial=False)
         self.model_manager.update_by_id(global_track_id, measurement)
 
@@ -32,6 +35,11 @@ class TrackManager(object):
             return False
 
     def pseudo_track_real_measurement(self, measurement, current_timestep):
+        """ 
+        Create a new track
+        Add the given measurement to a new track and increases the global_track_id
+        Return the global_track_id
+        """
         global_track_id = self.currently_highest_id
         self.global_config['highest_id'] = global_track_id
         self.currently_highest_id += 1

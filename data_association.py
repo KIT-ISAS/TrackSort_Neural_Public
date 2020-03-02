@@ -61,13 +61,16 @@ class DataAssociation(object):
                     plt.ylim((0.0, 0.2))
 
             self.global_config['current_time_step'] = time_step
-            #
+            
+            ## Get the measurements at the current time step
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
-            #
+            
+            ## Predict new belt position for each track
             predictions = self.track_manager.get_predictions()
             prediction_ids = list(predictions.keys())
             prediction_values = list(predictions.values())
             prediction_is_alive_probabilities = list(map(lambda x: self.track_manager.get_alive_probability(x), prediction_ids))
+            
             #
             if old_measurements is not None:
                 if len(old_measurements) != len(prediction_values):
@@ -91,6 +94,7 @@ class DataAssociation(object):
                 if self.global_config['visualize']: plt.scatter(np.array(prediction_values)[:, 0], np.array(prediction_values)[:, 1], c='red',
                             label='prediction')
 
+            ## Build distance matrix for association
             # why isn't infinity working anymore???
             distance_matrix = 10000 * np.ones([2 * len(measurements) + len(prediction_values), 2 * len(prediction_values) + len(measurements)])
             if distance_matrix.size == 0:
@@ -133,16 +137,19 @@ class DataAssociation(object):
                         * math.pow(2.0, self.global_config['is_alive_probability_weighting'])
                     distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=0)
                     distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=1)
-            #
+            
+            ## Associate predictions and measurements based on the distance matrix
             if self.global_config['matching_algorithm'] == 'local':
                 measurement_idxs, prediction_idxs = nearest_neighbour(distance_matrix)
             elif self.global_config['matching_algorithm'] == 'global':
                 measurement_idxs, prediction_idxs = linear_sum_assignment(distance_matrix)
-            #
+            
+            ## Create new, update existing and delete expired tracks
             counts = np.zeros([4], dtype=np.int32)
             old_measurements = {}
             for idx in range(len(measurement_idxs)):
                 if measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] < len(prediction_values):
+                    # The measurement was associated to an existing track
                     counts[0] += 1
                     prediction_id = prediction_ids[prediction_idxs[idx]]
                     #
@@ -154,6 +161,7 @@ class DataAssociation(object):
                     if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 #
                 elif measurement_idxs[idx] >= len(measurements) and prediction_idxs[idx] < len(prediction_values):
+                    # No measurement associated to existing track
                     counts[1] += 1
                     # feed it back its own prediction as measurement
                     prediction_id = prediction_ids[prediction_idxs[idx]]
@@ -174,6 +182,7 @@ class DataAssociation(object):
                     if self.global_config['visualize']: plt.plot(line[:, 0], line[:, 1], c='green')
                 #
                 elif measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] >= len(prediction_values):
+                    # Measurement associated to new track
                     counts[2] += 1
                     #
                     measurement = measurements[measurement_idxs[idx]]
