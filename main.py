@@ -9,11 +9,12 @@ import logging
 import tensorflow as tf
 import numpy as np
 
-from moviepy.editor import ImageSequenceClip
+#from moviepy.editor import ImageSequenceClip
 from data_association import DataAssociation
 from evaluator import Evaluator
 
 tf.get_logger().setLevel('ERROR')
+tf.enable_eager_execution()
 parser = argparse.ArgumentParser()
 
 
@@ -145,7 +146,7 @@ global_config = {
     'state_overwriting_started': False,
     'overwriting_activated': args.overwriting_activated,
     'verbose': 1,
-    'visualize': True,
+    'visualize': False,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
     'test_noise_robustness': args.test_noise_robustness,
