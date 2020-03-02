@@ -1053,19 +1053,21 @@ class CsvDataSet(AbstractDataSet):
         tracks_copy = np.copy(aligned_tracks)
 
         n_timesteps = tracks_copy.shape[1]
-        new_random_track_beginnings = np.random.randint(0, self.longest_track - self.min_number_detections, tracks_copy.shape[0])
+        new_random_track_beginnings = np.random.randint(self.min_number_detections,
+                                                        self.longest_track - self.min_number_detections,
+                                                        tracks_copy.shape[0])
 
         # ToDo: numpyify
         for track_i in range(tracks_copy.shape[0]):
             new_beginning = new_random_track_beginnings[track_i]
             new_length = n_timesteps - new_beginning
-            tracks_copy[track_i, :, :] = 0
 
             # shift the new track to the beginning
-            tracks_copy[track_i, :new_length, :] = aligned_tracks[track_i, new_beginning:, :]
+            tracks_copy[track_i, :new_length, :] = tracks_copy[track_i, new_beginning:, :]
+            tracks_copy[track_i, new_length:, :] = 0
 
-        # remove tracks which are zeros only
-        track_mask = (tracks_copy.sum(axis=2).sum(axis=-1) == 0)
+        # remove tracks which have less than self.min_number_detections
+        track_mask = (tracks_copy[:, self.min_number_detections:, :].sum(axis=2).sum(axis=-1) == 0)
         logging.info('Augmentation created {} empty tracks which are not being used'.format(track_mask.sum()))
         tracks_copy = tracks_copy[~track_mask]
 
