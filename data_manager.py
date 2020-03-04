@@ -850,33 +850,33 @@ class CsvDataSet(AbstractDataSet):
         # Set timesteps if wanted. Else: _load_tracks calculates the longest track length
         if timesteps is not None:
             self.timesteps = timesteps
-        self.tracks = self._load_tracks(rotate_columns=self.rotate_columns)
+        self.track_data = self._load_tracks(rotate_columns=self.rotate_columns)
 
         # Add normally distributed noise to the tracks
         self.additive_noise_stddev = additive_noise_stddev
         if self.additive_noise_stddev > 0.0:
             logging.info("Add normal noise with std={}".format(self.additive_noise_stddev))
             np.random.seed(0)
-            noise = np.random.normal(loc=0.0, scale=self.additive_noise_stddev, size=self.tracks.shape) * (self.tracks != self.nan_value)
-            self.tracks += noise
+            noise = np.random.normal(loc=0.0, scale=self.additive_noise_stddev, size=self.track_data.shape) * (self.track_data != self.nan_value)
+            self.track_data += noise
 
         # csv data is aligned?
         self.data_is_aligned = data_is_aligned
         if data_is_aligned:
-            self.aligned_tracks = self.tracks[:, :self.longest_track, :]
+            self.aligned_track_data = self.track_data[:, :self.longest_track, :]
         else:
             logging.info("align data")
-            self.aligned_tracks = self._convert_tracks_to_aligned_tracks(self.tracks)
+            self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
             logging.info("data is aligned")
 
-        self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_tracks)
+        self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_track_data)
 
         # if data is aligned -> we create an artificial ordering of the tracks according to the given
         #  number of timesteps
         if data_is_aligned:
             self.birth_rate_mean = birth_rate_mean
             self.birth_rate_std = birth_rate_std
-            self.artificial_tracks = self._expand_time_of_tracks(self.aligned_tracks)
+            self.artificial_tracks = self._expand_time_of_tracks(self.aligned_track_data)
 
         # normalize in all dimensions with the same factor
         if normalization_constant is None:

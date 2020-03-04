@@ -33,14 +33,8 @@ def nearest_neighbour(weight_matrix):
 class DataAssociation(object):
     def __init__(self, global_config):
         self.global_config = global_config
-        if global_config['dataset_type'] == 'FakeDataset':
-            self.data_source = FakeDataSet(timesteps=global_config['num_timesteps'], batch_size=global_config['batch_size'])
-        elif self.global_config['dataset_type'] == 'CsvDataset':
-            self.data_source = CsvDataSet(**global_config['CsvDataSet'])
-            global_config['num_timesteps'] = self.data_source.get_num_timesteps()
-        self.track_manager = TrackManager(global_config, self.data_source)
 
-    def associate_data(self):
+    def associate_data(self, data_source, track_manager, model_manager):
         old_measurements = None
         shutil.rmtree(self.global_config['visualization_path'], ignore_errors=True)
         os.makedirs(self.global_config['visualization_path'])
@@ -60,13 +54,13 @@ class DataAssociation(object):
             self.global_config['current_time_step'] = time_step
             
             ## Get the measurements at the current time step
-            measurements = self.data_source.get_measurement_at_timestep_list(time_step)
+            measurements = data_source.get_measurement_at_timestep_list(time_step)
             
             ## Predict new belt position for each track
-            predictions = self.track_manager.get_predictions()
+            predictions = track_manager.get_predictions(model_manager)
             prediction_ids = list(predictions.keys())
             prediction_values = list(predictions.values())
-            prediction_is_alive_probabilities = list(map(lambda x: self.track_manager.get_alive_probability(x), prediction_ids))
+            prediction_is_alive_probabilities = list(map(lambda x: track_manager.get_alive_probability(x), prediction_ids))
             
             #
             if old_measurements is not None:
@@ -150,7 +144,7 @@ class DataAssociation(object):
                     counts[0] += 1
                     prediction_id = prediction_ids[prediction_idxs[idx]]
                     #
-                    self.track_manager.real_track_real_measurement(prediction_id, measurements[measurement_idxs[idx]])
+                    track_manager.real_track_real_measurement(prediction_id, measurements[measurement_idxs[idx]], model_manager)
                     old_measurements[prediction_id] = (measurements[measurement_idxs[idx]], True)
                     #
                     line = np.stack((measurements[measurement_idxs[idx]], prediction_values[prediction_idxs[idx]]),
@@ -163,7 +157,7 @@ class DataAssociation(object):
                     # feed it back its own prediction as measurement
                     prediction_id = prediction_ids[prediction_idxs[idx]]
                     prediction = prediction_values[prediction_idxs[idx]]
-                    is_still_alive = self.track_manager.real_track_pseudo_measurement(prediction_id, prediction)
+                    is_still_alive = track_manager.real_track_pseudo_measurement(prediction_id, prediction, model_manager)
                     if is_still_alive:
                         old_measurements[prediction_id] = (prediction, False)
                     else:
@@ -183,7 +177,7 @@ class DataAssociation(object):
                     counts[2] += 1
                     #
                     measurement = measurements[measurement_idxs[idx]]
-                    prediction_id = self.track_manager.pseudo_track_real_measurement(measurement, time_step)
+                    prediction_id = track_manager.pseudo_track_real_measurement(measurement, time_step, model_manager)
                     old_measurements[prediction_id] = (measurement, True)
                     #
                     if self.global_config['visualize']:
@@ -209,4 +203,4 @@ class DataAssociation(object):
                 plt.savefig(os.path.join(self.global_config['visualization_path'], '{:05d}'.format(time_step)))
                 plt.clf()
         #
-        return self.track_manager.tracks
+        return track_manager.tracks

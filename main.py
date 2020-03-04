@@ -10,7 +10,10 @@ import tensorflow as tf
 import numpy as np
 
 #from moviepy.editor import ImageSequenceClip
+from track_manager import TrackManager
+from model_manager import ModelManager
 from data_association import DataAssociation
+from data_manager import FakeDataSet, CsvDataSet
 from evaluator import Evaluator
 
 tf.get_logger().setLevel('ERROR')
@@ -43,7 +46,7 @@ parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDatase
 parser.add_argument('--distance_threshold', type=float, default=0.02,
                     help='The threshold used for the matching with the artificial measurements and predictions')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
-parser.add_argument('--num_timesteps', type=int, default=10000,
+parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
 parser.add_argument('--lr_decay_after_epochs', type=int, default=150, help='When to decrease the lr by lr_decay_factor')
@@ -117,7 +120,6 @@ global_config = {
         'min_number_detections': args.min_number_detections,
         'nan_value': args.nan_value,
         'input_dim': args.input_dim,
-        'batch_size': args.batch_size,
         'data_is_aligned': args.data_is_aligned,
         'birth_rate_mean': args.birth_rate_mean,
         'birth_rate_std': args.birth_rate_std,
@@ -187,9 +189,22 @@ def run_global_config(global_config, experiment_series_names=''):
                                                              'matching_visualization_vid.mp4')
     global_config['json_file'] = os.path.join(global_config['experiment_path'], 'config.json')
 
+    ## Import data
+    if global_config['dataset_type'] == 'FakeDataset':
+        data_source = FakeDataSet(timesteps=global_config['num_timesteps'], batch_size=global_config['batch_size'])
+    elif global_config['dataset_type'] == 'CsvDataset':
+        data_source = CsvDataSet(**global_config['CsvDataSet'])
+        global_config['num_timesteps'] = data_source.get_num_timesteps()
+    
+    ## Initialize models
+    model_manager = ModelManager(global_config, data_source)
+
+    ## Init tracks
+    track_manager = TrackManager(global_config)
+
     data_association = DataAssociation(global_config)
-    particles = data_association.data_source.get_particles()
-    tracks = data_association.associate_data()
+    particles = data_source.get_particles()
+    tracks = data_association.associate_data(data_source, track_manager, model_manager)
 
     if global_config['visualize']:
         shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
