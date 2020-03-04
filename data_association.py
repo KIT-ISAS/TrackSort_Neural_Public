@@ -33,14 +33,11 @@ def nearest_neighbour(weight_matrix):
 class DataAssociation(object):
     def __init__(self, global_config):
         self.global_config = global_config
-        if self.global_config['dataset_type'] == 'FakeDataset':
+        if global_config['dataset_type'] == 'FakeDataset':
             self.data_source = FakeDataSet(global_config=global_config)
         elif self.global_config['dataset_type'] == 'CsvDataset':
             self.data_source = CsvDataSet(global_config=global_config, **global_config['CsvDataSet'])
-            self.global_config['num_timesteps'] = self.data_source.get_num_timesteps()
-        else:
-            logging.debug(str(self.global_config['dataset_type'] + ' is no valid data source!'))
-            raise ValueError("dataset_type invalid")
+            global_config['num_timesteps'] = self.data_source.get_num_timesteps()
         self.track_manager = TrackManager(global_config, self.data_source)
 
     def associate_data(self):

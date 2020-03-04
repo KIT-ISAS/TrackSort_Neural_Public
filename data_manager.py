@@ -39,10 +39,13 @@ class AbstractDataSet(ABC):
     train_split_ratio = 0.5
     test_split_ratio = 0.5
 
+    seq2seq_data = np.array([])
+    track_data = np.array([])
+    aligned_track_data = np.array([])
+
     def get_nan_value_ary(self):
         return [self.nan_value, self.nan_value]
-
-    @abstractmethod
+        
     def get_seq2seq_data(self, nan_value=0):
         """
         Return a numpy array which can be used for RNN training.
@@ -52,19 +55,18 @@ class AbstractDataSet(ABC):
 
         shape: [number_tracks, max_timestep, point_dimension * 2]
         """
-        raise NotImplementedError
+        return self.seq2seq_data
 
-    @abstractmethod
     def get_mlp_data(self):
         """
         Return a numpy array which can be used for MLP Training.
         The input are n datapoints and the label is the next datapoint which
         should be predicted.
         Example: [ [[0,0], [0,1], [0,2], [0,3]],   [0,4] ]
+        TODO implement.
         """
-        raise NotImplementedError
+        pass
 
-    @abstractmethod
     def get_track_data(self):
         """
         Return a numpy array with shape: [number_tracks, total_number_timesteps, point_dimension]
@@ -84,7 +86,7 @@ class AbstractDataSet(ABC):
              3 | NaN   | (2,0) | (1,1)
              4 | NaN   | NaN   | (2,2)
         """
-        raise NotImplementedError
+        return self.track_data
 
     def get_num_timesteps(self):
         """The number of time steps of the full data set.
@@ -110,7 +112,7 @@ class AbstractDataSet(ABC):
              3 | (N,N) | (3,0) | (N,N)
              4 | (N,N) | (N,N) | (N,N)
         """
-        raise NotImplementedError
+        return self.aligned_track_data
 
     def get_particles(self):
         """
@@ -831,18 +833,6 @@ class FakeDataSet(AbstractDataSet):
 
         return np.array(tracks)
 
-    def get_track_data(self):
-        return self.track_data
-
-    def get_aligned_track_data(self):
-        return self.aligned_track_data
-
-    def get_seq2seq_data(self, nan_value=0):
-        return self.seq2seq_data
-
-    def get_mlp_data(self):
-        pass
-
     def get_measurement_at_timestep(self, timestep, normalized=True):
         data = self.get_track_data()[:, [timestep], :].copy()
         if normalized:
@@ -966,18 +956,6 @@ class CsvDataSet(AbstractDataSet):
 
         tracks = np.array(tracks)
         return tracks
-
-    def get_track_data(self):
-        return self.tracks
-
-    def get_aligned_track_data(self):
-        return self.aligned_tracks
-
-    def get_seq2seq_data(self, nan_value=0):
-        return self.seq2seq_data
-
-    def get_mlp_data(self):
-        pass
 
     def get_measurement_at_timestep(self, timestep, normalized=True):
         if self.data_is_aligned:
