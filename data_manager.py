@@ -35,7 +35,6 @@ class AbstractDataSet(ABC):
     timesteps = None
     longest_track = None
 
-    batch_size = 128
     train_split_ratio = 0.5
     test_split_ratio = 0.5
 
@@ -270,7 +269,7 @@ class AbstractDataSet(ABC):
         :return:
         """
 
-        assert n <= self.batch_size
+        #assert n <= self.batch_size
 
         for input_batch, target_batch in dataset.take(1):
             # reset model state
@@ -324,7 +323,7 @@ class AbstractDataSet(ABC):
 
         return input_seq, target_seq
 
-    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1):
+    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1, batch_size=64):
         tracks = self.get_seq2seq_data()
         if normalized:
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
@@ -334,8 +333,8 @@ class AbstractDataSet(ABC):
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
-        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
-        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
+        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(batch_size, drop_remainder=True)
+        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(batch_size, drop_remainder=True)
 
         self.minibatches_train = minibatches_train
         self.minibatches_test = minibatches_test
@@ -354,7 +353,7 @@ class AbstractDataSet(ABC):
 
     def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1, time_normalization=22.,
                                                       virtual_belt_edge_x_position=1200,
-                                                      virtual_nozzle_array_x_position=1400):
+                                                      virtual_nozzle_array_x_position=1400, batch_size=64):
         track_data, spatial_labels, temporal_labels = self.get_separation_prediction_data(
             virtual_belt_edge_x_position=virtual_belt_edge_x_position,
             virtual_nozzle_array_x_position=virtual_nozzle_array_x_position)
@@ -384,8 +383,8 @@ class AbstractDataSet(ABC):
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
-        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
-        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(self.batch_size, drop_remainder=True)
+        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(drop_remainder=True)
+        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(drop_remainder=True)
 
         def split_input_target_separation(chunk):
             # split the tensor (x, y, y_pred, t_pred, x_target, y_target, y_pred_target, t_pred_target)
@@ -743,8 +742,6 @@ class FakeDataSet(AbstractDataSet):
         self.additive_target_stddev = additive_target_stddev
         self.splits = splits
         self.min_number_points_per_trajectory = min_number_points_per_trajectory
-        self.batch_size = batch_size
-        self.batch_size = batch_size
         self.nan_value = nan_value
         self.step_length = step_length
 
@@ -756,7 +753,7 @@ class FakeDataSet(AbstractDataSet):
         # than a batch. Because we use drop_remainder=True we cannot allow this, or else the only batch
         # would be empty -> as a result we would not have test data
         assert self.n_trajectories * min(self.test_split_ratio,
-                                         self.train_split_ratio) > self.batch_size, \
+                                         self.train_split_ratio) > batch_size, \
             "min(len(test_split), len(train_split)) < batch_size is not allowed! -> increase number_trajectories"
 
     def _generate_tracks(self):
@@ -836,7 +833,7 @@ class FakeDataSet(AbstractDataSet):
 
 class CsvDataSet(AbstractDataSet):
     def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2,
-                 timesteps=35, batch_size=128, data_is_aligned=True,
+                 timesteps=35, data_is_aligned=True,
                  rotate_columns=False, normalization_constant=None,
                  birth_rate_mean=6, birth_rate_std=2,
                  additive_noise_stddev=0):
@@ -849,7 +846,6 @@ class CsvDataSet(AbstractDataSet):
 
         self.nan_value = nan_value
         self.input_dim = input_dim
-        self.batch_size = batch_size
 
         # Set timesteps if wanted. Else: _load_tracks calculates the longest track length
         if timesteps is not None:
