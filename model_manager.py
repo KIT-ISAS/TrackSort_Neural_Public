@@ -7,15 +7,14 @@ from tensorflow.keras import backend as K
 
 tf.keras.backend.set_floatx('float64')
 
-from model import Model
+from rnn_model import RNN_Model
 
 
 class ModelManager(object):
     def __init__(self, global_config, data_source):
         self.global_config = global_config
-        self.model = Model(self.global_config, data_source)
-        self.zero_state = self.model.get_zero_state()
-        self.model.rnn_model.reset_states()
+        self.rnn_model = RNN_Model(self.global_config, data_source)
+        self.rnn_model.rnn_model.reset_states()
         self.current_states = []  # stored as numpy array for easier access
         self.current_inputs = []
         self.current_ids = []
@@ -26,7 +25,7 @@ class ModelManager(object):
         for batch_nr in range(len(self.current_states)):
             # state_statetype_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
             # state_tuple = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(state_statetype_first[0], state_statetype_first[1])
-            prediction, new_state = self.model.predict(self.current_inputs[batch_nr], self.current_states[batch_nr])
+            prediction, new_state = self.rnn_model.predict(self.current_inputs[batch_nr], self.current_states[batch_nr])
             # state_batch_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
             self.current_states[batch_nr] = new_state
             for idx in range(len(self.current_is_alive[batch_nr])):
@@ -73,7 +72,7 @@ class ModelManager(object):
                         # code.interact(local=dict(globals(), **locals()))
                     return
         # create new entry of the lists
-        self.current_states.append(self.zero_state)
+        self.current_states.append(self.rnn_model.get_zero_state())
         self.current_is_alive.append(np.zeros([self.global_config['batch_size']], dtype=bool))
         self.current_ids.append(-np.ones([self.global_config['batch_size']], dtype=np.int32))
         self.current_inputs.append(np.zeros([self.global_config['batch_size'], 2], dtype=np.float64))
