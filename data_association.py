@@ -34,9 +34,9 @@ class DataAssociation(object):
     def __init__(self, global_config):
         self.global_config = global_config
         if global_config['dataset_type'] == 'FakeDataset':
-            self.data_source = FakeDataSet(global_config=global_config)
+            self.data_source = FakeDataSet(timesteps=global_config['num_timesteps'], batch_size=global_config['batch_size'])
         elif self.global_config['dataset_type'] == 'CsvDataset':
-            self.data_source = CsvDataSet(global_config=global_config, **global_config['CsvDataSet'])
+            self.data_source = CsvDataSet(**global_config['CsvDataSet'])
             global_config['num_timesteps'] = self.data_source.get_num_timesteps()
         self.track_manager = TrackManager(global_config, self.data_source)
 

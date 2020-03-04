@@ -717,7 +717,7 @@ class FakeDataSet(AbstractDataSet):
     def __init__(self, timesteps=350, number_trajectories=512,
                  additive_noise_stddev=0, splits=0, additive_target_stddev=0,
                  min_number_points_per_trajectory=20, batch_size=64,
-                 belt_width=2000, belt_height=2000, nan_value=0, step_length=70, global_config=None):
+                 belt_width=2000, belt_height=2000, nan_value=0, step_length=70):
         """
         Create Fake Data Lines for timesteps with normally distributed noise on a belt.
 
@@ -732,10 +732,7 @@ class FakeDataSet(AbstractDataSet):
         Attention: x-coordinate is along the height of the belt.
                y-coordinate is along the width of the belt.
         """
-        if global_config and 'num_timesteps' in global_config.keys():
-            self.timesteps = global_config['num_timesteps']
-        else:
-            self.timesteps = timesteps
+        self.timesteps = timesteps
         self.n_dim = 2
         self.n_trajectories = number_trajectories
         self.belt_max_x = belt_height
@@ -746,10 +743,7 @@ class FakeDataSet(AbstractDataSet):
         self.additive_target_stddev = additive_target_stddev
         self.splits = splits
         self.min_number_points_per_trajectory = min_number_points_per_trajectory
-        if global_config and 'batch_size' in global_config.keys():
-            self.batch_size = global_config['batch_size']
-        else:
-            self.batch_size = batch_size
+        self.batch_size = batch_size
         self.batch_size = batch_size
         self.nan_value = nan_value
         self.step_length = step_length
@@ -842,11 +836,10 @@ class FakeDataSet(AbstractDataSet):
 
 class CsvDataSet(AbstractDataSet):
     def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2,
-                 timesteps=35, batch_size=128, global_config=None, data_is_aligned=True,
+                 timesteps=35, batch_size=128, data_is_aligned=True,
                  rotate_columns=False, normalization_constant=None,
                  birth_rate_mean=6, birth_rate_std=2,
                  additive_noise_stddev=0):
-        self.global_config = global_config
         self.glob_file_pattern = glob_file_pattern
         self.file_list = sorted(glob.glob(glob_file_pattern))
         assert len(self.file_list) > 0, "No files found"
