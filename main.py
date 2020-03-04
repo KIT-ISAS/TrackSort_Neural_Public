@@ -34,12 +34,12 @@ parser.add_argument('--is_loaded', type=str2bool, default=True,
                     help='Whether the model is loaded or created + trained.')
 parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
-parser.add_argument('--matching_algorithm', default='global',
-                    help='The algorithm, that is used for matching. Current options are: ["local","global"])')
+parser.add_argument('--matching_algorithm', default='global', choices=['local', 'global'],
+                    help='The algorithm, that is used for matching.')
 parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv',
                     help='The directory of the data set. Only needed for CsvDataset.')
-parser.add_argument('--dataset_type', default='CsvDataset',
-                    help='The type of the dataset. Current options are: ["FakeDataset","CsvDataset"].')
+parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDataset', 'CsvDataset'],
+                    help='The type of the dataset.')
 parser.add_argument('--distance_threshold', type=float, default=0.02,
                     help='The threshold used for the matching with the artificial measurements and predictions')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
