@@ -1057,7 +1057,6 @@ class CsvDataSet(AbstractDataSet):
                                                         self.longest_track - self.min_number_detections,
                                                         tracks_copy.shape[0])
 
-        # ToDo: numpyify
         for track_i in range(tracks_copy.shape[0]):
             new_beginning = new_random_track_beginnings[track_i]
             new_length = n_timesteps - new_beginning
