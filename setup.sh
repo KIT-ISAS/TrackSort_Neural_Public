@@ -49,7 +49,8 @@ then
       echo "Username: $username"
 
       # Download bundle
-      sftp "${username}@i81server:/mnt/data/user/home/inside-schuettgut/Datensaetze/proprak_ws1920.zip" tmp_download_dir/
+      mkdir tmp_download_dir
+      sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/proprak_ws1920.zip" tmp_download_dir/
   else
       # pollithy.com
       wget -P "./tmp_download_dir/" -N "pollithy.com/proprak_ws1920.zip"
@@ -66,8 +67,3 @@ then
   # remove tmp data
   rm -r tmp_download_dir
 fi
-
-
-
-
-

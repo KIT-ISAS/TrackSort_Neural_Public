@@ -15,9 +15,11 @@ from model_manager import ModelManager
 from data_association import DataAssociation
 from data_manager import FakeDataSet, CsvDataSet
 from evaluator import Evaluator
+# Test
+from cv_model import *
 
 tf.get_logger().setLevel('ERROR')
-tf.enable_eager_execution()
+#tf.enable_eager_execution()
 parser = argparse.ArgumentParser()
 
 
@@ -196,6 +198,36 @@ def run_global_config(global_config, experiment_series_names=''):
         data_source = CsvDataSet(**global_config['CsvDataSet'])
         global_config['num_timesteps'] = data_source.get_num_timesteps()
     
+    # calc mean vel in first time step
+    sum_v = 0
+    c = 0
+    for track in data_source.aligned_track_data:
+        c = c+1
+        sum_v = sum_v + (track[1,0] - track[0,0])
+
+    mean_v = (sum_v/c)/0.005
+    cv_model = CV_Model(velocity_guess=mean_v)
+    # Test CV model
+    for track in data_source.aligned_track_data:
+        cv_state = CV_State(track[0], velocity_guess=mean_v)
+        cv_state = cv_model.predict(cv_state)
+        error = 0
+        c = 0
+        for i in range(1,track.shape[0]):
+            pos = track[i,:]
+            if np.array_equal(pos,np.array([0, 0])) == False:
+                state_pos = [cv_state.get_pos().item(0), cv_state.get_pos().item(1)]
+                error = error + np.sqrt((pos[0]-state_pos[0]) ** 2 + (pos[1]-state_pos[1]) ** 2)
+                # update
+                cv_state = cv_model.update(cv_state, pos)
+                updated_pos = [cv_state.get_pos().item(0), cv_state.get_pos().item(1)]
+                # predict
+                cv_state = cv_model.predict(cv_state)
+                predicted_pos = [cv_state.get_pos().item(0), cv_state.get_pos().item(1)]
+                c = c+1
+
+        print(error/c)
+
     ## Initialize models
     model_manager = ModelManager(global_config, data_source)
 
