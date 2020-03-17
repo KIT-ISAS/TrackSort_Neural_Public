@@ -199,6 +199,7 @@ def run_global_config(global_config, experiment_series_names=''):
         global_config['num_timesteps'] = data_source.get_num_timesteps()
     
     # calc mean vel in first time step
+    """
     sum_v = 0
     c = 0
     for track in data_source.aligned_track_data:
@@ -206,6 +207,7 @@ def run_global_config(global_config, experiment_series_names=''):
         sum_v = sum_v + (track[1,0] - track[0,0])
 
     mean_v = (sum_v/c)/0.005
+
     cv_model = CV_Model()
     # Test CV model
     for track in data_source.aligned_track_data:
@@ -227,7 +229,8 @@ def run_global_config(global_config, experiment_series_names=''):
                 c = c+1
 
         print(error/c)
-
+    """
+    
     ## Initialize models
     model_manager = ModelManager(global_config, data_source)
 
