@@ -49,6 +49,12 @@ class ModelManager(object):
 
     # TODO can this function be used generally for predict all models?
     def predict_all(self):
+        """
+            Predict the next position with all experts.
+            Predicts a whole batch at a time.
+
+            @return predictions for all alive tracks from all models
+        """
         prediction_dict = {}
         for batch_nr in range(len(self.current_states)):
             # state_statetype_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
@@ -78,22 +84,43 @@ class ModelManager(object):
 
     # These are the functions for multi-target tracking
     def update_by_id(self, global_track_id, measurement):
+        """
+            Update a track with a new measurement for all models.    
+
+            @param gobal_track_id:  The id of the track from which the new measurement stems
+            @param measurement:     The new measurement [x_in, y_in]
+        """
         self.current_inputs[global_track_id] = measurement
 
     def delete_by_id(self, global_track_id):
+        """
+            Delete a track
+
+            @param gobal_track_id:  The id of the track
+        """
         self.current_is_alive[global_track_id] = False
         # Free the entry in this batch if overwriting is activated
         if self.global_config['overwriting_activated']:
             self.current_free_entries.add(self.current_batches.get(global_track_id))
 
     def create_by_id(self, global_track_id, measurement):
+        """
+            Create a new track with a new measurement for all models. 
+            Creates a new batch of tracks if there is no free space in the existing batches.   
+
+            @param gobal_track_id:  The id of the track from which the new measurement stems
+            @param measurement:     The new measurement [x_in, y_in]
+        """
         # Add new track to existing batch if possible
         if len(self.current_free_entries) > 0:
+            # Get the next free entry (unordered!)
             (batch_nr, idx) = self.current_free_entries.pop()
+            # Fill free entry with new track
             self.current_is_alive[global_track_id] = True
             self.current_inputs[global_track_id] = measurement
             self.current_ids[batch_nr][idx] = global_track_id
             self.current_batches[global_track_id] = (batch_nr, idx)
+            # Add new state
             state_buffers = []
             for state in self.current_states[batch_nr]:
                 state_buffer = np.transpose(state, [1, 0, 2])
@@ -105,12 +132,6 @@ class ModelManager(object):
                 state_buffer = np.transpose(state_buffer, [1, 0, 2])
                 state_buffers.append(state_buffer)
             self.current_states[batch_nr] = state_buffers
-            # TODO: Adjust warnings
-            if self.global_config['overwriting_activated'] and self.global_config['highest_id'] > idx + self.global_config['batch_size'] * batch_nr and \
-                    not self.global_config['state_overwriting_started']:
-                self.global_config['state_overwriting_started'] = True
-                logging.warning('state_overwriting_started at timestep ' + str(self.global_config['current_time_step']))
-                # code.interact(local=dict(globals(), **locals()))
         else:
             # create new batch
             self.current_states.append(self.rnn_model.get_zero_state())
@@ -126,5 +147,5 @@ class ModelManager(object):
             self.current_batches[global_track_id] = (batch_nr, 0)
             self.current_free_entries.remove((batch_nr, 0))
             if len(self.current_states) > 1:
-                logging.info('batch ' + str(len(self.current_states)) + ' is constructed now at timestep' + str(self.global_config['current_time_step']) + '!')
+                logging.info('batch ' + str(len(self.current_states)) + ' is constructed now at timestep ' + str(self.global_config['current_time_step']) + '!')
                 # code.interact(local=dict(globals(), **locals()))
