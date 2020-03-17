@@ -12,27 +12,36 @@ from rnn_model import RNN_Model
 
 class ModelManager(object):
     def __init__(self, global_config, data_source):
+        # TODO what variables do we need?
         self.global_config = global_config
+        # TODO List of models
         self.rnn_model = RNN_Model(self.global_config, data_source)
         self.rnn_model.rnn_model.reset_states()
+        # TODO List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []  # stored as numpy array for easier access
         self.current_inputs = []
         self.current_ids = []
         self.current_is_alive = []
 
+    # TODO create train, test and evaluate functions for single-target tracking
+
+    # TODO can this function be used generally for predict all models?
     def predict_all(self):
         prediction_dict = {}
+        # TODO understand batch_nr
         for batch_nr in range(len(self.current_states)):
             # state_statetype_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
             # state_tuple = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(state_statetype_first[0], state_statetype_first[1])
             prediction, new_state = self.rnn_model.predict(self.current_inputs[batch_nr], self.current_states[batch_nr])
             # state_batch_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
             self.current_states[batch_nr] = new_state
+            # TODO understand current_is_alive
             for idx in range(len(self.current_is_alive[batch_nr])):
                 if self.current_is_alive[batch_nr][idx]:
                     prediction_dict[self.current_ids[batch_nr][idx]] = prediction[idx]
         return prediction_dict
 
+    # These are the functions for multi-target tracking
     def update_by_id(self, global_track_id, measurement):
         for batch_nr in range(len(self.current_ids)):
             for idx in range(len(self.current_ids[batch_nr])):

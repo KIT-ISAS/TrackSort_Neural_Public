@@ -41,7 +41,7 @@ parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
 parser.add_argument('--matching_algorithm', default='global', choices=['local', 'global'],
                     help='The algorithm, that is used for matching.')
-parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv',
+parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv',
                     help='The directory of the data set. Only needed for CsvDataset.')
 parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDataset', 'CsvDataset'],
                     help='The type of the dataset.')
@@ -206,10 +206,10 @@ def run_global_config(global_config, experiment_series_names=''):
         sum_v = sum_v + (track[1,0] - track[0,0])
 
     mean_v = (sum_v/c)/0.005
-    cv_model = CV_Model(velocity_guess=mean_v)
+    cv_model = CV_Model()
     # Test CV model
     for track in data_source.aligned_track_data:
-        cv_state = CV_State(track[0], velocity_guess=mean_v)
+        cv_state = CV_State(track[0])
         cv_state = cv_model.predict(cv_state)
         error = 0
         c = 0

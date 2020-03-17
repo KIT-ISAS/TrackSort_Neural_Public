@@ -387,7 +387,7 @@ class RNN_Model(object):
                                                             output_dim=self._label_dim,
                                                             **self.global_config['rnn_model_factory'])
         logging.info(self.rnn_model.summary())
-
+        # TODO add batch size and test train split to function call
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
 
         optimizer = tf.keras.optimizers.Adam()
