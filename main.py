@@ -47,6 +47,8 @@ parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDatase
                     help='The type of the dataset.')
 parser.add_argument('--distance_threshold', type=float, default=0.02,
                     help='The threshold used for the matching with the artificial measurements and predictions')
+parser.add_argument('--config_path', default="configs/default_config.json",
+                    help='Path to config file including information about experts, gating network and weighting function.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
@@ -105,6 +107,7 @@ global_config = {
     'is_loaded': args.is_loaded,
     'model_path': args.model_path,
     'distance_threshold': args.distance_threshold,
+    'config_path': args.config_path,
     'batch_size': args.batch_size,
     'matching_algorithm': args.matching_algorithm,
     #
@@ -129,6 +132,7 @@ global_config = {
         'normalization_constant': args.normalization_constant,
         'additive_noise_stddev': args.additive_noise_stddev
     },
+    """
     'rnn_model_factory': {
         'num_units_first_rnn': args.num_units_first_rnn,
         'num_units_second_rnn': args.num_units_second_rnn,
@@ -141,7 +145,7 @@ global_config = {
         'rnn_model_name': 'lstm',
         'use_batchnorm_on_dense': True,
     },
-    #
+    """
     'num_train_epochs': args.num_train_epochs,
     'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
     'lr_decay_after_epochs': args.lr_decay_after_epochs,
@@ -230,9 +234,14 @@ def run_global_config(global_config, experiment_series_names=''):
 
         print(error/c)
     """
-    
+
+    ## Import model config to json tree
+    # TODO: Create json schema to check config validity
+    with open(global_config["config_path"]) as f:
+        model_config = json.load(f)
+        
     ## Initialize models
-    model_manager = ModelManager(global_config, data_source)
+    model_manager = ModelManager(global_config, data_source, model_config)
 
     ## Init tracks
     track_manager = TrackManager(global_config)

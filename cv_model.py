@@ -67,6 +67,20 @@ class CV_Model(object):
         current_state.C_e = current_state.C_p - np.matmul(np.matmul(K, self.H), current_state.C_p)
         return current_state
 
+    def get_zero_state(self, batch_size):
+        """
+            Return a list of dummy CV_States
+
+            @param batch_size: The size of the dummy list
+
+            @return list of dummy CV_States
+        """
+        dummy_list = []
+        for i in range(batch_size):
+            dummy_list.append(CV_State([0.0, 0.0], 0))
+
+        return dummy_list
+
 class CV_State(object):
     def __init__(self, initial_pos, velocity_guess=15000, pos_var=5, velo_var=10000):
         """

@@ -348,10 +348,10 @@ def get_state(rnn_model):
 
 
 class RNN_Model(object):
-    def __init__(self, global_config, data_source):
+    def __init__(self, global_config, rnn_config, data_source):
         self.global_config = global_config
         self.data_source = data_source
-
+        self.rnn_config = rnn_config
         self._label_dim = 4 if self.global_config['separation_prediction'] else 2
 
         if self.global_config['is_loaded']:
@@ -385,7 +385,7 @@ class RNN_Model(object):
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
                                                             num_time_steps=self.data_source.longest_track,
                                                             output_dim=self._label_dim,
-                                                            **self.global_config['rnn_model_factory'])
+                                                            **self.rnn_config)
         logging.info(self.rnn_model.summary())
         # TODO add batch size and test train split to function call
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
