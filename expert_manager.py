@@ -42,7 +42,7 @@ class Expert_Manager(object):
                 sub_type = expert.get("sub_type")
                 if sub_type == 'CV':
                     # Create constant velocity model
-                    cv_model = CV_Model(**expert.get("options"))
+                    cv_model = CV_Model(**expert.get("model_options"), default_state_options=expert.get("state_options"))
                     self.experts.append(cv_model)
                     self.current_states.append([])
                 else:
@@ -89,10 +89,7 @@ class Expert_Manager(object):
                     self.current_states[i].append(expert.get_zero_state(self.global_config.get("batch_size")))
 
                 # Update existing batch
-                # TODO Add cv state options?!
-                # TODO Write function that converts relative input to meters!
-                # TODO Figure out what the first state of the CV model should be
-                self.current_states[i][batch_nr][idx] = CV_State(measurement)
+                self.current_states[i][batch_nr][idx] = CV_State(measurement, **expert.default_state_options)
             else:
                 logging.error("Track creation for expert not implemented!")
 
@@ -118,7 +115,7 @@ class Expert_Manager(object):
                 
                 prediction = []
                 for j in range(len(self.current_states[i][batch_nr])):
-                    # update TODO: Test if update and prediction works or = neccessary
+                    # update
                     expert.update(self.current_states[i][batch_nr][j], inputs[j])
                     # predict
                     expert.predict(self.current_states[i][batch_nr][j])
@@ -130,5 +127,5 @@ class Expert_Manager(object):
             else:
                 logging.error("Track creation for expert not implemented!")
         
-        return all_predictions
+        return np.array(all_predictions)
 

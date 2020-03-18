@@ -203,36 +203,40 @@ def run_global_config(global_config, experiment_series_names=''):
         global_config['num_timesteps'] = data_source.get_num_timesteps()
     
     # calc mean vel in first time step
+
     """
     sum_v = 0
     c = 0
     for track in data_source.aligned_track_data:
         c = c+1
         sum_v = sum_v + (track[1,0] - track[0,0])
-
-    mean_v = (sum_v/c)/0.005
-
-    cv_model = CV_Model()
-    # Test CV model
+    dt = 0.005
+    mean_v = (sum_v/c)/dt
+    var_sum = 0
     for track in data_source.aligned_track_data:
-        cv_state = CV_State(track[0])
-        cv_state = cv_model.predict(cv_state)
-        error = 0
-        c = 0
+        var_sum = var_sum + ((track[1,0] - track[0,0])/dt - mean_v)**2
+    var_v = var_sum/c
+
+    cv_model = CV_Model(dt = dt, s_w = 10E7)
+    # Test CV model
+    c = 0
+    error = 0
+    for track in data_source.aligned_track_data:
+        cv_state = CV_State(track[0], velocity_guess=15000, velo_var_x=10E6, velo_var_y = 10E8)
+        cv_model.update(cv_state)
+        cv_model.predict(cv_state)
         for i in range(1,track.shape[0]):
             pos = track[i,:]
             if np.array_equal(pos,np.array([0, 0])) == False:
                 state_pos = [cv_state.get_pos().item(0), cv_state.get_pos().item(1)]
                 error = error + np.sqrt((pos[0]-state_pos[0]) ** 2 + (pos[1]-state_pos[1]) ** 2)
                 # update
-                cv_state = cv_model.update(cv_state, pos)
-                updated_pos = [cv_state.get_pos().item(0), cv_state.get_pos().item(1)]
+                cv_model.update(cv_state, pos)
                 # predict
-                cv_state = cv_model.predict(cv_state)
-                predicted_pos = [cv_state.get_pos().item(0), cv_state.get_pos().item(1)]
+                cv_model.predict(cv_state)
                 c = c+1
 
-        print(error/c)
+    print(error/c)
     """
 
     ## Import model config to json tree

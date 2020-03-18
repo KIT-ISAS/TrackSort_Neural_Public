@@ -18,9 +18,16 @@
     "kf1": {
       "type": "KalmanFilter",
       "sub_type": "CV",
-      "options": {
-        "s_w": 100000,
-        "s_v": 1
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7
       }
     }
   }
