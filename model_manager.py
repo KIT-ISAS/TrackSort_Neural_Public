@@ -6,6 +6,7 @@ import code  # code.interact(local=dict(globals(), **locals()))
 #from tensorflow.keras import backend as K
 
 from expert_manager import Expert_Manager
+from weighting_function import weighting_function
 
 #tf.keras.backend.set_floatx('float64')
 
@@ -78,12 +79,15 @@ class ModelManager(object):
                 # Predict the next state for all models
                 all_predictions = self.expert_manager.predict_all(inputs, batch_nr)
 
-                # TODO: Handle weighting
-                # For now select RNN model
-                prediction = all_predictions[0]
+                # Gating
+                weights = (1/all_predictions.shape[0]) * np.ones([all_predictions.shape[0],1])
+
+                # Weighting
+                prediction = weighting_function(all_predictions, weights)
 
             for i in alive_tracks:
-                prediction_dict[global_track_ids[i]] = prediction[i]
+                # TODO cleaner solution
+                prediction_dict[global_track_ids[i]] = np.array([prediction[i,0,0], prediction[i,1,0]])
         return prediction_dict
 
     # These are the functions for multi-target tracking
