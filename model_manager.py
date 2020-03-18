@@ -17,9 +17,9 @@ class ModelManager(object):
             @param data_source          The data source object
             @param model_config         The json tree containing all information about the experts, gating network and wighting function
 
-            @variable experts:          A list containing all experts
+            @variable expert_manager:   Object handling all experts (creation, states, prediction, ...)
             @variable gating_network:
-            @varibale weighting_function:
+
             @variable current_ids:      Stores a global track id for each entry in the batches
                                         current_ids[batch_nr, idx] = global_track_id
             @variable current_inputs:   Stores the next inputs (measurements) for each track id.

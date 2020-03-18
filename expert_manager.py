@@ -12,6 +12,11 @@ from cv_model import CV_Model, CV_State
 
 class Expert_Manager(object):
     def __init__(self, global_config, expert_config, data_source):
+        """
+            @param expert_config: The configuration dictionary of all experts
+            @param data_source: TODO remove
+            @param global_config: TODO remove
+        """
         self.expert_config = expert_config
         # TODO: Remove global config and data source
         self.global_config = global_config
