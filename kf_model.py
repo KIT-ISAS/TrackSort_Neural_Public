@@ -2,6 +2,7 @@
 
 Todo:
     * Convert np representation to tensor representation for mixture of experts
+    * Implement CA Model (and more)
 """
 
 import numpy as np
