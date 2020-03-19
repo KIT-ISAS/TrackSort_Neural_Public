@@ -1,3 +1,12 @@
+"""Model Manager.
+
+Todo:
+    * Delete global_config
+    * Add train and test method
+    * Move data_source to training and test methods
+    * Convert np representation to tensor representation for mixture of experts
+"""
+
 import logging
 import tensorflow as tf
 import numpy as np
@@ -13,28 +22,41 @@ from ensemble import Simple_Ensemble
 
 
 class ModelManager(object):
+    """The model manager handles all models for single target tracking.
+
+    Handles the experts, the gating network and the weighting of experts.
+    Provides train and test methods.
+    Handles inputs for experts for tracking of multiple single particles (No data association is done here).
+
+    Attributes:
+        expert_manager:     Object handling all experts (creation, states, prediction, ...)
+        gating_network:     Object creating the weights for each expert
+        current_ids (list):     Stores a global track id for each entry in the batches
+                                    current_ids[batch_nr, idx] = global_track_id
+        current_inputs (dict):  Stores the next inputs (measurements) for each track id.
+                                    Maps the input to a global track id.
+                                    current_ids[global_track_id] = [x_in, y_in]
+        current_is_alive (dict): Stores if a track is alive.
+                                    Maps the alive status to a global track id.
+                                    current_is_alive[global_track_id] = [True or False]
+        current_states (list):  Stores the internal states of all tracks for each model.
+                                    State structure may vary for each type of expert.
+                                    current_states[batch_nr] = [Batch States[...]]
+        current_batches (dict): Maps a (batch_nr, idx) tuple to each global track id
+        current_free_entries (set): Set of all dead free entries in batches
+    """
+
     def __init__(self, global_config, data_source, model_config):
-        """
-            @param global_config
-            @param data_source          The data source object
-            @param model_config         The json tree containing all information about the experts, gating network and wighting function
+        """Initialize a model manager.
 
-            @variable expert_manager:   Object handling all experts (creation, states, prediction, ...)
-            @variable gating_network:
+        Creates the expert manager and gating network.
+        Initializes attributes.
 
-            @variable current_ids:      Stores a global track id for each entry in the batches
-                                        current_ids[batch_nr, idx] = global_track_id
-            @variable current_inputs:   Stores the next inputs (measurements) for each track id.
-                                        Maps the input to a global track id.
-                                        current_ids[global_track_id] = [x_in, y_in]
-            @variable current_is_alive: Stores if a track is alive.
-                                        Maps the alive status to a global track id.
-                                        current_is_alive[global_track_id] = [True or False]
-            @variable current_states:   Stores the internal states of all tracks for each model.
-                                        State structure may vary for each type of expert.
-                                        current_states[batch_nr] = [Batch States[...]]     
-            @variable current_batches:  Maps a (batch_nr, idx) tuple to each global track id   
-            @variable current_free_entries:     Set of all dead free entries in batches                   
+        Args:
+            global_config (dict): To be removed
+            data_source (object): To be moved to training and test functions
+            model_config (dict):  The json tree containing all information about the experts, gating network and weighting function
+
         """
         # TODO what variables do we need?
         self.global_config = global_config
@@ -53,6 +75,14 @@ class ModelManager(object):
         self.current_free_entries = set()
 
     def create_gating_network(self, gating_config):
+        """Create the gating network.
+
+        Creates a gating network according to the given config
+
+        Args:
+            gating_config (dict): Includes information about type and options of the gating network
+
+        """
         gating_type = gating_config.get("type")
         if gating_type == "Simple_Ensemble":
             self.gating_network = Simple_Ensemble(self.expert_manager.n_experts)
@@ -63,11 +93,12 @@ class ModelManager(object):
 
     # TODO can this function be used generally for predict all models?
     def predict_all(self):
-        """
-            Predict the next position with all experts.
-            Predicts a whole batch at a time.
+        """Predict the next position with all experts.
+        
+        Predict a whole batch of particles at a time.
 
-            @return predictions for all alive tracks from all models
+        Returns:
+            Predictions for all alive tracks from all models
         """
         prediction_dict = {}
         for batch_nr in range(len(self.current_ids)):
@@ -103,19 +134,19 @@ class ModelManager(object):
 
     # These are the functions for multi-target tracking
     def update_by_id(self, global_track_id, measurement):
-        """
-            Update a track with a new measurement for all models.    
+        """Update a track with a new measurement for all models.
 
-            @param gobal_track_id:  The id of the track from which the new measurement stems
-            @param measurement:     The new measurement [x_in, y_in]
+        Args:
+            gobal_track_id (int): The id of the track from which the new measurement stems
+            measurement (list):   The new measurement [x_in, y_in]
         """
         self.current_inputs[global_track_id] = measurement
 
     def delete_by_id(self, global_track_id):
-        """
-            Delete a track
+        """Delete a track.
 
-            @param gobal_track_id:  The id of the track
+        Args:
+            gobal_track_id (int):  The id of the track to delte
         """
         self.current_is_alive[global_track_id] = False
         # Free the entry in this batch if overwriting is activated
@@ -123,12 +154,13 @@ class ModelManager(object):
             self.current_free_entries.add(self.current_batches.get(global_track_id))
 
     def create_by_id(self, global_track_id, measurement):
-        """
-            Create a new track with a new measurement for all models. 
-            Creates a new batch of tracks if there is no free space in the existing batches.   
+        """Create a new track with a new measurement for all models.
+            
+        Creates a new batch of tracks if there is no free space in the existing batches.   
 
-            @param gobal_track_id:  The id of the track from which the new measurement stems
-            @param measurement:     The new measurement [x_in, y_in]
+        Args:
+            gobal_track_id (int):  The id of the track from which the new measurement stems
+            measurement (list):    The new measurement [x_in, y_in]
         """
         batch_nr = 0
         idx = 0
