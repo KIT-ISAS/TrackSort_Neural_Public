@@ -5,6 +5,7 @@ Todo:
     * Add train and test method
     * Move data_source to training and test methods
     * Convert np representation to tensor representation for mixture of experts
+    * Understand state buffering for RNN
 """
 
 import logging
@@ -31,6 +32,7 @@ class Expert_Manager(object):
                                     current_states[batch_nr] = [Batch States[...]]
         n_experts (int):        The number of experts in the expert bank.
     """
+    
     def __init__(self, global_config, expert_config, data_source):
         """Initialize an expert manager.
 
