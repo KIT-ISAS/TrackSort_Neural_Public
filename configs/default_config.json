@@ -30,5 +30,11 @@
         "pos_var": 3.6E-7
       }
     }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "options": {
+
+    }
   }
 }

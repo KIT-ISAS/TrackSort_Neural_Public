@@ -7,6 +7,7 @@ import code  # code.interact(local=dict(globals(), **locals()))
 
 from expert_manager import Expert_Manager
 from weighting_function import weighting_function
+from ensemble import Simple_Ensemble
 
 #tf.keras.backend.set_floatx('float64')
 
@@ -40,6 +41,8 @@ class ModelManager(object):
 
         # The manager of all the models
         self.expert_manager = Expert_Manager(global_config, model_config.get('experts'), data_source)
+        # The gating network that calculates all weights
+        self.create_gating_network(model_config.get('gating'))
         
         self.current_inputs = {}
         self.current_inputs[-1] = [0.0, 0.0]
@@ -48,6 +51,13 @@ class ModelManager(object):
         self.current_is_alive[-1] = False
         self.current_batches = dict()
         self.current_free_entries = set()
+
+    def create_gating_network(self, gating_config):
+        gating_type = gating_config.get("type")
+        if gating_type == "Simple_Ensemble":
+            self.gating_network = Simple_Ensemble(self.expert_manager.n_experts)
+        else:
+            raise Exception("Unknown gating type '" + gating_type + "'!")
 
     # TODO create train, test and evaluate functions for single-target tracking
 
@@ -81,7 +91,7 @@ class ModelManager(object):
 
             # Gating
             #weights = np.array([[1], [0]])
-            weights = (1/all_predictions.shape[0]) * np.ones([all_predictions.shape[0],1])
+            weights = self.gating_network.get_weights()
 
             # Weighting
             prediction = weighting_function(all_predictions, weights)

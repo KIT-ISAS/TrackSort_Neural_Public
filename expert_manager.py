@@ -21,9 +21,10 @@ class Expert_Manager(object):
         # TODO: Remove global config and data source
         self.global_config = global_config
         self.data_source = data_source
+        # List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []
         self.create_models(expert_config)
-        # List of list of states -> Each model has its own list of current states (= particles)
+        self.n_experts = len(self.experts)
 
     def create_models(self, expert_config):
         """
