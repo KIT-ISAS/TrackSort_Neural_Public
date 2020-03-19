@@ -39,9 +39,6 @@ class ModelManager(object):
         current_is_alive (dict): Stores if a track is alive.
                                     Maps the alive status to a global track id.
                                     current_is_alive[global_track_id] = [True or False]
-        current_states (list):  Stores the internal states of all tracks for each model.
-                                    State structure may vary for each type of expert.
-                                    current_states[batch_nr] = [Batch States[...]]
         current_batches (dict): Maps a (batch_nr, idx) tuple to each global track id
         current_free_entries (set): Set of all dead free entries in batches
     """

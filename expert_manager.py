@@ -1,3 +1,12 @@
+"""Expert Manager.
+
+Todo:
+    * Delete global_config
+    * Add train and test method
+    * Move data_source to training and test methods
+    * Convert np representation to tensor representation for mixture of experts
+"""
+
 import logging
 #import tensorflow as tf
 import numpy as np
@@ -11,11 +20,27 @@ from rnn_model import RNN_Model
 from cv_model import CV_Model, CV_State
 
 class Expert_Manager(object):
+    """The expert manager handles all forecasting experts.
+
+    Handles the experts and their states in continuous forecasting.
+    Provides train and test methods.
+
+    Attributes:
+        current_states (list):  Stores the internal states of all tracks for each model.
+                                    State structure may vary for each type of expert.
+                                    current_states[batch_nr] = [Batch States[...]]
+        n_experts (int):        The number of experts in the expert bank.
+    """
     def __init__(self, global_config, expert_config, data_source):
-        """
-            @param expert_config: The configuration dictionary of all experts
-            @param data_source: TODO remove
-            @param global_config: TODO remove
+        """Initialize an expert manager.
+
+        Creates the expert models.
+        Initializes attributes.
+
+        Args:
+            expert_config (dict): The configuration dictionary of all experts
+            data_source:   TODO remove
+            global_config: TODO remove
         """
         self.expert_config = expert_config
         # TODO: Remove global config and data source
@@ -26,16 +51,16 @@ class Expert_Manager(object):
         self.create_models(expert_config)
         self.n_experts = len(self.experts)
 
-    def create_models(self, expert_config):
-        """
-            Create list of experts
+    def create_models(self):
+        """Create list of experts.
 
-            @param expert_config:   Config dict that contains all options to all experts to create
+        Creat experts based on self.expert_cofig.
+        Add empty list to list of states for each expert.
         """
         self.experts = []
 
-        for expert_name in expert_config:
-            expert = expert_config.get(expert_name)
+        for expert_name in self.expert_config:
+            expert = self.expert_config.get(expert_name)
             expert_type = expert.get("type")
             if expert_type == 'RNN':
                 # Create RNN model
@@ -57,14 +82,15 @@ class Expert_Manager(object):
                 logging.warning("Expert type " + expert_type + " not supported. Will not create model.")
 
     def create_new_track(self, batch_nr, idx, measurement):
-        """
-            Create a new track with the given measurement in an existing batch at position idx.
-            Adds a new state at the given position of current_states for each model. 
-            If batch_nr > number of batches in current_states -> Create new batch
+        """Create a new track with the given measurement in an existing batch at position idx.
+            
+        Adds a new state at the given position of current_states for each model. 
+        If batch_nr > number of batches in current_states -> Create new batch
 
-            @param batch_nr:    Batch in which the new state is saved
-            @param idx:         Position of new state in batch
-            @param measurement: The first measurement of the new track #TODO remove measurement!!!
+        Args:
+            batch_nr (int):     Batch in which the new state is saved
+            idx (int):          Position of new state in batch
+            measurement (list): The first measurement of the new track
         """
         # Add new state
         for i in range(len(self.experts)):
@@ -100,12 +126,13 @@ class Expert_Manager(object):
                 logging.error("Track creation for expert not implemented!")
 
     def predict_all(self, inputs, batch_nr):
-        """
-            predict next state of all models
+        """Predict next state of all models.
 
-            @param inputs: A batch of inputs (measurements) to the predictors
+        Args:
+            inputs (np.array): A batch of inputs (measurements) to the predictors
 
-            @return: A list of all predictions
+        Returns: 
+            A numpy array of all predictions
         """
         all_predictions = []
         for i in range(len(self.experts)):
