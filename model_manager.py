@@ -76,14 +76,15 @@ class ModelManager(object):
                 else:
                     inputs[i] = [0.0, 0.0]
                 
-                # Predict the next state for all models
-                all_predictions = self.expert_manager.predict_all(inputs, batch_nr)
+            # Predict the next state for all models
+            all_predictions = self.expert_manager.predict_all(inputs, batch_nr)
 
-                # Gating
-                weights = (1/all_predictions.shape[0]) * np.ones([all_predictions.shape[0],1])
+            # Gating
+            #weights = np.array([[1], [0]])
+            weights = (1/all_predictions.shape[0]) * np.ones([all_predictions.shape[0],1])
 
-                # Weighting
-                prediction = weighting_function(all_predictions, weights)
+            # Weighting
+            prediction = weighting_function(all_predictions, weights)
 
             for i in alive_tracks:
                 # TODO cleaner solution
