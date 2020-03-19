@@ -1,4 +1,4 @@
-"""KF Model and KF States.
+"""KF Model and KF State.
 
 Todo:
     * Convert np representation to tensor representation for mixture of experts
@@ -75,7 +75,7 @@ class KF_Model(ABC):
     def get_zero_state(self, batch_size):
         """Return a list of dummy states of correct size for the corresponding model.
 
-        Needs to be overwritten by descenting class.
+        Needs to be overwritten by child class.
 
         Args:
             batch_size (int): The size of the dummy list
@@ -90,7 +90,7 @@ class KF_State(ABC):
     """The Kalman filter state saves information about the state and covariance matrix of a particle.
 
     State should include position and velocity.
-    Has information about all constant matrices (F, C_w, H and C_v).
+    Has information about all varying covariance matrices.
 
     Attributes:
         state (np.array):   The state ((x,y) position, velocity, ...)
@@ -122,7 +122,7 @@ class KF_State(ABC):
     def get_v(self):
         """Return the velocity of the state.
 
-        Needs to be overwritten by descenting class.
+        Needs to be overwritten by child class.
 
         Returns:
             [x_velo; y_velo] as a numpy array
