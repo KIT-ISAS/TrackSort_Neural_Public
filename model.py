@@ -354,15 +354,16 @@ class Model(object):
 
         self._label_dim = 4 if self.global_config['separation_prediction'] else 2
 
-        if self.global_config['is_loaded']:
-            self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
-            logging.info(self.rnn_model.summary())
-            self.rnn_model.reset_states()
-        else:
-            if self.global_config['separation_prediction']:
-                self.train_separation_prediction()
-            else:
-                self.train()
+        # Old training
+        #    if self.global_config['separation_prediction']:
+        #        self.train_separation_prediction()
+        #    else:
+        #        self.train()
+
+    def load_rnn_model(self):
+        self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
+        logging.info(self.rnn_model.summary())
+        self.rnn_model.reset_states()
 
     def get_zero_state(self):
         self.rnn_model.reset_states()

@@ -72,6 +72,10 @@ class KF_Model(ABC):
         else:
             current_state.first = False
 
+    def train(self):
+    """Dummy function for training."""
+        pass
+
     @abstractmethod
     def get_zero_state(self, batch_size):
         """Return a list of dummy states of correct size for the corresponding model.

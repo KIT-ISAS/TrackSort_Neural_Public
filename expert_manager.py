@@ -83,6 +83,14 @@ class Expert_Manager(object):
             else:
                 logging.warning("Expert type " + expert_type + " not supported. Will not create model.")
 
+    def train_models(self):
+        """Train all experts.
+
+        The training information of each model should be provided in the expert configuration.
+        """
+        for expert in self.experts:
+            expert.train()
+
     def create_new_track(self, batch_nr, idx, measurement):
         """Create a new track with the given measurement in an existing batch at position idx.
             

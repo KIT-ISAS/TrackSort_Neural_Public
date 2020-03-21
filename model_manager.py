@@ -87,8 +87,14 @@ class ModelManager(object):
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
     # TODO create train, test and evaluate functions for single-target tracking
+    def train_models(self):
+        """Train all experts and the gating network.
 
-    # TODO can this function be used generally for predict all models?
+        The training information of each model should be provided in the configuration json.
+        """
+        # Right now only the RNN needs training. Adjust this function with increasing complexity.
+        self.expert_manager.train_models()
+
     def predict_all(self):
         """Predict the next position with all experts.
         
