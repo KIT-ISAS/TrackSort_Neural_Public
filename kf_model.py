@@ -73,6 +73,7 @@ class KF_Model(ABC):
         else:
             current_state.first = False
 
+    @abstractmethod
     def train_batch(self, inp, target):
         """Train the kf model on a batch of data.
 
@@ -87,7 +88,7 @@ class KF_Model(ABC):
             mse (double): Mean squared error of training on this batch
             mae (double): Mean abs error of training on this batch
         """
-        return 0.0, 0.0
+        pass
 
     @abstractmethod
     def get_zero_state(self, batch_size):

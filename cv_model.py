@@ -44,6 +44,41 @@ class CV_Model(KF_Model):
         
         super().__init__(F, C_w, H, C_v, default_state_options)
 
+    def train_batch(self, inp, target):
+        """Train the cv model on a batch of data."""
+        np_inp = inp.numpy()
+        np_target = target.numpy()
+        all_mse = []
+        mse_sum = 0
+        all_mae = []
+        mae_sum = 0
+        c = 0
+        for i in range(np_inp.shape[0]):
+            cv_state = CV_State(np_inp[i, 0], **self.default_state_options)
+            mse_track = []
+            mae_track = []
+            for j in range(np_inp.shape[1]):
+                if np.all(np.isclose(np_target[i, j],[0.0, 0.0])) == False:
+                    # update
+                    self.update(cv_state, np_inp[i, j])
+                    # predict
+                    self.predict(cv_state)
+                    pos = cv_state.get_pos()
+                    current_mse = (pos[0]-np_target[i, j, 0])**2 + (pos[1]-np_target[i, j, 1])**2
+                    mse_track.append(current_mse.item(0))
+                    mse_sum = mse_sum + current_mse
+                    current_mae = np.abs(pos[0]-np_target[i, j, 0]) + np.abs(pos[1]-np_target[i, j, 1])
+                    mae_track.append(current_mae.item(0)) 
+                    mae_sum = mae_sum + current_mae     
+                    c = c+1
+                    if current_mae > 0.001:
+                        stop = 0
+            all_mse.append(mse_track)
+            all_mae.append(mae_track)
+        mse = mse_sum/c
+        mae = mae_sum/c
+        return mse, mae
+
     def get_zero_state(self, batch_size):
         """Return a list of dummy CV_States."""
         dummy_list = []
