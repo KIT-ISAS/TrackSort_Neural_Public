@@ -2,6 +2,7 @@
 
 Todo:
     * Convert np representation to tensor representation for mixture of experts
+    * Implement training function
     * Implement CA Model (and more)
 """
 
@@ -72,9 +73,21 @@ class KF_Model(ABC):
         else:
             current_state.first = False
 
-    def train(self):
-    """Dummy function for training."""
-        pass
+    def train_batch(self, inp, target):
+        """Train the kf model on a batch of data.
+
+        No training of Kalman filters available yet --> Will run prediction and return values.
+        Returns MSE and MAE of model on training batch.
+
+        Args:
+            inp (tf.Tensor): A batch of input tracks
+            target (tf.Tensor): The prediction targets to the inputs
+
+        Returns
+            mse (double): Mean squared error of training on this batch
+            mae (double): Mean abs error of training on this batch
+        """
+        return 0.0, 0.0
 
     @abstractmethod
     def get_zero_state(self, batch_size):

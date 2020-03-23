@@ -132,20 +132,6 @@ global_config = {
         'normalization_constant': args.normalization_constant,
         'additive_noise_stddev': args.additive_noise_stddev
     },
-    """
-    'rnn_model_factory': {
-        'num_units_first_rnn': args.num_units_first_rnn,
-        'num_units_second_rnn': args.num_units_second_rnn,
-        'num_units_third_rnn': 0,
-        'num_units_fourth_rnn': 0,
-        'num_units_first_dense': 0,
-        'num_units_second_dense': 0,
-        'num_units_third_dense': 0,
-        'num_units_fourth_dense': 0,
-        'rnn_model_name': 'lstm',
-        'use_batchnorm_on_dense': True,
-    },
-    """
     'num_train_epochs': args.num_train_epochs,
     'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
     'lr_decay_after_epochs': args.lr_decay_after_epochs,
@@ -244,8 +230,22 @@ def run_global_config(global_config, experiment_series_names=''):
     with open(global_config["config_path"]) as f:
         model_config = json.load(f)
         
+    # [TEST] of training
+    global_config["is_loaded"] = False
     ## Initialize models
-    model_manager = ModelManager(global_config, data_source, model_config)
+    model_manager = ModelManager(global_config, data_source, model_config, global_config["is_loaded"], data_source.longest_track)
+
+    ## Train or import model
+    if global_config["is_loaded"]:
+        model_manager.load_models(global_config["model_path"])
+    else:
+        # Seperate dataset into train and test set
+        # TODO: Fix random seed 
+        dataset_train, dataset_test = data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+        # Train models
+        model_manager.train_models(dataset_train, global_config["num_train_epochs"])
+        # Test models
+
 
     ## Init tracks
     track_manager = TrackManager(global_config)

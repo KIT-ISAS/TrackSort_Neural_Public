@@ -43,7 +43,7 @@ class ModelManager(object):
         current_free_entries (set): Set of all dead free entries in batches
     """
 
-    def __init__(self, global_config, data_source, model_config):
+    def __init__(self, global_config, data_source, model_config, is_loaded, num_time_steps):
         """Initialize a model manager.
 
         Creates the expert manager and gating network.
@@ -53,13 +53,15 @@ class ModelManager(object):
             global_config (dict): To be removed
             data_source (object): To be moved to training and test functions
             model_config (dict):  The json tree containing all information about the experts, gating network and weighting function
-
+            num_time_steps (int): The number of timesteps in the longest track
         """
         # TODO what variables do we need?
         self.global_config = global_config
 
         # The manager of all the models
-        self.expert_manager = Expert_Manager(global_config, model_config.get('experts'), data_source)
+        self.expert_manager = Expert_Manager(global_config, model_config.get('experts'), data_source,
+                                             is_loaded, model_config.get('model_path'), model_config.get('batch_size'),
+                                             num_time_steps)
         # The gating network that calculates all weights
         self.create_gating_network(model_config.get('gating'))
         
@@ -87,13 +89,75 @@ class ModelManager(object):
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
     # TODO create train, test and evaluate functions for single-target tracking
-    def train_models(self):
+    def train_models(self, dataset_train, num_train_epochs = 1000):
         """Train all experts and the gating network.
 
         The training information of each model should be provided in the configuration json.
+
+        Args:
+            dataset_train (dict): All training samples in the correct format for various models
+            num_train_epochs (int): Number of epochs for training the overall model
         """
-        # Right now only the RNN needs training. Adjust this function with increasing complexity.
-        self.expert_manager.train_models()
+        for epoch in range(num_train_epochs):
+            # TODO: Implement lr decay
+            """
+            # learning rate decay after 100 epochs
+            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
+                old_lr = K.get_value(optimizer.lr)
+                new_lr = old_lr * self.global_config['lr_decay_factor']
+                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+                K.set_value(optimizer.lr, new_lr)
+            """
+            for (batch_n, (inp, target)) in enumerate(dataset_train):
+                self.expert_manager.train_batch(inp, target)
+            """
+            mse = np.mean(mse_batch)
+            mae = np.mean(mae_batch)
+            train_losses.append([epoch, mse, mae * self.data_source.normalization_constant])
+
+            log_string = "{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], mse)
+
+            # Evaluate
+            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
+                    or (epoch + 1) == self.global_config['num_train_epochs']:
+                logging.info(log_string)
+                test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
+                test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
+            else:
+                logging.debug(log_string)
+            """
+        """
+        # Visualize loss curve
+        train_losses = np.array(train_losses)
+        test_losses = np.array(test_losses)
+
+        # MSE
+        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
+        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
+        plt.legend(loc="upper right")
+        plt.yscale('log')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
+        plt.clf()
+
+        # MAE
+        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
+        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
+        plt.legend(loc="upper right")
+        plt.yscale('log')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
+        plt.clf()
+        """
+
+    def load_models(self, model_path):
+        """Load experts and gating network from path.
+
+        Args:
+            model_path (string): Path to saved models
+
+        Todo:
+            Implement load function
+        """
+        pass
 
     def predict_all(self):
         """Predict the next position with all experts.

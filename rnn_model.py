@@ -348,21 +348,9 @@ def get_state(rnn_model):
 
 
 class RNN_Model(object):
-    def __init__(self, global_config, rnn_config, data_source):
-        self.global_config = global_config
-        self.data_source = data_source
+    def __init__(self, is_next_step, rnn_config = {}):
         self.rnn_config = rnn_config
-        self._label_dim = 4 if self.global_config['separation_prediction'] else 2
-
-        if self.global_config['is_loaded']:
-            self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
-            logging.info(self.rnn_model.summary())
-            self.rnn_model.reset_states()
-        else:
-            if self.global_config['separation_prediction']:
-                self.train_separation_prediction()
-            else:
-                self.train()
+        self._label_dim = 2 if is_next_step else 4
 
     def get_zero_state(self):
         self.rnn_model.reset_states()
@@ -381,18 +369,55 @@ class RNN_Model(object):
         new_state = get_state(self.rnn_model)
         return prediction, new_state
 
-    def train(self):
-        self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
-                                                            num_time_steps=self.data_source.longest_track,
-                                                            output_dim=self._label_dim,
-                                                            **self.rnn_config)
+    def create_model(self, batch_size, num_time_steps):
+        """Create a new RNN model.
+
+        Args:
+            batch_size (int):            The batch size of the data
+            num_time_steps (int):        The number of timesteps in the longest track
+        """
+        self.rnn_model, self.model_hash = rnn_model_factory(batch_size=batch_size, num_time_steps=num_time_steps, 
+                                                           output_dim=self._label_dim, **self.rnn_config.get("model_structure"))
         logging.info(self.rnn_model.summary())
-        # TODO add batch size and test train split to function call
-        dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+        self.rnn_model.reset_states()
+        self.optimizer = tf.keras.optimizers.Adam()
+        self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer)
 
-        optimizer = tf.keras.optimizers.Adam()
-        train_step_fn = train_step_generator(self.rnn_model, optimizer)
+    def load_model(self, model_path):
+        """Load a RNN model from the given model path.
 
+        Args:
+            model_path (String): The path to the model file
+        """
+        self.rnn_model = tf.keras.models.load_model(model_path)
+        logging.info(self.rnn_model.summary())
+        self.rnn_model.reset_states()
+
+    def train_batch(self, inp, target):
+        """Train the rnn model on a batch of data.
+
+        Args:
+            inp (tf.Tensor): A batch of input tracks
+            target (tf.Tensor): The prediction targets to the inputs
+
+        Returns
+            mse (double): Mean squared error of training on this batch
+            mae (double): Mean abs error of training on this batch
+        """
+        if self.rnn_config.get("clear_state"):
+            self.rnn_model.reset_states()
+        return self.train_step_fn(inp, target)
+
+    def save_model(self, model_path):
+        """Saves the model to the given path.
+
+        Args:
+            model_path: The path to save the model to.
+        """
+        self.rnn_model.save(model_path)
+
+    """
+    def train(self):
         # dict(epoch->float)
         train_losses = []
         test_losses = []
@@ -454,6 +479,7 @@ class RNN_Model(object):
         plt.yscale('log')
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
         plt.clf()
+    """
 
     def train_separation_prediction(self):
         dataset_train, dataset_test, num_time_steps = self.data_source.get_tf_data_sets_seq2seq_with_separation_data(

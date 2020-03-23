@@ -33,7 +33,7 @@ class Expert_Manager(object):
         n_experts (int):        The number of experts in the expert bank.
     """
     
-    def __init__(self, global_config, expert_config, data_source):
+    def __init__(self, global_config, expert_config, data_source, is_loaded, model_path="", batch_size=64, num_time_steps=0):
         """Initialize an expert manager.
 
         Creates the expert models.
@@ -43,6 +43,10 @@ class Expert_Manager(object):
             expert_config (dict): The configuration dictionary of all experts
             data_source:   TODO remove
             global_config: TODO remove
+            is_loaded (Boolean):  True for loading models, False for creating new models
+            model_path (String):  The path of the models if is_loaded is True
+            batch_size (int):     The batch size of the data
+            num_time_steps (int): The number of timesteps in the longest track
         """
         self.expert_config = expert_config
         # TODO: Remove global config and data source
@@ -50,14 +54,22 @@ class Expert_Manager(object):
         self.data_source = data_source
         # List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []
-        self.create_models(expert_config)
+        self.create_models(is_loaded, model_path, batch_size, num_time_steps)
         self.n_experts = len(self.experts)
 
-    def create_models(self):
+    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0):
         """Create list of experts.
 
         Creat experts based on self.expert_cofig.
         Add empty list to list of states for each expert.
+        Load experts from model_path if is_loaded is True.
+        Create new experts if is_loaded is False.
+
+        Args:
+            is_loaded (Boolean):  True for loading models, False for creating new models
+            model_path (String):  The path of the models if is_loaded is True
+            batch_size (int):     The batch size of the data
+            num_time_steps (int): The number of timesteps in the longest track
         """
         self.experts = []
 
@@ -66,8 +78,11 @@ class Expert_Manager(object):
             expert_type = expert.get("type")
             if expert_type == 'RNN':
                 # Create RNN model
-                rnn_model = RNN_Model(self.global_config, expert.get("options"), self.data_source)
-                rnn_model.rnn_model.reset_states()
+                rnn_model = RNN_Model(True, expert.get("options"))
+                if is_loaded:
+                    rnn_model.load_model(model_path)
+                else:
+                    rnn_model.create_model(batch_size, num_time_steps)
                 self.experts.append(rnn_model)
                 self.current_states.append([])
             elif expert_type == 'KalmanFilter':
@@ -83,13 +98,16 @@ class Expert_Manager(object):
             else:
                 logging.warning("Expert type " + expert_type + " not supported. Will not create model.")
 
-    def train_models(self):
-        """Train all experts.
+    def train_batch(self, inp, target):
+        """Train one batch for all experts.
 
         The training information of each model should be provided in the expert configuration.
         """
         for expert in self.experts:
-            expert.train()
+            mse, mae = expert.train_batch(inp, target)
+            #mse_batch.append(mse)
+            #mae_batch.append(mae)
+        
 
     def create_new_track(self, batch_nr, idx, measurement):
         """Create a new track with the given measurement in an existing batch at position idx.
