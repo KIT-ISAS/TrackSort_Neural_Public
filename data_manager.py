@@ -406,12 +406,12 @@ class AbstractDataSet(ABC):
             for i in range(beginning, track.shape[0]):
                 if np.all(np.isnan(track[i])):
                     return i
-            return i
+            return i+1
         else:
             for i in range(beginning, track.shape[0]):
                 if np.all(track[i] == [self.nan_value, self.nan_value]):
                     return i
-            return i
+            return i+1
 
     def get_first_timestep_of_track(self, track, use_nan=False):
         if use_nan:
@@ -440,6 +440,17 @@ class AbstractDataSet(ABC):
         return longest_track
 
     def _convert_aligned_tracks_to_seq2seq_data(self, aligned_track_data):
+        """Create input to target data from aligned tracks.
+
+        The output format will be:
+        x_input, y_input, x_output, y_output
+
+        Args:
+            aligned_track_data (np.array): The tracks in format: [n_tracks, length_tracks, 2]
+
+        Returns:
+            np.array of sequence to sequence data (seq2seq)
+        """
         assert self.longest_track is not None, "self.longest_track not set"
         logging.info("longest_track={}".format(self.longest_track))
         seq2seq_data = []
@@ -447,32 +458,17 @@ class AbstractDataSet(ABC):
         # for every track we create:
         #  x, y, x_target, y_target nan_value-padded
         for track_number in range(aligned_track_data.shape[0]):
-            # make sure the last entry of the input arrays are nan-values
-            x = aligned_track_data[track_number][:, 0]
-            x = np.concatenate((x[:-1], np.array([self.nan_value])))
-            y = aligned_track_data[track_number][:, 1]
-            y = np.concatenate((y[:-1], np.array([self.nan_value])))
+            last_index = self.get_last_timestep_of_track(aligned_track_data[track_number]) - 1
+            input_array = aligned_track_data[track_number, 0:last_index]
+            output_array = aligned_track_data[track_number, 1:last_index+1]
+            seq2seq_array = np.hstack((input_array, output_array))
+            # make sure the last entry of the arrays are nan-values
+            n_nan = self.longest_track - last_index
+            seq2seq_array = np.concatenate((seq2seq_array, np.full((n_nan, 4), self.nan_value)))
 
-            # remove the last input because we have no target for it
-            last_index = self.get_last_timestep_of_track(x) - 1
-            x[last_index] = self.nan_value
-            y[last_index] = self.nan_value
+            seq2seq_data.append(seq2seq_array)
 
-            # the ground truth where the particle will be
-            x_target = np.concatenate((aligned_track_data[track_number][1:, 0].copy(), np.array([self.nan_value])))
-            y_target = np.concatenate((aligned_track_data[track_number][1:, 1].copy(), np.array([self.nan_value])))
-
-            input_matrix = np.vstack((x, y, x_target, y_target))
-
-            # initialize the array with nan-value
-            matrix = np.ones([self.longest_track, self.input_dim * 2]) * self.nan_value
-
-            # insert the data of the track into the zero background (example: nan-value=0 -> black background)
-            matrix[0:x.size, 0:self.input_dim * 2] = input_matrix.T
-
-            seq2seq_data.append(matrix)
-
-        return np.array(seq2seq_data)[:, :self.longest_track + 1, :]
+        return np.array(seq2seq_data)
 
     def get_box_plot(self, model, dataset):
         maes = []

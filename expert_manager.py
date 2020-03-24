@@ -9,7 +9,7 @@ Todo:
 """
 
 import logging
-#import tensorflow as tf
+import tensorflow as tf
 import numpy as np
 import code
 
@@ -102,11 +102,25 @@ class Expert_Manager(object):
         """Train one batch for all experts.
 
         The training information of each model should be provided in the expert configuration.
+
+        Args:
+            inp (tf.Tensor):    Input tensor of tracks
+            target (tf.Tensor): Target tensor of tracks
+
+        Returns:
+            mse_list (list): Mean squared error for each expert
+            mae_list (list): Mean abs error for each expert
         """
+        mse_list = []
+        mae_list = []
         for expert in self.experts:
             mse, mae = expert.train_batch(inp, target)
-            #mse_batch.append(mse)
-            #mae_batch.append(mae)
+            if tf.is_tensor(mse):
+                mse = mse.numpy()
+                mae = mae.numpy()
+            mse_list.append(mse)
+            mae_list.append(mae)
+        return mse_list, mae_list
         
 
     def create_new_track(self, batch_nr, idx, measurement):

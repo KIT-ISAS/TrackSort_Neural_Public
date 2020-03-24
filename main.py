@@ -190,7 +190,7 @@ def run_global_config(global_config, experiment_series_names=''):
     
     # calc mean vel in first time step
 
-    """
+    
     sum_v = 0
     c = 0
     for track in data_source.aligned_track_data:
@@ -202,7 +202,7 @@ def run_global_config(global_config, experiment_series_names=''):
     for track in data_source.aligned_track_data:
         var_sum = var_sum + ((track[1,0] - track[0,0])/dt - mean_v)**2
     var_v = var_sum/c
-
+    """
     cv_model = CV_Model(dt = dt, s_w = 10E7)
     # Test CV model
     c = 0
@@ -231,7 +231,7 @@ def run_global_config(global_config, experiment_series_names=''):
         model_config = json.load(f)
         
     # [TEST] of training
-    global_config["is_loaded"] = False
+    #global_config["is_loaded"] = False
     ## Initialize models
     model_manager = ModelManager(global_config, data_source, model_config, global_config["is_loaded"], data_source.longest_track)
 

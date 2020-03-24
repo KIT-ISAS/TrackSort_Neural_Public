@@ -89,7 +89,7 @@ class ModelManager(object):
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
     # TODO create train, test and evaluate functions for single-target tracking
-    def train_models(self, dataset_train, num_train_epochs = 1000):
+    def train_models(self, dataset_train, num_train_epochs = 1000, evaluate_every_n_epochs=20):
         """Train all experts and the gating network.
 
         The training information of each model should be provided in the configuration json.
@@ -98,6 +98,7 @@ class ModelManager(object):
             dataset_train (dict): All training samples in the correct format for various models
             num_train_epochs (int): Number of epochs for training the overall model
         """
+        train_losses = []
         for epoch in range(num_train_epochs):
             # TODO: Implement lr decay
             """
@@ -108,24 +109,35 @@ class ModelManager(object):
                 logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
                 K.set_value(optimizer.lr, new_lr)
             """
+            mse_batch = []
+            mae_batch = []
             for (batch_n, (inp, target)) in enumerate(dataset_train):
-                self.expert_manager.train_batch(inp, target)
-            """
-            mse = np.mean(mse_batch)
-            mae = np.mean(mae_batch)
-            train_losses.append([epoch, mse, mae * self.data_source.normalization_constant])
+                mse_list, mae_list = self.expert_manager.train_batch(inp, target)
+                mse_batch.append(mse_list)
+                mae_batch.append(mae_list)
+                stop=0
 
-            log_string = "{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], mse)
+            mean_mse = np.mean(np.array(mse_batch), 0)
+            mean_mae = np.mean(np.array(mae_batch), 0)
+            total_mse = np.mean(mean_mse)
+            total_mae = np.mean(mean_mae)
+            stop = 0
+            
+            train_losses.append([epoch, total_mse, total_mae * self.data_source.normalization_constant])
+
+            log_string = "{}/{}: \t loss={}".format(epoch, num_train_epochs, total_mse)
 
             # Evaluate
-            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
-                    or (epoch + 1) == self.global_config['num_train_epochs']:
+            if (epoch + 1) % sevaluate_every_n_epochs == 0 \
+                    or (epoch + 1) == num_train_epochs:
                 logging.info(log_string)
+            """
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
             else:
                 logging.debug(log_string)
             """
+            
         """
         # Visualize loss curve
         train_losses = np.array(train_losses)
