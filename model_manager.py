@@ -11,6 +11,7 @@ import logging
 import tensorflow as tf
 import numpy as np
 import code  # code.interact(local=dict(globals(), **locals()))
+import time
 
 #from tensorflow.keras import backend as K
 
@@ -100,6 +101,7 @@ class ModelManager(object):
         """
         train_losses = []
         for epoch in range(num_train_epochs):
+            start_time = time.time()
             # TODO: Implement lr decay
             """
             # learning rate decay after 100 epochs
@@ -123,12 +125,13 @@ class ModelManager(object):
             total_mae = np.mean(mean_mae)
             stop = 0
             
-            train_losses.append([epoch, total_mse, total_mae * self.data_source.normalization_constant])
+            train_losses.append([epoch, total_mse, total_mae]) #total_mae * self.data_source.normalization_constant
 
             log_string = "{}/{}: \t loss={}".format(epoch, num_train_epochs, total_mse)
-
+            end_time = time.time()
+            logging.info("Batch trained, time needed: " + str(end_time - start_time))
             # Evaluate
-            if (epoch + 1) % sevaluate_every_n_epochs == 0 \
+            if (epoch + 1) % evaluate_every_n_epochs == 0 \
                     or (epoch + 1) == num_train_epochs:
                 logging.info(log_string)
             """
