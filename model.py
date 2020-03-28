@@ -20,7 +20,7 @@ rnn_models = {
 def rnn_model_factory(
         num_units_first_rnn=1024, num_units_second_rnn=16, num_units_third_rnn=0, num_units_fourth_rnn=0,
         num_units_first_dense=0, num_units_second_dense=0, num_units_third_dense=0, num_units_fourth_dense=0,
-        rnn_model_name='lstm', dropout=0.0,
+        rnn_model_name='lstm', dropout=0.0, regularization=0.0,
         use_batchnorm_on_dense=True,
         num_time_steps=35, batch_size=128, nan_value=0, input_dim=2, output_dim=2,
         unroll=True, stateful=True):
@@ -78,7 +78,12 @@ def rnn_model_factory(
                                 stateful=stateful,
                                 name='rnn-{}'.format(rnn_layer_count),
                                 recurrent_initializer='glorot_uniform',
-                                unroll=unroll))
+                                unroll=unroll,
+                                recurrent_regularizer=tf.keras.regularizers.l2(regularization),
+                                bias_regularizer=tf.keras.regularizers.l2(regularization),
+                                kernel_regularizer=tf.keras.regularizers.l2(regularization)
+                                )
+                      )
             rnn_layer_count += 1
 
     # Add the dense layers
@@ -91,7 +96,10 @@ def rnn_model_factory(
             hash_ += "-dense[{}, leakyrelu]".format(units_in_dense_layer)
             if dropout > 0.0:
                 model.add(tf.keras.layers.Dropout(dropout))
-            model.add(tf.keras.layers.Dense(units_in_dense_layer))
+            model.add(tf.keras.layers.Dense(units_in_dense_layer,
+                                            bias_regularizer=tf.keras.regularizers.l2(regularization),
+                                            kernel_regularizer=tf.keras.regularizers.l2(regularization)
+                                            ))
             model.add(tf.keras.layers.LeakyReLU(alpha=0.2))
             if use_batchnorm_on_dense:
                 model.add(tf.keras.layers.BatchNormalization())
@@ -101,7 +109,10 @@ def rnn_model_factory(
     # - two outputs (x, y)
     # - or: three outputs (x, y, y_separation)
     # - or: four outputs (x, y, y_separation, t_separation)
-    model.add(tf.keras.layers.Dense(output_dim))
+    model.add(tf.keras.layers.Dense(output_dim,
+                                    bias_regularizer=tf.keras.regularizers.l2(regularization),
+                                    kernel_regularizer=tf.keras.regularizers.l2(regularization)
+                                    ))
 
     hash_ += "-dense[{}]".format(output_dim)
 
