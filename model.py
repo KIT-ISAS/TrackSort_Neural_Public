@@ -212,8 +212,8 @@ def train_step_separation_prediction_generator(model,
                 temporal_mse = K.sum(temporal_mse) / K.sum(mask)
                 temporal_mae = K.sum(temporal_mae) / K.sum(mask)
 
-            mse = pred_mse + spatial_mse + temporal_mse
-            mae = pred_mae + spatial_mae + temporal_mae
+            mse = pred_mse + spatial_mse + temporal_mse + tf.add_n(model.losses)
+            mae = pred_mae + spatial_mae + temporal_mae + tf.add_n(model.losses)
 
         if apply_gradients:
             grads = tape.gradient(mse, model.trainable_variables)
@@ -267,8 +267,8 @@ def train_step_generator(model, optimizer, nan_value=0):
             mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
 
             # take average w.r.t. the number of unmasked entries
-            mse = K.sum(mse) / K.sum(mask)
-            mae = K.sum(mae) / K.sum(mask)
+            mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
+            mae = K.sum(mae) / K.sum(mask) + tf.add_n(model.losses)
 
         grads = tape.gradient(mse, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
