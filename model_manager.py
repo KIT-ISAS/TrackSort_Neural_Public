@@ -2,7 +2,6 @@
 
 Todo:
     * Add train and test method
-    * Move data_source to training and test methods
     * Convert np representation to tensor representation for mixture of experts
 """
 
@@ -43,22 +42,20 @@ class ModelManager(object):
         current_free_entries (set): Set of all dead free entries in batches
     """
 
-    def __init__(self, data_source, model_config, is_loaded, num_time_steps, overwriting_activated=True):
+    def __init__(self, model_config, is_loaded, num_time_steps, overwriting_activated=True):
         """Initialize a model manager.
 
         Creates the expert manager and gating network.
         Initializes attributes.
 
         Args:
-            data_source (object): To be moved to training and test functions
             model_config (dict):  The json tree containing all information about the experts, gating network and weighting function
             num_time_steps (int): The number of timesteps in the longest track
             overwriting_activated (Boolean): Should expired tracks in batches be overwritten with new tracks
         """
         # The manager of all the models
-        self.expert_manager = Expert_Manager(model_config.get('experts'), data_source,
-                                             is_loaded, model_config.get('model_path'), model_config.get('batch_size'),
-                                             num_time_steps)
+        self.expert_manager = Expert_Manager(model_config.get('experts'), is_loaded, model_config.get('model_path'), 
+                                             model_config.get('batch_size'), num_time_steps)
         # The gating network that calculates all weights
         self.create_gating_network(model_config.get('gating'))
         self.overwriting_activated = overwriting_activated

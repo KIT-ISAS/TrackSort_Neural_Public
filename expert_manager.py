@@ -2,7 +2,6 @@
 
 Todo:
     * Add train and test method
-    * Move data_source to training and test methods
     * Convert np representation to tensor representation for mixture of experts
     * Understand state buffering for RNN
 """
@@ -32,7 +31,7 @@ class Expert_Manager(object):
         n_experts (int):        The number of experts in the expert bank.
     """
     
-    def __init__(self, expert_config, data_source, is_loaded, model_path="", batch_size=64, num_time_steps=0):
+    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0):
         """Initialize an expert manager.
 
         Creates the expert models.
@@ -40,7 +39,6 @@ class Expert_Manager(object):
 
         Args:
             expert_config (dict): The configuration dictionary of all experts
-            data_source:   TODO remove
             is_loaded (Boolean):  True for loading models, False for creating new models
             model_path (String):  The path of the models if is_loaded is True
             batch_size (int):     The batch size of the data
@@ -48,8 +46,6 @@ class Expert_Manager(object):
         """
         self.expert_config = expert_config
         self.batch_size = batch_size
-        # TODO: Remove global config and data source
-        self.data_source = data_source
         # List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []
         self.create_models(is_loaded, model_path, batch_size, num_time_steps)
