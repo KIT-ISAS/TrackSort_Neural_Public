@@ -41,5 +41,18 @@
     "options": {
 
     }
+  },
+  "data_association": {
+    "association_config": {
+      "distance_threshold": 0.02,
+      "positional_probabilities": 0.0,
+      "is_alive_probability_weighting": 0.0,
+      "matching_algorithm": "global"
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
   }
 }

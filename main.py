@@ -249,9 +249,11 @@ def run_global_config(global_config, experiment_series_names=''):
 
 
     ## Init tracks
-    track_manager = TrackManager(global_config.get('Track'))
+    track_manager = TrackManager(model_config.get('data_association').get('track_config'))
 
-    data_association = DataAssociation(global_config)
+    data_association = DataAssociation(global_config.get('num_timesteps'), global_config.get('CsvDataSet').get('rotate_columns'),
+                                       global_config.get("visualization_path"), global_config.get("visualize"),
+                                       **model_config.get('data_association').get('association_config'))
     particles = data_source.get_particles()
     tracks = data_association.associate_data(data_source, track_manager, model_manager)
 
