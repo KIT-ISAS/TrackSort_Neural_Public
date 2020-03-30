@@ -9,7 +9,7 @@ import logging
 import tensorflow as tf
 import numpy as np
 
-#from moviepy.editor import ImageSequenceClip
+from moviepy.editor import ImageSequenceClip
 from track_manager import TrackManager
 from model_manager import ModelManager
 from data_association import DataAssociation
@@ -140,7 +140,7 @@ global_config = {
     'state_overwriting_started': False,
     'overwriting_activated': args.overwriting_activated,
     'verbose': 1,
-    'visualize': False,
+    'visualize': True,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
     'test_noise_robustness': args.test_noise_robustness,
@@ -249,7 +249,7 @@ def run_global_config(global_config, experiment_series_names=''):
 
 
     ## Init tracks
-    track_manager = TrackManager(global_config)
+    track_manager = TrackManager(global_config.get('Track'))
 
     data_association = DataAssociation(global_config)
     particles = data_source.get_particles()

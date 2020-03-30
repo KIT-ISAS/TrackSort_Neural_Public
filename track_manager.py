@@ -1,3 +1,9 @@
+"""Track Manager.
+
+TODO:
+    * Add docstring
+"""
+
 import logging
 
 from model_manager import ModelManager
@@ -6,11 +12,11 @@ import code
 
 
 class TrackManager(object):
-    def __init__(self, global_config):
-        self.global_config = global_config
+    def __init__(self, track_config):
         self.tracks = {}
         self.active_ids = []
-        self.currently_highest_id = 0
+        self.currently_highest_id = -1
+        self.track_config = track_config
 
     def real_track_real_measurement(self, global_track_id, measurement, model_manager):
         """ 
@@ -34,17 +40,14 @@ class TrackManager(object):
             return False
 
     def pseudo_track_real_measurement(self, measurement, current_timestep, model_manager):
-        """ 
-        Create a new track
+        """Create a new track.
         Add the given measurement to a new track and increases the global_track_id
-        Return the global_track_id
+        Return the global track id of the newly created track.
         """
-        global_track_id = self.currently_highest_id
-        self.global_config['highest_id'] = global_track_id
         self.currently_highest_id += 1
+        global_track_id = self.currently_highest_id
         self.active_ids.append(global_track_id)
-        self.tracks[global_track_id] = Track(self.global_config, current_timestep, measurement,
-                                             **self.global_config['Track'])
+        self.tracks[global_track_id] = Track(current_timestep, measurement, **self.track_config)
         model_manager.create_by_id(global_track_id, measurement)
         return global_track_id
 
@@ -57,3 +60,7 @@ class TrackManager(object):
 
     def get_alive_probability(self, track_id):
         return self.tracks[track_id].is_alive_probability
+
+    def get_highest_track_id(self):
+        """Return the current highest track ID."""
+        return self.currently_highest_id

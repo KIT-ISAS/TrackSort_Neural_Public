@@ -1,9 +1,14 @@
+"""Track.
+
+TODO:
+    * Add docstring
+"""
+
 class Track(object):
-    def __init__(self, global_config, initial_timestep, first_measurement,
+    def __init__(self, initial_timestep, first_measurement,
                  initial_is_alive_probability=0.5,
                  is_alive_increase=0.5,
                  is_alive_decrease=0.25):
-        self.global_config = global_config
         self.measurements = [first_measurement]
         self.initial_timestep = initial_timestep
         self.is_alive_probability = initial_is_alive_probability
