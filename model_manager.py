@@ -108,16 +108,17 @@ class ModelManager(object):
             """
             mse_batch = []
             mae_batch = []
+            prediction_batch = []
             for (batch_n, (inp, target)) in enumerate(dataset_train):
-                mse_list, mae_list = self.expert_manager.train_batch(inp, target)
-                mse_batch.append(mse_list)
-                mae_batch.append(mae_list)
+                prediction_batch.append(self.expert_manager.train_batch(inp, target))
+                """mse_batch.append(mse_list)
+                mae_batch.append(mae_list)"""
                 stop=0
 
-            mean_mse = np.mean(np.array(mse_batch), 0)
+            """mean_mse = np.mean(np.array(mse_batch), 0)
             mean_mae = np.mean(np.array(mae_batch), 0)
             total_mse = np.mean(mean_mse)
-            total_mae = np.mean(mean_mae)
+            total_mae = np.mean(mean_mae)"""
             stop = 0
             
             train_losses.append([epoch, total_mse, total_mae]) #total_mae * self.data_source.normalization_constant

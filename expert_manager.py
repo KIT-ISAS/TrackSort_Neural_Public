@@ -102,19 +102,19 @@ class Expert_Manager(object):
             target (tf.Tensor): Target tensor of tracks
 
         Returns:
-            mse_list (list): Mean squared error for each expert
-            mae_list (list): Mean abs error for each expert
+            predictions (list): Predictions for each expert
         """
         mse_list = []
         mae_list = []
+        prediction_list = []
         for expert in self.experts:
-            mse, mae = expert.train_batch(inp, target)
-            if tf.is_tensor(mse):
+            prediction_list.append(expert.train_batch(inp, target))
+            """if tf.is_tensor(mse):
                 mse = mse.numpy()
                 mae = mae.numpy()
             mse_list.append(mse)
-            mae_list.append(mae)
-        return mse_list, mae_list
+            mae_list.append(mae)"""
+        return prediction_list
         
 
     def create_new_track(self, batch_nr, idx, measurement):

@@ -85,8 +85,7 @@ class KF_Model(ABC):
             target (tf.Tensor): The prediction targets to the inputs
 
         Returns
-            mse (double): Mean squared error of training on this batch
-            mae (double): Mean abs error of training on this batch
+            prediction (tf.Tensor): Predicted positions for training instances
         """
         pass
 

@@ -210,10 +210,9 @@ def train_step_separation_prediction_generator(model,
 
 
 def train_step_generator(model, optimizer, nan_value=0):
-    """
-    Build a function which returns a computational graph for tensorflow.
-    This function can be called to train the given model with the given
-    optimizer.
+    """Build a function which returns a computational graph for tensorflow.
+
+    This function can be called to train the given model with the given optimizer.
 
     :param model: model according to estimator api
     :param optimizer: tf estimator
@@ -258,7 +257,7 @@ def train_step_generator(model, optimizer, nan_value=0):
         grads = tape.gradient(mse, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        return mse, mae
+        return predictions
 
     return train_step
 
@@ -402,8 +401,7 @@ class RNN_Model(object):
             target (tf.Tensor): The prediction targets to the inputs
 
         Returns
-            mse (double): Mean squared error of training on this batch
-            mae (double): Mean abs error of training on this batch
+            prediction (tf.Tensor): Predicted positions for training instances
         """
         if self.clear_state:
             self.rnn_model.reset_states()
