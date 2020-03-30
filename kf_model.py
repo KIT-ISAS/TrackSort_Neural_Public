@@ -85,7 +85,7 @@ class KF_Model(ABC):
             target (tf.Tensor): The prediction targets to the inputs
 
         Returns
-            prediction (tf.Tensor): Predicted positions for training instances
+            prediction (np.array): Predicted positions for training instances
         """
         pass
 

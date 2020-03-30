@@ -69,6 +69,8 @@ class ModelManager(object):
         self.current_batches = dict()
         self.current_free_entries = set()
 
+        self.mask_value = np.array([.0, .0])
+
     def create_gating_network(self, gating_config):
         """Create the gating network.
 
@@ -110,27 +112,40 @@ class ModelManager(object):
             mae_batch = []
             prediction_batch = []
             for (batch_n, (inp, target)) in enumerate(dataset_train):
-                prediction_batch.append(self.expert_manager.train_batch(inp, target))
-                """mse_batch.append(mse_list)
-                mae_batch.append(mae_list)"""
+                predictions = self.expert_manager.train_batch(inp, target)
+                prediction_batch.append(predictions)
+                target_np = target.numpy()
+
+                # Calulate MSE for each expert
+                mse = []
+                for i in range(len(predictions)):
+                    mask = np.all(np.equal(target_np, self.mask_value), axis=2)
+                    mse_pos = ((target_np - predictions[i])**2).mean(axis=2)
+                    masked_mse_pos = np.ma.array(mse_pos, mask=mask)
+                    mse_expert = masked_mse_pos.mean(axis=1).mean(axis=0)
+                    mse.append(mse_expert)
+
+
+                mse_batch.append(mse)
                 stop=0
 
-            """mean_mse = np.mean(np.array(mse_batch), 0)
-            mean_mae = np.mean(np.array(mae_batch), 0)
-            total_mse = np.mean(mean_mse)
-            total_mae = np.mean(mean_mae)"""
+            mean_mse = np.mean(np.array(mse_batch), axis=0)
+
+            #total_mse = np.mean(mean_mse) --> does not make sense
+            
             stop = 0
             
-            train_losses.append([epoch, total_mse, total_mae]) #total_mae * self.data_source.normalization_constant
 
-            log_string = "{}/{}: \t loss={}".format(epoch, num_train_epochs, total_mse)
+            log_string = "{}/{}: \t loss={}".format(epoch, num_train_epochs, mean_mse)
             end_time = time.time()
             logging.info("Batch trained, time needed: " + str(end_time - start_time))
+            logging.info(log_string)
             # Evaluate
+            """
             if (epoch + 1) % evaluate_every_n_epochs == 0 \
                     or (epoch + 1) == num_train_epochs:
                 logging.info(log_string)
-            """
+            
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
             else:

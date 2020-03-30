@@ -108,12 +108,12 @@ class Expert_Manager(object):
         mae_list = []
         prediction_list = []
         for expert in self.experts:
-            prediction_list.append(expert.train_batch(inp, target))
-            """if tf.is_tensor(mse):
-                mse = mse.numpy()
-                mae = mae.numpy()
-            mse_list.append(mse)
-            mae_list.append(mae)"""
+            prediction = expert.train_batch(inp, target)
+            if tf.is_tensor(prediction):
+                prediction = prediction.numpy()
+
+            prediction_list.append(prediction)
+            
         return prediction_list
         
 

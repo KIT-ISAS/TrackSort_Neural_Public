@@ -45,28 +45,37 @@ class CV_Model(KF_Model):
         super().__init__(F, C_w, H, C_v, default_state_options)
 
     def train_batch(self, inp, target):
-        """Train the cv model on a batch of data."""
+        """Train the cv model on a batch of data.
+        
+        TODO: 
+            * Move MSE, MAE calculation to model manager
+        """
         np_inp = inp.numpy()
         np_target = target.numpy()
-        predictions = []
+        predictions = np.zeros(np_target.shape)
+        """
         all_mse = []
         mse_sum = 0
         all_mae = []
         mae_sum = 0
         c = 0
+        """
+        
+        # For each track in batch
         for i in range(np_inp.shape[0]):
             cv_state = CV_State(np_inp[i, 0], **self.default_state_options)
-            mse_track = []
-            mae_track = []
-            track_prediction = []
+            #+mse_track = []
+            #mae_track = []
+            # For each instance in track
             for j in range(np_inp.shape[1]):
+                # Check if track is still alive
                 if np.all(np.isclose(np_target[i, j],[0.0, 0.0])) == False:
                     # update
                     self.update(cv_state, np_inp[i, j])
                     # predict
                     self.predict(cv_state)
-                    pos = cv_state.get_pos()
-                    track_prediction.append(pos)
+                    predictions[i, j, :] = [cv_state.get_pos()[0], cv_state.get_pos()[1]]
+                    """
                     current_mse = (pos[0]-np_target[i, j, 0])**2 + (pos[1]-np_target[i, j, 1])**2
                     mse_track.append(current_mse.item(0))
                     mse_sum = mse_sum + current_mse.item(0)
@@ -74,12 +83,13 @@ class CV_Model(KF_Model):
                     mae_track.append(current_mae.item(0)) 
                     mae_sum = mae_sum + current_mae.item(0)  
                     c = c+1
-            all_mse.append(mse_track)
-            all_mae.append(mae_track)
-            predictions.append(np.array(track_prediction))
-        mse = mse_sum/c
-        mae = mae_sum/c
-        return np.array(predictions)
+                    """
+            #all_mse.append(mse_track)
+            #all_mae.append(mae_track)
+            
+        #mse = mse_sum/c
+        #mae = mae_sum/c
+        return predictions
 
     def get_zero_state(self, batch_size):
         """Return a list of dummy CV_States."""
