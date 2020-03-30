@@ -1,7 +1,6 @@
 """Expert Manager.
 
 Todo:
-    * Delete global_config
     * Add train and test method
     * Move data_source to training and test methods
     * Convert np representation to tensor representation for mixture of experts
@@ -33,7 +32,7 @@ class Expert_Manager(object):
         n_experts (int):        The number of experts in the expert bank.
     """
     
-    def __init__(self, global_config, expert_config, data_source, is_loaded, model_path="", batch_size=64, num_time_steps=0):
+    def __init__(self, expert_config, data_source, is_loaded, model_path="", batch_size=64, num_time_steps=0):
         """Initialize an expert manager.
 
         Creates the expert models.
@@ -42,15 +41,14 @@ class Expert_Manager(object):
         Args:
             expert_config (dict): The configuration dictionary of all experts
             data_source:   TODO remove
-            global_config: TODO remove
             is_loaded (Boolean):  True for loading models, False for creating new models
             model_path (String):  The path of the models if is_loaded is True
             batch_size (int):     The batch size of the data
             num_time_steps (int): The number of timesteps in the longest track
         """
         self.expert_config = expert_config
+        self.batch_size = batch_size
         # TODO: Remove global config and data source
-        self.global_config = global_config
         self.data_source = data_source
         # List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []
@@ -160,7 +158,7 @@ class Expert_Manager(object):
                 # Create new entry for CV model
                 if len(self.current_states[i]) <= batch_nr:
                     # Create new batch
-                    self.current_states[i].append(expert.get_zero_state(self.global_config.get("batch_size")))
+                    self.current_states[i].append(expert.get_zero_state(self.batch_size))
 
                 # Update existing batch
                 self.current_states[i][batch_nr][idx] = CV_State(measurement, **expert.default_state_options)

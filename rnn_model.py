@@ -349,7 +349,8 @@ def get_state(rnn_model):
 
 class RNN_Model(object):
     def __init__(self, is_next_step, rnn_config = {}):
-        self.rnn_config = rnn_config
+        self.model_structure = rnn_config.get("model_structure")
+        self.clear_state = rnn_config.get("clear_state")
         self._label_dim = 2 if is_next_step else 4
 
     def get_zero_state(self):
@@ -377,7 +378,7 @@ class RNN_Model(object):
             num_time_steps (int):        The number of timesteps in the longest track
         """
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=batch_size, num_time_steps=num_time_steps, 
-                                                           output_dim=self._label_dim, **self.rnn_config.get("model_structure"))
+                                                           output_dim=self._label_dim, **self.model_structure)
         logging.info(self.rnn_model.summary())
         self.rnn_model.reset_states()
         self.optimizer = tf.keras.optimizers.Adam()
@@ -404,12 +405,12 @@ class RNN_Model(object):
             mse (double): Mean squared error of training on this batch
             mae (double): Mean abs error of training on this batch
         """
-        if self.rnn_config.get("clear_state"):
+        if self.clear_state:
             self.rnn_model.reset_states()
         return self.train_step_fn(inp, target)
 
     def save_model(self, model_path):
-        """Saves the model to the given path.
+        """Save the model to the given path.
 
         Args:
             model_path: The path to save the model to.
@@ -538,8 +539,8 @@ class RNN_Model(object):
             _ = self.rnn_model.reset_states()
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 # Mini-Batches
-                if self.global_config['clear_state']:
-                    _ = self.rnn_model.reset_states()
+                if self.clear_state:
+                    self.rnn_model.reset_states()
                 errors = train_step_fn(inp, target)
                 errors_in_one_batch.append(errors)
 
@@ -558,8 +559,8 @@ class RNN_Model(object):
                 _ = self.rnn_model.reset_states()
                 for (batch_n, (inp, target)) in enumerate(dataset_test):
                     # Mini-Batches
-                    if self.global_config['clear_state']:
-                        _ = self.rnn_model.reset_states()
+                    if self.clear_state:
+                        self.rnn_model.reset_states()
                     errors = test_step_fn(inp, target)
                     errors_in_one_batch.append(errors)
 
@@ -601,6 +602,11 @@ class RNN_Model(object):
         plt.clf()
 
     def _evaluate_model(self, dataset_test, epoch):
+        """Plot boxplot of MSE and MAE.
+
+        TODO: Move evaluation functions into seperate class.
+                This function should only return the predictions.
+        """
         mses = np.array([])
         maes = np.array([])
 
@@ -609,8 +615,8 @@ class RNN_Model(object):
 
         _ = self.rnn_model.reset_states()
         for input_batch, target_batch in dataset_test:
-            if self.global_config['clear_state']:
-                _ = self.rnn_model.reset_states()
+            if selfclear_state:
+                self.rnn_model.reset_states()
 
             batch_predictions = self.rnn_model(input_batch)
 
@@ -664,8 +670,8 @@ class RNN_Model(object):
 
         hidden = self.rnn_model.reset_states()
         for input_batch, target_batch in dataset_test:
-            if self.global_config['clear_state']:
-                _ = self.rnn_model.reset_states()
+            if self.clear_state:
+                self.rnn_model.reset_states()
 
             batch_predictions = self.rnn_model(input_batch)
             batch_predictions_np = batch_predictions.numpy()

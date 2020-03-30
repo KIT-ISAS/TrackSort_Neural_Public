@@ -1,7 +1,6 @@
 """Model Manager.
 
 Todo:
-    * Delete global_config
     * Add train and test method
     * Move data_source to training and test methods
     * Convert np representation to tensor representation for mixture of experts
@@ -44,27 +43,26 @@ class ModelManager(object):
         current_free_entries (set): Set of all dead free entries in batches
     """
 
-    def __init__(self, global_config, data_source, model_config, is_loaded, num_time_steps):
+    def __init__(self, data_source, model_config, is_loaded, num_time_steps, overwriting_activated=True):
         """Initialize a model manager.
 
         Creates the expert manager and gating network.
         Initializes attributes.
 
         Args:
-            global_config (dict): To be removed
             data_source (object): To be moved to training and test functions
             model_config (dict):  The json tree containing all information about the experts, gating network and weighting function
             num_time_steps (int): The number of timesteps in the longest track
+            overwriting_activated (Boolean): Should expired tracks in batches be overwritten with new tracks
         """
-        # TODO what variables do we need?
-        self.global_config = global_config
-
         # The manager of all the models
-        self.expert_manager = Expert_Manager(global_config, model_config.get('experts'), data_source,
+        self.expert_manager = Expert_Manager(model_config.get('experts'), data_source,
                                              is_loaded, model_config.get('model_path'), model_config.get('batch_size'),
                                              num_time_steps)
         # The gating network that calculates all weights
         self.create_gating_network(model_config.get('gating'))
+        self.overwriting_activated = overwriting_activated
+        self.batch_size = model_config.get('batch_size')
         
         self.current_inputs = {}
         self.current_inputs[-1] = [0.0, 0.0]
@@ -232,7 +230,7 @@ class ModelManager(object):
         """
         self.current_is_alive[global_track_id] = False
         # Free the entry in this batch if overwriting is activated
-        if self.global_config['overwriting_activated']:
+        if self.overwriting_activated:
             self.current_free_entries.add(self.current_batches.get(global_track_id))
 
     def create_by_id(self, global_track_id, measurement):
@@ -252,16 +250,16 @@ class ModelManager(object):
             (batch_nr, idx) = self.current_free_entries.pop()
         else:
             # create new batch
-            self.current_ids.append(-np.ones([self.global_config['batch_size']], dtype=np.int32))
+            self.current_ids.append(-np.ones(self.batch_size, dtype=np.int32))
             batch_nr = len(self.current_ids)-1
             idx = 0
             # declare all entries in new batch as free
-            for i in range(self.global_config['batch_size']):
+            for i in range(self.batch_size):
                 self.current_free_entries.add((batch_nr, i))
             # remove first entry from free list
             self.current_free_entries.remove((batch_nr, 0))
             if batch_nr > 0:
-                logging.info('batch ' + str(batch_nr) + ' is constructed now at timestep ' + str(self.global_config['current_time_step']) + '!')
+                logging.info('batch ' + str(batch_nr) + ' is constructed!')
                 # code.interact(local=dict(globals(), **locals()))
 
         # Fill free entry with new track

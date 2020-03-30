@@ -233,7 +233,8 @@ def run_global_config(global_config, experiment_series_names=''):
     # [TEST] of training
     #global_config["is_loaded"] = False
     ## Initialize models
-    model_manager = ModelManager(global_config, data_source, model_config, global_config["is_loaded"], data_source.longest_track)
+    model_manager = ModelManager(data_source, model_config, global_config.get("is_loaded"), 
+                                data_source.longest_track, global_config.get("overwriting_activated"))
 
     ## Train or import model
     if global_config["is_loaded"]:
