@@ -116,6 +116,23 @@ class Expert_Manager(object):
             
         return prediction_list
         
+    def test_batch(self, inp):
+        """Run predictions for all experts on a batch of test data.
+
+        Args:
+            inp (tf.Tensor): Input tensor of tracks
+
+        Returns:
+            prediction_list: Predictions of all experts
+        """
+        prediction_list = []
+        for expert in self.experts:
+            prediction = expert.predict_batch(inp)
+            if tf.is_tensor(prediction):
+                prediction = prediction.numpy()
+
+            prediction_list.append(prediction)
+        return prediction_list
 
     def create_new_track(self, batch_nr, idx, measurement):
         """Create a new track with the given measurement in an existing batch at position idx.
@@ -198,3 +215,6 @@ class Expert_Manager(object):
         
         return np.array(all_predictions)
 
+    def get_n_experts(self):
+        """Return n_experts."""
+        return self.n_experts

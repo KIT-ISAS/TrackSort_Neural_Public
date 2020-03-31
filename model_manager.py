@@ -16,6 +16,7 @@ import time
 from expert_manager import Expert_Manager
 from weighting_function import weighting_function
 from ensemble import Simple_Ensemble
+from evaluation_functions import *
 
 #tf.keras.backend.set_floatx('float64')
 
@@ -60,7 +61,8 @@ class ModelManager(object):
         self.create_gating_network(model_config.get('gating'))
         self.overwriting_activated = overwriting_activated
         self.batch_size = model_config.get('batch_size')
-        
+        self.num_time_steps = num_time_steps
+
         self.current_inputs = {}
         self.current_inputs[-1] = [0.0, 0.0]
         self.current_ids = []
@@ -114,6 +116,12 @@ class ModelManager(object):
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 predictions = self.expert_manager.train_batch(inp, target)
                 prediction_batch.append(predictions)
+                
+                if (epoch + 1) % evaluate_every_n_epochs == 0 \
+                    or (epoch + 1) == num_train_epochs:
+                    find_worst_predictions(inp, target, predictions, self.mask_value)
+
+
                 target_np = target.numpy()
 
                 # Calulate MSE for each expert
@@ -127,6 +135,8 @@ class ModelManager(object):
 
 
                 mse_batch.append(mse)
+
+                
                 stop=0
 
             mean_mse = np.mean(np.array(mse_batch), axis=0)
@@ -173,6 +183,31 @@ class ModelManager(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
         plt.clf()
         """
+
+    def test_models(self, dataset_test):
+        """Test model performance on test dataset and create evaluations.
+
+        Args:
+            dataset_test (tf.Tensor): Batches of test data
+        """
+        predictions = []
+        targets = []
+        n_batches = 0
+        for (batch_n, (inp, target)) in enumerate(dataset_test):
+            prediction = self.expert_manager.test_batch(inp)
+            predictions.append(np.array(prediction))
+            targets.append(target)
+            n_batches += 1
+        
+        # Reshape the data to get rid of the batches.
+        np_predictions = np.zeros([self.expert_manager.get_n_experts(), n_batches*self.batch_size, self.num_time_steps, 2])
+        np_targets = np.zeros([n_batches*self.batch_size, self.num_time_steps, 2])
+        for i in range(n_batches):
+            np_predictions[:, i*self.batch_size:(i+1)*self.batch_size, :, :] = np.array(predictions[i])
+            np_targets[i*self.batch_size:(i+1)*self.batch_size, :, :] = targets[i].numpy()
+
+        calculate_mse(np_targets, np_predictions, self.mask_value)
+        find_worst_predictions(np_targets, np_predictions, self.mask_value)
 
     def load_models(self, model_path):
         """Load experts and gating network from path.

@@ -89,6 +89,16 @@ class KF_Model(ABC):
         """
         pass
 
+    def predict_batch(self, inp):
+        """Predict a batch of input data for testing.
+
+        Args:
+            inp (tf.Tensor): A batch of input tracks
+
+        Returns
+            prediction (np.array): Predicted positions for training instances
+        """
+    
     @abstractmethod
     def get_zero_state(self, batch_size):
         """Return a list of dummy states of correct size for the corresponding model.

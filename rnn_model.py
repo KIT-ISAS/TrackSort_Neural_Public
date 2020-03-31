@@ -406,6 +406,9 @@ class RNN_Model(object):
         if self.clear_state:
             self.rnn_model.reset_states()
         return self.train_step_fn(inp, target)
+    def predict_batch(self, inp):
+        """Predict a batch of input data."""
+        return self.rnn_model(inp)
 
     def save_model(self, model_path):
         """Save the model to the given path.

@@ -8,6 +8,7 @@ import logging
 
 import tensorflow as tf
 import numpy as np
+import matplotlib.pyplot as plt
 
 from moviepy.editor import ImageSequenceClip
 from track_manager import TrackManager
@@ -41,7 +42,7 @@ parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
 parser.add_argument('--matching_algorithm', default='global', choices=['local', 'global'],
                     help='The algorithm, that is used for matching.')
-parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv',
+parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv',
                     help='The directory of the data set. Only needed for CsvDataset.')
 parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDataset', 'CsvDataset'],
                     help='The type of the dataset.')
@@ -52,7 +53,7 @@ parser.add_argument('--config_path', default="configs/default_config.json",
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
-parser.add_argument('--num_train_epochs', type=int, default=100, help='Only necessary, when model is trained.')
+parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
 parser.add_argument('--lr_decay_after_epochs', type=int, default=150, help='When to decrease the lr by lr_decay_factor')
 parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='When learning rate should be decreased, '
                                                                        'multiply with this')
@@ -62,7 +63,7 @@ parser.add_argument('--birth_rate_mean', type=float, default=5.0,
 parser.add_argument('--birth_rate_std', type=float, default=2.0,
                     help='The birth_rate_std value, that is used by the DataManager')
 parser.add_argument('--normalization_constant', type=float, default=None, help='Normalization value')
-parser.add_argument('--evaluate_every_n_epochs', type=int, default=20)
+parser.add_argument('--evaluate_every_n_epochs', type=int, default=50)
 parser.add_argument('--time_normalization_constant', type=float, default=22.0, help='Normalization for time prediction')
 parser.add_argument('--min_number_detections', type=int, default=6,
                     help='The min_number_detections value, that is used by the DataManager')
@@ -236,17 +237,19 @@ def run_global_config(global_config, experiment_series_names=''):
     model_manager = ModelManager(model_config, global_config.get("is_loaded"), 
                                 data_source.longest_track, global_config.get("overwriting_activated"))
 
+    # Seperate dataset into train and test set
+    # TODO: Fix random seed 
+    dataset_train, dataset_test = data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+
     ## Train or import model
     if global_config["is_loaded"]:
         model_manager.load_models(global_config["model_path"])
     else:
-        # Seperate dataset into train and test set
-        # TODO: Fix random seed 
-        dataset_train, dataset_test = data_source.get_tf_data_sets_seq2seq_data(normalized=True)
         # Train models
         model_manager.train_models(dataset_train, global_config["num_train_epochs"])
-        # Test models
 
+    ## Test models
+    model_manager.test_models(dataset_test)
 
     ## Init tracks
     track_manager = TrackManager(model_config.get('data_association').get('track_config'))
