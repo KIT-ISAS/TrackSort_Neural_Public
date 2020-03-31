@@ -10,8 +10,9 @@ import tensorflow as tf
 import numpy as np
 import code  # code.interact(local=dict(globals(), **locals()))
 import time
+import datetime
 
-#from tensorflow.keras import backend as K
+from tensorflow.keras import backend as K
 
 from expert_manager import Expert_Manager
 from weighting_function import weighting_function
@@ -99,6 +100,17 @@ class ModelManager(object):
             num_train_epochs (int): Number of epochs for training the overall model
         """
         train_losses = []
+        train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
+        loss_object = tf.keras.losses.MeanSquaredError()
+        k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
+        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # TODO: Create a tensorboard folder and writer for every expert
+        train_log_dir = 'logs/gradient_tape/' + current_time + '/train'
+        test_log_dir = 'logs/gradient_tape/' + current_time + '/test'
+        train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+        test_summary_writer = tf.summary.create_file_writer(test_log_dir)
+
+
         for epoch in range(num_train_epochs):
             start_time = time.time()
             # TODO: Implement lr decay
@@ -117,11 +129,15 @@ class ModelManager(object):
                 predictions = self.expert_manager.train_batch(inp, target)
                 prediction_batch.append(predictions)
                 
-                if (epoch + 1) % evaluate_every_n_epochs == 0 \
-                    or (epoch + 1) == num_train_epochs:
-                    find_worst_predictions(inp, target, predictions, self.mask_value)
+                mask = K.all(K.equal(inp, k_mask_value), axis=-1)
+                mask = 1 - K.cast(mask, tf.float64)
+                mask = K.cast(mask, tf.float64)
+                #TODO: Loss for all models
+                loss = loss_object(target, predictions[0], sample_weight = mask)
+                train_loss(loss)
 
 
+                """
                 target_np = target.numpy()
 
                 # Calulate MSE for each expert
@@ -135,11 +151,21 @@ class ModelManager(object):
 
 
                 mse_batch.append(mse)
-
+                """
                 
                 stop=0
 
-            mean_mse = np.mean(np.array(mse_batch), axis=0)
+            with train_summary_writer.as_default():
+                tf.summary.scalar('loss', train_loss.result(), step=epoch)
+
+            template = 'Epoch {}, Loss: {}'
+            logging.info((template.format(epoch+1,
+                                          train_loss.result())))
+
+            # Reset metrics every epoch
+            train_loss.reset_states()
+
+            """mean_mse = np.mean(np.array(mse_batch), axis=0)
 
             #total_mse = np.mean(mean_mse) --> does not make sense
             
@@ -150,6 +176,8 @@ class ModelManager(object):
             end_time = time.time()
             logging.info("Batch trained, time needed: " + str(end_time - start_time))
             logging.info(log_string)
+            """
+
             # Evaluate
             """
             if (epoch + 1) % evaluate_every_n_epochs == 0 \

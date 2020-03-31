@@ -209,7 +209,7 @@ def train_step_separation_prediction_generator(model,
     return train_step
 
 
-def train_step_generator(model, optimizer, nan_value=0):
+def train_step_generator(model, optimizer, loss_object, nan_value=0):
     """Build a function which returns a computational graph for tensorflow.
 
     This function can be called to train the given model with the given optimizer.
@@ -236,7 +236,7 @@ def train_step_generator(model, optimizer, nan_value=0):
     """
     # the placeholder character used for padding
     mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
-
+    
     @tf.function
     def train_step(inp, target):
         with tf.GradientTape() as tape:
@@ -247,14 +247,14 @@ def train_step_generator(model, optimizer, nan_value=0):
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
-            mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
+            loss = loss_object(target, predictions, sample_weight = mask)
+            #mae = tf.keras.losses.mean_absolute_error(target, predictions, sample_weight = mask)
 
             # take average w.r.t. the number of unmasked entries
-            mse = K.sum(mse) / K.sum(mask)
-            mae = K.sum(mae) / K.sum(mask)
+            #mse = K.sum(mse) / K.sum(mask)
+            #mae = K.sum(mae) / K.sum(mask)
 
-        grads = tape.gradient(mse, model.trainable_variables)
+        grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
         return predictions
@@ -381,7 +381,8 @@ class RNN_Model(object):
         logging.info(self.rnn_model.summary())
         self.rnn_model.reset_states()
         self.optimizer = tf.keras.optimizers.Adam()
-        self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer)
+        self.loss_object = tf.keras.losses.MeanSquaredError()
+        self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer, self.loss_object)
 
     def load_model(self, model_path):
         """Load a RNN model from the given model path.
