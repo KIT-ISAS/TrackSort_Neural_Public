@@ -1050,9 +1050,12 @@ class CsvDataSet(AbstractDataSet):
         We use this function to reduce the correlation between
         """
 
+        tracks_copy = np.copy(aligned_tracks)
+
         # copy tracks and add a small epsilon in order to deduplicate observations
         epsilon = 0.0000001
-        tracks_copy = np.copy(aligned_tracks) + epsilon
+        noise = np.random.normal(loc=0.0, scale=epsilon, size=tracks_copy.shape) * (tracks_copy != self.nan_value)
+        tracks_copy += noise
 
         n_timesteps = tracks_copy.shape[1]
         new_random_track_beginnings = np.random.randint(self.min_number_detections,
