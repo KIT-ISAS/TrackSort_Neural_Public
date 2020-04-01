@@ -259,8 +259,8 @@ def train_kendall_step_generator(model, optimizer, nan_value=0.0):
             neg_log_likelihood = K.sum(neg_log_likelihood) / K.sum(mask) + tf.add_n(model.losses)
 
             # following lines are for logging metric
-            mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
-            mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
+            mse = tf.keras.losses.mean_squared_error(target, predictions[:, :, 2]) * mask
+            mae = tf.keras.losses.mean_absolute_error(target, predictions[:, :, 2]) * mask
             mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
             mae = K.sum(mae) / K.sum(mask) + tf.add_n(model.losses)
 
