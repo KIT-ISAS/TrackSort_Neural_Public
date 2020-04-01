@@ -90,25 +90,40 @@ class ModelManager(object):
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
     # TODO create train, test and evaluate functions for single-target tracking
-    def train_models(self, dataset_train, num_train_epochs = 1000, evaluate_every_n_epochs=20):
+    def train_models(self, dataset_train, dataset_test, num_train_epochs = 1000, evaluate_every_n_epochs=20):
         """Train all experts and the gating network.
 
         The training information of each model should be provided in the configuration json.
 
         Args:
-            dataset_train (dict): All training samples in the correct format for various models
-            num_train_epochs (int): Number of epochs for training the overall model
+            dataset_train (dict):           All training samples in the correct format for various models
+            dataset_test (dict):            All testing samples for evaluating the trained models
+            num_train_epochs (int):         Number of epochs for training
+            evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
         """
         train_losses = []
-        train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
+        
+        # Define a loss function: MSE
         loss_object = tf.keras.losses.MeanSquaredError()
+        # Mask value for keras
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        # TODO: Create a tensorboard folder and writer for every expert
-        train_log_dir = 'logs/gradient_tape/' + current_time + '/train'
-        test_log_dir = 'logs/gradient_tape/' + current_time + '/test'
-        train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-        test_summary_writer = tf.summary.create_file_writer(test_log_dir)
+        # Create a tensorboard folder and writer for every expert
+        expert_names = self.expert_manager.get_expert_names()
+        train_log_dirs = []
+        test_log_dirs = []
+        train_summary_writers = []
+        test_summary_writers = []
+        # Define a metric for calculating the train loss: MEAN
+        train_losses = []
+        test_losses = []
+        for name in expert_names:
+            train_log_dirs.append('logs/gradient_tape/' + current_time + '/' + name +'/train')
+            test_log_dirs.append('logs/gradient_tape/' + current_time + '/' + name + '/test')
+            train_summary_writers.append(tf.summary.create_file_writer(train_log_dirs[-1]))
+            test_summary_writers.append(tf.summary.create_file_writer(test_log_dirs[-1]))
+            train_losses.append(tf.keras.metrics.Mean('train_loss', dtype=tf.float32))
+            test_losses.append(tf.keras.metrics.Mean('train_loss', dtype=tf.float32))
 
 
         for epoch in range(num_train_epochs):
@@ -122,95 +137,59 @@ class ModelManager(object):
                 logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
                 K.set_value(optimizer.lr, new_lr)
             """
-            mse_batch = []
-            mae_batch = []
-            prediction_batch = []
+            #prediction_batch = []
             for (batch_n, (inp, target)) in enumerate(dataset_train):
+                # Train experts on a batch
                 predictions = self.expert_manager.train_batch(inp, target)
-                prediction_batch.append(predictions)
-                
+                # Save predictions
+                #prediction_batch.append(predictions)
+                # Create a mask for end of tracks
                 mask = K.all(K.equal(inp, k_mask_value), axis=-1)
                 mask = 1 - K.cast(mask, tf.float64)
                 mask = K.cast(mask, tf.float64)
-                #TODO: Loss for all models
-                loss = loss_object(target, predictions[0], sample_weight = mask)
-                train_loss(loss)
-
-
-                """
-                target_np = target.numpy()
-
-                # Calulate MSE for each expert
-                mse = []
+                # Calculate loss for all models
                 for i in range(len(predictions)):
-                    mask = np.all(np.equal(target_np, self.mask_value), axis=2)
-                    mse_pos = ((target_np - predictions[i])**2).mean(axis=2)
-                    masked_mse_pos = np.ma.array(mse_pos, mask=mask)
-                    mse_expert = masked_mse_pos.mean(axis=1).mean(axis=0)
-                    mse.append(mse_expert)
+                    loss = loss_object(target, predictions[i], sample_weight = mask)
+                    train_losses[i](loss)
+            
+            for i in range(len(train_summary_writers)):
+                with train_summary_writers[i].as_default():
+                    tf.summary.scalar('loss', train_losses[i].result(), step=epoch)
 
-
-                mse_batch.append(mse)
-                """
-                
-                stop=0
-
-            with train_summary_writer.as_default():
-                tf.summary.scalar('loss', train_loss.result(), step=epoch)
-
-            template = 'Epoch {}, Loss: {}'
+            template = 'Epoch {}, Train Losses: {}'
             logging.info((template.format(epoch+1,
-                                          train_loss.result())))
+                                          [train_loss.result().numpy() for train_loss in train_losses])))
 
             # Reset metrics every epoch
-            train_loss.reset_states()
+            for train_loss in train_losses:
+                train_loss.reset_states()
 
-            """mean_mse = np.mean(np.array(mse_batch), axis=0)
-
-            #total_mse = np.mean(mean_mse) --> does not make sense
-            
-            stop = 0
-            
-
-            log_string = "{}/{}: \t loss={}".format(epoch, num_train_epochs, mean_mse)
-            end_time = time.time()
-            logging.info("Batch trained, time needed: " + str(end_time - start_time))
-            logging.info(log_string)
-            """
-
-            # Evaluate
-            """
+            # Run trained models on the test set every n epochs
             if (epoch + 1) % evaluate_every_n_epochs == 0 \
                     or (epoch + 1) == num_train_epochs:
-                logging.info(log_string)
-            
-                test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
-                test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
-            else:
-                logging.debug(log_string)
-            """
-            
-        """
-        # Visualize loss curve
-        train_losses = np.array(train_losses)
-        test_losses = np.array(test_losses)
 
-        # MSE
-        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
-        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
-        plt.legend(loc="upper right")
-        plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
-        plt.clf()
+                for (batch_n, (inp, target)) in enumerate(dataset_test):
+                    # Train experts on a batch
+                    predictions = self.expert_manager.test_batch(inp)
+                    # Create a mask for end of tracks
+                    mask = K.all(K.equal(inp, k_mask_value), axis=-1)
+                    mask = 1 - K.cast(mask, tf.float64)
+                    mask = K.cast(mask, tf.float64)
+                    # Calculate loss for all models
+                    for i in range(len(predictions)):
+                        loss = loss_object(target, predictions[i], sample_weight = mask)
+                        test_losses[i](loss)
+               
+                for i in range(len(test_summary_writers)):
+                    with test_summary_writers[i].as_default():
+                        tf.summary.scalar('loss', test_losses[i].result(), step=epoch)
 
-        # MAE
-        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
-        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
-        plt.legend(loc="upper right")
-        plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
-        plt.clf()
-        """
+                template = 'Epoch {}, Test Losses: {}'
+                logging.info((template.format(epoch+1,
+                                            [test_loss.result().numpy() for test_loss in test_losses])))
+            
+        # Save all models
+        self.expert_manager.save_models()
 
     def test_models(self, dataset_test):
         """Test model performance on test dataset and create evaluations.

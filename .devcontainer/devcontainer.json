@@ -30,7 +30,10 @@
 	// "postCreateCommand": "apt-get update && apt-get install -y git",
 
 	// Uncomment when using a ptrace-based debugger like C++, Go, and Rust
-	"runArgs": [ "--gpus=all"],
+	"runArgs": [ "--gpus=all",
+							 "--net", "host",
+        			 "-e", "DISPLAY=${env:DISPLAY}",
+               "-v", "/tmp/.X11-unix:/tmp/.X11-unix"],
 
 	// Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-in-docker.
 	// "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ],

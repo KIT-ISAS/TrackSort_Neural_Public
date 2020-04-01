@@ -48,6 +48,7 @@ class Expert_Manager(object):
         self.batch_size = batch_size
         # List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []
+        self.experts = []
         self.create_models(is_loaded, model_path, batch_size, num_time_steps)
         self.n_experts = len(self.experts)
 
@@ -65,16 +66,15 @@ class Expert_Manager(object):
             batch_size (int):     The batch size of the data
             num_time_steps (int): The number of timesteps in the longest track
         """
-        self.experts = []
-
         for expert_name in self.expert_config:
             expert = self.expert_config.get(expert_name)
             expert_type = expert.get("type")
             if expert_type == 'RNN':
                 # Create RNN model
-                rnn_model = RNN_Model(True, expert_name, expert.get("options"))
+                model_path = expert.get("model_path")
+                rnn_model = RNN_Model(True, expert_name, model_path, expert.get("options"))
                 if is_loaded:
-                    rnn_model.load_model(model_path)
+                    rnn_model.load_model()
                 else:
                     rnn_model.create_model(batch_size, num_time_steps)
                 self.experts.append(rnn_model)
@@ -91,6 +91,11 @@ class Expert_Manager(object):
                     logging.warning("Kalman filter subtype " + sub_type + " not supported. Will not create model.") 
             else:
                 logging.warning("Expert type " + expert_type + " not supported. Will not create model.")
+
+    def save_models(self):
+        """Save all models to their model paths."""
+        for expert in self.experts:
+            expert.save_model()
 
     def train_batch(self, inp, target):
         """Train one batch for all experts.
@@ -218,3 +223,7 @@ class Expert_Manager(object):
     def get_n_experts(self):
         """Return n_experts."""
         return self.n_experts
+
+    def get_expert_names(self):
+        """Return list of names."""
+        return [expert.name for expert in self.experts]

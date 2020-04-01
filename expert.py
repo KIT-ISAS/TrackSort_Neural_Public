@@ -22,15 +22,17 @@ class Expert(ABC):
         name (String):      The name of the expert (For evaluation and logging)
     """
 
-    def __init__(self, expert_type, name):
+    def __init__(self, expert_type, name, model_path = ""):
         """Initialize a new expert.
         
         Args:
             type (Expert_Type): The type of the expert
             name (String):      The name of the expert (For evaluation and logging)
+            model_path (String):The path to save or load the model
         """
         self.type = expert_type
         self.name = name
+        self.model_path = model_path
 
     @abstractmethod
     def train_batch(self, inp, target):
@@ -57,6 +59,16 @@ class Expert(ABC):
         Returns
             prediction (np.array or tf.Tensor): Predicted positions for training instances
         """
+        pass
+
+    @abstractmethod
+    def save_model(self):
+        """Save the model to its model path."""
+        pass
+
+    @abstractmethod
+    def load_model(self):
+        """Load the model from its model path."""
         pass
 
 class Expert_Type(Enum):

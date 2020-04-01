@@ -101,6 +101,19 @@ class KF_Model(Expert):
         """
         pass
 
+    def load_model(self):
+        """Load KF model.
+
+        Loading or saving not implemented for KF yet.
+        """
+        pass
+
+    def save_model(self):
+        """Save KF model.
+
+        Loading or saving not implemented for KF yet.
+        """
+        pass
 
 class KF_State(ABC):
     """The Kalman filter state saves information about the state and covariance matrix of a particle.

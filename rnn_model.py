@@ -351,11 +351,11 @@ class RNN_Model(Expert):
 
     __metaclass__ = Expert
 
-    def __init__(self, is_next_step, name, rnn_config = {}):
+    def __init__(self, is_next_step, name, model_path, rnn_config = {}):
         self.model_structure = rnn_config.get("model_structure")
         self.clear_state = rnn_config.get("clear_state")
         self._label_dim = 2 if is_next_step else 4
-        super().__init__(Expert_Type.RNN, name)
+        super().__init__(Expert_Type.RNN, name, model_path)
 
     def get_zero_state(self):
         self.rnn_model.reset_states()
@@ -389,13 +389,9 @@ class RNN_Model(Expert):
         self.loss_object = tf.keras.losses.MeanSquaredError()
         self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer, self.loss_object)
 
-    def load_model(self, model_path):
-        """Load a RNN model from the given model path.
-
-        Args:
-            model_path (String): The path to the model file
-        """
-        self.rnn_model = tf.keras.models.load_model(model_path)
+    def load_model(self):
+        """Load a RNN model from its model path."""
+        self.rnn_model = tf.keras.models.load_model(self.model_path)
         logging.info(self.rnn_model.summary())
         self.rnn_model.reset_states()
 
@@ -412,82 +408,14 @@ class RNN_Model(Expert):
         if self.clear_state:
             self.rnn_model.reset_states()
         return self.train_step_fn(inp, target)
+
     def predict_batch(self, inp):
         """Predict a batch of input data."""
         return self.rnn_model(inp)
 
-    def save_model(self, model_path):
-        """Save the model to the given path.
-
-        Args:
-            model_path: The path to save the model to.
-        """
-        self.rnn_model.save(model_path)
-
-    """
-    def train(self):
-        # dict(epoch->float)
-        train_losses = []
-        test_losses = []
-
-        # Train model
-        for epoch in range(self.global_config['num_train_epochs']):
-            # learning rate decay after 100 epochs
-            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
-                old_lr = K.get_value(optimizer.lr)
-                new_lr = old_lr * self.global_config['lr_decay_factor']
-                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-                K.set_value(optimizer.lr, new_lr)
-
-            # Train for one batch
-            mae_batch = []
-            mse_batch = []
-
-            _ = self.rnn_model.reset_states()
-            for (batch_n, (inp, target)) in enumerate(dataset_train):
-                # Mini-Batches
-                if self.global_config['clear_state']:
-                    _ = self.rnn_model.reset_states()
-                mse, mae = train_step_fn(inp, target)
-                mse_batch.append(mse)
-                mae_batch.append(mae)
-            mse = np.mean(mse_batch)
-            mae = np.mean(mae_batch)
-            train_losses.append([epoch, mse, mae * self.data_source.normalization_constant])
-
-            log_string = "{}/{}: \t loss={}".format(epoch, self.global_config['num_train_epochs'], mse)
-
-            # Evaluate
-            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
-                    or (epoch + 1) == self.global_config['num_train_epochs']:
-                logging.info(log_string)
-                test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
-                test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
-            else:
-                logging.debug(log_string)
-
-        self.rnn_model.save(os.path.join(self.global_config['diagrams_path'], 'model.h5'))
-
-        # Visualize loss curve
-        train_losses = np.array(train_losses)
-        test_losses = np.array(test_losses)
-
-        # MSE
-        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
-        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
-        plt.legend(loc="upper right")
-        plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
-        plt.clf()
-
-        # MAE
-        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
-        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
-        plt.legend(loc="upper right")
-        plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
-        plt.clf()
-    """
+    def save_model(self):
+        """Save the model to its model path."""
+        self.rnn_model.save(self.model_path)
 
     def train_separation_prediction(self):
         dataset_train, dataset_test, num_time_steps = self.data_source.get_tf_data_sets_seq2seq_with_separation_data(

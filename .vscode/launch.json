@@ -18,7 +18,11 @@
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
-            "args": ["--is_loaded", "False"]
+            "args": ["--is_loaded", "False", 
+                     "--config_path", "configs/train_pepper.json",
+                     "--num_train_epochs", "10",
+                     "--execute_evaluation", "False",
+                     "--execute_multi_target_tracking", "False"]
         },
         {
             "name": "Run training fake",

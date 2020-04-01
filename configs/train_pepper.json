@@ -1,9 +1,9 @@
 {
-  "model_path": "models/default_model.h5",
   "batch_size": 64,
   "experts": {
     "LSTM_1024_16": {
       "type": "RNN",
+      "model_path": "models/pepper/LSTM_1024_16.h5",
       "options": {
         "clear_state": true,
         "model_structure": {

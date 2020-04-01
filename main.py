@@ -94,6 +94,10 @@ parser.add_argument('--clear_state', type=str2bool, default=True,
                     help='Whether a new track should be initialized with empty state?')
 parser.add_argument('--overwriting_activated', type=str2bool, default=True,
                     help='Whether batches of the RNN are reused')
+parser.add_argument('--execute_evaluation', type=str2bool, default=True,
+                    help='Run evaluation after training/loading or not')
+parser.add_argument('--execute_multi_target_tracking', type=str2bool, default=True,
+                    help='Run multi-target tracking after training/loading or not')
 
 args = parser.parse_args()
 
@@ -147,7 +151,10 @@ global_config = {
     'test_noise_robustness': args.test_noise_robustness,
     'experiment_series': 'independent',
     'is_alive_probability_weighting': 0.0,
-    'positional_probabilities': 0.0
+    'positional_probabilities': 0.0,
+
+    'execute_evaluation': args.execute_evaluation,
+    'execute_multi_target_tracking': args.execute_multi_target_tracking
 }
 
 # setup logging
@@ -231,8 +238,6 @@ def run_global_config(global_config, experiment_series_names=''):
     with open(global_config["config_path"]) as f:
         model_config = json.load(f)
         
-    # [TEST] of training
-    #global_config["is_loaded"] = False
     ## Initialize models
     model_manager = ModelManager(model_config, global_config.get("is_loaded"), 
                                 data_source.longest_track, global_config.get("overwriting_activated"))
@@ -246,45 +251,51 @@ def run_global_config(global_config, experiment_series_names=''):
         model_manager.load_models(global_config["model_path"])
     else:
         # Train models
-        model_manager.train_models(dataset_train, global_config["num_train_epochs"])
+        model_manager.train_models(dataset_train, dataset_test, global_config["num_train_epochs"])
 
     ## Test models
-    model_manager.test_models(dataset_test)
+    # TODO:
+    #   * Test with an evaluation set instead of test set.
+    if global_config.get('execute_evaluation'):
+        model_manager.test_models(dataset_test)
 
-    ## Init tracks
-    track_manager = TrackManager(model_config.get('data_association').get('track_config'))
+    if global_config.get('execute_multi_target_tracking'):
+        ## Init tracks
+        track_manager = TrackManager(model_config.get('data_association').get('track_config'))
+        ## Run multi-target tracking
+        data_association = DataAssociation(global_config.get('num_timesteps'), global_config.get('CsvDataSet').get('rotate_columns'),
+                                        global_config.get("visualization_path"), global_config.get("visualize"),
+                                        **model_config.get('data_association').get('association_config'))
+        particles = data_source.get_particles()
+        tracks = data_association.associate_data(data_source, track_manager, model_manager)
 
-    data_association = DataAssociation(global_config.get('num_timesteps'), global_config.get('CsvDataSet').get('rotate_columns'),
-                                       global_config.get("visualization_path"), global_config.get("visualize"),
-                                       **model_config.get('data_association').get('association_config'))
-    particles = data_source.get_particles()
-    tracks = data_association.associate_data(data_source, track_manager, model_manager)
+        if global_config['visualize']:
+            shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
+            clip = ImageSequenceClip(global_config['visualization_path'], fps=4)
+            clip.write_videofile(global_config['visualization_video_path'], fps=4)
 
-    if global_config['visualize']:
-        shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
-        clip = ImageSequenceClip(global_config['visualization_path'], fps=4)
-        clip.write_videofile(global_config['visualization_video_path'], fps=4)
+        evaluator = Evaluator(global_config, particles, tracks)
+        accuracy_of_the_first_kind = 1.0 - evaluator.error_of_first_kind()
+        accuracy_of_the_second_kind = 1.0 - evaluator.error_of_second_kind()
+        score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (
+                accuracy_of_the_first_kind + accuracy_of_the_second_kind)
 
-    evaluator = Evaluator(global_config, particles, tracks)
-    accuracy_of_the_first_kind = 1.0 - evaluator.error_of_first_kind()
-    accuracy_of_the_second_kind = 1.0 - evaluator.error_of_second_kind()
-    score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (
-            accuracy_of_the_first_kind + accuracy_of_the_second_kind)
+        # save the current config
+        global_config['score'] = score
+        global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
+        global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
 
-    # save the current config
-    global_config['score'] = score
-    global_config['accuracy_of_the_first_kind'] = accuracy_of_the_first_kind
-    global_config['accuracy_of_the_second_kind'] = accuracy_of_the_second_kind
+        with open(global_config['json_file'], 'w') as file_:
+            json.dump(global_config, file_, sort_keys=True, indent=4)
 
-    with open(global_config['json_file'], 'w') as file_:
-        json.dump(global_config, file_, sort_keys=True, indent=4)
+        del data_association
+        del particles
+        del tracks
+        del global_config
 
-    del data_association
-    del particles
-    del tracks
-    del global_config
-
-    return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
+        return score, accuracy_of_the_first_kind, accuracy_of_the_second_kind
+    else:
+        return 0.0, 0.0, 0.0
 
 
 if not global_config['run_hyperparameter_search']:
