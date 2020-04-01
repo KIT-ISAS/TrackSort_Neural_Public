@@ -401,6 +401,7 @@ class Model(object):
 
             for _ in range(self.global_config['mc_samples']):
                 self.rnn_model.reset_states()
+                set_state(self.rnn_model, state)
 
                 # https://github.com/tensorflow/tensorflow/issues/34201
                 # ... eager execution bug with keras functions
@@ -415,6 +416,14 @@ class Model(object):
 
             prediction = sample_mean
             variances = sample_variance
+
+        elif self.global_config['kendall_loss']:
+            set_state(self.rnn_model, state)
+            prediction_and_variance = self.rnn_model(current_input).numpy()
+
+            prediction = np.copy(prediction_and_variance[:, :, :2])
+            variances = np.copy(K.exp(-prediction_and_variance[:, :, 2:4]))
+
         else:
             set_state(self.rnn_model, state)
             prediction = self.rnn_model(current_input)

@@ -94,7 +94,12 @@ parser.add_argument('--augment_beginning', type=str2bool, default=False,
 parser.add_argument('--mc_dropout', type=str2bool, default=False, help='Calculate uncertainties with MC Dropout')
 parser.add_argument('--mc_samples', type=int, default=5, help='MC Dropout: how many samples per track?')
 
+parser.add_argument('--kendall_loss', type=str2bool, default=False,
+                    help='Estimate Heteroscedastic Aleatoric Uncertainty (https://arxiv.org/pdf/1703.04977.pdf)')
+
 args = parser.parse_args()
+
+assert not all((args.kendall_loss, args.mc_dropout)), "Choose either MC Dropout or kendall_loss"
 
 global_config = {
     'separation_prediction': args.separation_prediction,
@@ -167,6 +172,8 @@ global_config = {
 
     'mc_dropout': args.mc_dropout,
     'mc_samples': args.mc_samples,
+
+    'kendall_loss': args.kendall_loss,
 
 }
 
