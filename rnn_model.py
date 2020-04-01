@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from tensorflow.keras import backend as K
+from expert import Expert, Expert_Type
 
 tf.keras.backend.set_floatx('float64')
 
@@ -346,11 +347,15 @@ def get_state(rnn_model):
     return rnn_layer_states
 
 
-class RNN_Model(object):
-    def __init__(self, is_next_step, rnn_config = {}):
+class RNN_Model(Expert):
+
+    __metaclass__ = Expert
+
+    def __init__(self, is_next_step, name, rnn_config = {}):
         self.model_structure = rnn_config.get("model_structure")
         self.clear_state = rnn_config.get("clear_state")
         self._label_dim = 2 if is_next_step else 4
+        super().__init__(Expert_Type.RNN, name)
 
     def get_zero_state(self):
         self.rnn_model.reset_states()

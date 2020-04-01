@@ -1,7 +1,7 @@
 """CV Kalman filter model and CV State.
 
 Todo:
-    * Convert np representation to tensor representation for mixture of experts
+    * (Convert np representation to tensor representation for mixture of experts)
 """
 
 import numpy as np
@@ -16,15 +16,16 @@ class CV_Model(KF_Model):
 
     __metaclass__ = KF_Model
 
-    def __init__(self, dt=0.005, s_w=10E7, s_v=2, default_state_options = {}):
+    def __init__(self, name, dt=0.005, s_w=10E7, s_v=2, default_state_options = {}):
         """Initialize a new model to track particles with the CV Kalman filter.
 
         Default values are for pixel representation if 1 Pixel = 0.056 mm
 
         Args:
-            dt=0.005:    The time difference between two measurements
-            s_w=10E7:    Power spectral density of particle noise (Highly dependent on particle type)
-            s_v=2:       Measurement noise variance (2 is default if input is in pixel)
+            name (String):      The name of the expert
+            dt=0.005 (double):  The time difference between two measurements
+            s_w=10E7 (double):  Power spectral density of particle noise (Highly dependent on particle type)
+            s_v=2 (double):     Measurement noise variance (2 is default if input is in pixel)
         """
         # Transition matrix
         F = np.matrix([[1, dt, 0, 0],
@@ -42,7 +43,7 @@ class CV_Model(KF_Model):
         # Measurement covariance matrix
         C_v = s_v * np.matrix(np.eye(2))
         
-        super().__init__(F, C_w, H, C_v, default_state_options)
+        super().__init__(name, F, C_w, H, C_v, default_state_options)
 
     def train_batch(self, inp, target):
         """Train the cv model on a batch of data."""

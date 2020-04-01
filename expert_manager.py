@@ -72,19 +72,19 @@ class Expert_Manager(object):
             expert_type = expert.get("type")
             if expert_type == 'RNN':
                 # Create RNN model
-                rnn_model = RNN_Model(True, expert.get("options"))
+                rnn_model = RNN_Model(True, expert_name, expert.get("options"))
                 if is_loaded:
                     rnn_model.load_model(model_path)
                 else:
                     rnn_model.create_model(batch_size, num_time_steps)
                 self.experts.append(rnn_model)
                 self.current_states.append([])
-            elif expert_type == 'KalmanFilter':
+            elif expert_type == 'KF':
                 # Create Kalman filter model
                 sub_type = expert.get("sub_type")
                 if sub_type == 'CV':
                     # Create constant velocity model
-                    cv_model = CV_Model(**expert.get("model_options"), default_state_options=expert.get("state_options"))
+                    cv_model = CV_Model(expert_name, **expert.get("model_options"), default_state_options=expert.get("state_options"))
                     self.experts.append(cv_model)
                     self.current_states.append([])
                 else:

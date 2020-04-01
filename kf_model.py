@@ -1,15 +1,15 @@
 """KF Model and KF State.
 
 Todo:
-    * Convert np representation to tensor representation for mixture of experts
-    * Implement training function
     * Implement CA Model (and more)
+    * (Convert np representation to tensor representation for mixture of experts)
 """
 
 import numpy as np
 from abc import ABC, abstractmethod
+from expert import Expert, Expert_Type
 
-class KF_Model(ABC):
+class KF_Model(Expert):
     """The Kalman filter model handles prediction and update of Kalman states.
 
     Has information about all constant matrices (F, C_w, H and C_v).
@@ -23,13 +23,16 @@ class KF_Model(ABC):
         default_state_options (dict): The options for creating a new state taken from the config file
     """
 
-    def __init__(self, F, C_w, H, C_v, default_state_options):
+    __metaclass__ = Expert
+
+    def __init__(self, name, F, C_w, H, C_v, default_state_options):
         """Initialize a new Kalman filter with given matrices."""
         self.F = F
         self.C_w = C_w
         self.H = H
         self.C_v = C_v
         self.default_state_options = default_state_options
+        super().__init__(Expert_Type.KF, name)
 
     def predict(self, current_state):
         """Execute the prediction step of the Kalman filter.
@@ -73,22 +76,6 @@ class KF_Model(ABC):
         else:
             current_state.first = False
 
-    @abstractmethod
-    def train_batch(self, inp, target):
-        """Train the kf model on a batch of data.
-
-        No training of Kalman filters available yet --> Will run prediction and return values.
-        Returns MSE and MAE of model on training batch.
-
-        Args:
-            inp (tf.Tensor): A batch of input tracks
-            target (tf.Tensor): The prediction targets to the inputs
-
-        Returns
-            prediction (np.array): Predicted positions for training instances
-        """
-        pass
-
     def predict_batch(self, inp):
         """Predict a batch of input data for testing.
 
@@ -98,6 +85,7 @@ class KF_Model(ABC):
         Returns
             prediction (np.array): Predicted positions for training instances
         """
+        pass
     
     @abstractmethod
     def get_zero_state(self, batch_size):

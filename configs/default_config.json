@@ -2,7 +2,7 @@
   "model_path": "models/default_model.h5",
   "batch_size": 64,
   "experts": {
-    "rnn1": {
+    "LSTM_1024_16": {
       "type": "RNN",
       "options": {
         "clear_state": true,
@@ -20,8 +20,8 @@
         }
       }
     },
-    "kf1": {
-      "type": "KalmanFilter",
+    "KF_CV_s_v3.6E-7": {
+      "type": "KF",
       "sub_type": "CV",
       "model_options": {
         "dt": 0.005,
