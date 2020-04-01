@@ -7,6 +7,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from tensorflow.keras import backend as K
+# issue with eager execution
+# https://github.com/tensorflow/tensorflow/issues/34201
+from tensorflow.python.keras import backend as K2
 
 tf.keras.backend.set_floatx('float64')
 
@@ -224,6 +227,51 @@ def train_step_separation_prediction_generator(model,
     return train_step
 
 
+def train_kendall_step_generator(model, optimizer, nan_value=0.0):
+    mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
+
+    @tf.function
+    def train_step(inp, target):
+        with tf.GradientTape() as tape:
+            target = K.cast(target, tf.float64)
+            predictions = model(inp)
+
+            mask = K.all(K.equal(inp, mask_value), axis=-1)
+            mask = 1 - K.cast(mask, tf.float64)
+            mask = K.cast(mask, tf.float64)
+
+            target_x = target[:, :, 0]
+            target_y = target[:, :, 1]
+
+            pos_pred_x = predictions[:, :, 0]
+            pos_pred_y = predictions[:, :, 1]
+
+            log_var_pred_x = predictions[:, :, 2]
+            log_var_pred_y = predictions[:, :, 3]
+
+            pos_loss_x = tf.keras.losses.mean_squared_error(target_x, pos_pred_x)
+            bnn_loss_x = K.exp(-log_var_pred_x) * pos_loss_x + log_var_pred_x
+
+            pos_loss_y = tf.keras.losses.mean_squared_error(target_y, pos_pred_y)
+            bnn_loss_y = K.exp(-log_var_pred_y) * pos_loss_y + log_var_pred_y
+
+            neg_log_likelihood = mask * (bnn_loss_x + bnn_loss_y)
+            neg_log_likelihood = K.sum(neg_log_likelihood) / K.sum(mask) + tf.add_n(model.losses)
+
+            # following lines are for logging metric
+            mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
+            mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
+            mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
+            mae = K.sum(mae) / K.sum(mask) + tf.add_n(model.losses)
+
+        grads = tape.gradient(neg_log_likelihood, model.trainable_variables)
+        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        return mse, mae, neg_log_likelihood
+
+    return train_step
+
+
 def train_step_generator(model, optimizer, nan_value=0):
     """
     Build a function which returns a computational graph for tensorflow.
@@ -367,7 +415,13 @@ class Model(object):
         self.global_config = global_config
         self.data_source = data_source
 
-        self._label_dim = 4 if self.global_config['separation_prediction'] else 2
+        # ToDo: implement uncertainties + separation prediction
+        self._label_dim = 2
+        if self.global_config['kendall_loss']:
+            self._label_dim += 2
+        if self.global_config['separation_prediction']:
+            self._label_dim += 2
+
         self._mc_dropout_predict_function = None
 
         if self.global_config['is_loaded']:
@@ -375,7 +429,9 @@ class Model(object):
             logging.info(self.rnn_model.summary())
             self.rnn_model.reset_states()
         else:
-            if self.global_config['separation_prediction']:
+            if self.global_config['kendall_loss']:
+                self.train_kendall()
+            elif self.global_config['separation_prediction']:
                 self.train_separation_prediction()
             else:
                 self.train()
@@ -398,21 +454,22 @@ class Model(object):
         if self.global_config['mc_dropout']:
             samples = []
             f = self._get_mc_dropout_predict_function()
+            mc_samples = self.global_config['mc_samples']
 
-            for _ in range(self.global_config['mc_samples']):
+            for _ in range(mc_samples):
                 self.rnn_model.reset_states()
                 set_state(self.rnn_model, state)
 
                 # https://github.com/tensorflow/tensorflow/issues/34201
                 # ... eager execution bug with keras functions
                 # mitigation: set learning_phase=1  =>  dropout is active
-                tf.python.keras.backend.set_learning_phase(1)
+                K2.set_learning_phase(1)
                 predic = f((current_input,))[0]
                 samples.append(predic)
 
             samples = np.array(samples)
-            sample_mean = np.sum(samples, axis=0) / float(self.global_config['mc_samples'])
-            sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(self.global_config['mc_samples'])
+            sample_mean = np.sum(samples, axis=0) / float(mc_samples)
+            sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(mc_samples)
 
             prediction = sample_mean
             variances = sample_variance
@@ -422,7 +479,8 @@ class Model(object):
             prediction_and_variance = self.rnn_model(current_input).numpy()
 
             prediction = np.copy(prediction_and_variance[:, :, :2])
-            variances = np.copy(K.exp(-prediction_and_variance[:, :, 2:4]))
+            # the network outputs: log(variance) -> therefore we apply the exponential function to the result
+            variances = np.copy(K.exp(prediction_and_variance[:, :, 2:4]))
 
         else:
             set_state(self.rnn_model, state)
@@ -436,6 +494,99 @@ class Model(object):
         prediction = np.squeeze(prediction)
         new_state = get_state(self.rnn_model)
         return prediction, new_state, variances
+
+    def train_kendall(self):
+        """Train  Heteroscedastic Aleatoric Uncertainty (https://arxiv.org/pdf/1703.04977.pdf)"""
+        self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
+                                                            num_time_steps=self.data_source.longest_track,
+                                                            output_dim=self._label_dim,
+                                                            **self.global_config['rnn_model_factory'])
+        logging.info(self.rnn_model.summary())
+
+        dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+
+        optimizer = tf.keras.optimizers.Adam()
+
+        train_step_fn = train_kendall_step_generator(self.rnn_model, optimizer)
+
+        train_losses = []
+        test_losses = []
+
+        # Train model
+        for epoch in range(self.global_config['num_train_epochs']):
+            # learning rate decay
+            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
+                old_lr = K.get_value(optimizer.lr)
+                new_lr = old_lr * self.global_config['lr_decay_factor']
+                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+                K.set_value(optimizer.lr, new_lr)
+
+            # Train for one batch
+            mae_batch = []
+            mse_batch = []
+            neg_log_likelihood_batch = []
+
+            _ = self.rnn_model.reset_states()
+            for (batch_n, (inp, target)) in enumerate(dataset_train):
+                # Mini-Batches
+                if self.global_config['clear_state']:
+                    _ = self.rnn_model.reset_states()
+                mse, mae, neg_log_likelihood = train_step_fn(inp, target)
+                mse_batch.append(mse)
+                mae_batch.append(mae)
+                neg_log_likelihood_batch.append(neg_log_likelihood)
+
+            mse = np.mean(mse_batch)
+            mae = np.mean(mae_batch)
+            neg_log_likelihood = np.mean(neg_log_likelihood_batch)
+
+            train_losses.append([epoch, mse, mae * self.data_source.normalization_constant, neg_log_likelihood])
+
+            log_string = "{}/{}: \t nll={} \t mse={}".format(epoch, self.global_config['num_train_epochs'],
+                                                             neg_log_likelihood, mse)
+
+            # Evaluate
+            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
+                    or (epoch + 1) == self.global_config['num_train_epochs']:
+                logging.info(log_string)
+                test_mse, test_mae, test_nll = self._evaluate_kendall_model(dataset_test, epoch)
+                test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant, test_nll])
+            else:
+                logging.debug(log_string)
+
+        self.rnn_model.save(os.path.join(self.global_config['diagrams_path'], 'model.h5'))
+
+        # Visualize loss curve
+        train_losses = np.array(train_losses)
+        test_losses = np.array(test_losses)
+
+        # MSE
+        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
+        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
+        plt.legend(loc="upper right")
+        plt.yscale('log')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
+        plt.clf()
+
+        # MAE
+        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
+        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
+        plt.legend(loc="upper right")
+        plt.yscale('log')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
+        plt.clf()
+
+        # NLL
+        plt.plot(train_losses[:, 0], train_losses[:, 3], c='blue', label="Training Negative Log Likelihood")
+        plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test Negative Log Likelihood")
+        plt.legend(loc="upper right")
+        plt.yscale('log')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'NLL.png'))
+        plt.clf()
+
+
+
+
 
     def train(self):
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
@@ -630,6 +781,86 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
         plt.clf()
 
+    def _evaluate_kendall_model(self, dataset_test, epoch):
+        mses = np.array([])
+        maes = np.array([])
+        nlls = np.array([])
+
+        mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
+        normalization_factor = self.data_source.normalization_constant
+
+        _ = self.rnn_model.reset_states()
+        for input_batch, target_batch in dataset_test:
+            if self.global_config['clear_state']:
+                _ = self.rnn_model.reset_states()
+
+            batch_predictions = self.rnn_model(input_batch)
+
+            # Calculate the mask
+            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
+            mask = 1 - K.cast(mask, tf.float64)
+            mask = K.cast(mask, tf.float64)
+
+            target_batch_unnormalized = target_batch
+            pred_batch_unnormalized = batch_predictions
+
+            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
+            batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
+
+            batch_mae = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            batch_mae_per_track = tf.reduce_sum(batch_mae, axis=-1) / num_time_steps_per_track
+
+            # -----------
+
+            target_x = target_batch[:, :, 0]
+            target_y = target_batch[:, :, 1]
+
+            pos_pred_x = batch_predictions[:, :, 0]
+            pos_pred_y = batch_predictions[:, :, 1]
+
+            log_var_pred_x = batch_predictions[:, :, 2]
+            log_var_pred_y = batch_predictions[:, :, 3]
+
+            pos_loss_x = tf.keras.losses.mean_squared_error(target_x, pos_pred_x)
+            bnn_loss_x = K.exp(-log_var_pred_x) * pos_loss_x + log_var_pred_x
+
+            pos_loss_y = tf.keras.losses.mean_squared_error(target_y, pos_pred_y)
+            bnn_loss_y = K.exp(-log_var_pred_y) * pos_loss_y + log_var_pred_y
+
+            neg_log_likelihood = mask * (bnn_loss_x + bnn_loss_y)
+            neg_log_likelihood_per_track = tf.reduce_sum(neg_log_likelihood, axis=-1) / tf.reduce_sum(mask, axis=-1) + tf.add_n(self.rnn_model.losses)
+
+            mses = np.concatenate((mses, batch_loss_per_track.numpy().reshape([-1])))
+            maes = np.concatenate((maes, batch_mae_per_track.numpy().reshape([-1])))
+            nlls = np.concatenate((nlls, neg_log_likelihood_per_track.numpy().reshape([-1])))
+
+        test_mae = np.mean(maes)
+        test_mse = np.mean(mses)
+        test_nll = np.mean(nlls)
+
+        logging.info("Evaluate: MSE={}".format(test_mse))
+        logging.info("Evaluate: MAE={}".format(test_mae))
+        logging.info("Evaluate: NLL={}".format(test_nll))
+
+        plt.rc('grid', linestyle=":")
+        fig1, ax1 = plt.subplots()
+
+        if self.data_source.normalization_constant > 2.0:
+            # ToDo: make this an argument
+            ax1.yaxis.grid(True)
+            ax1.set_ylim([0, 4.0])
+
+        name = '{:05d}epoch-NextStep-RNN ({})'.format(epoch, self.model_hash)
+        ax1.set_title(name)
+        prop = dict(linewidth=2.5)
+        ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
+                    medianprops=prop, capprops=prop)
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.png'))
+        plt.clf()
+
+        return test_mse, test_mae, test_nll
+
     def _evaluate_model(self, dataset_test, epoch):
         mses = np.array([])
         maes = np.array([])
@@ -769,3 +1000,5 @@ class Model(object):
         ax1.boxplot(errors, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
         plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
+
+
