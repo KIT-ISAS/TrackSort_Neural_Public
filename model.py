@@ -368,6 +368,7 @@ class Model(object):
         self.data_source = data_source
 
         self._label_dim = 4 if self.global_config['separation_prediction'] else 2
+        self._mc_dropout_predict_function = None
 
         if self.global_config['is_loaded']:
             self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
@@ -379,6 +380,11 @@ class Model(object):
             else:
                 self.train()
 
+    def _get_mc_dropout_predict_function(self):
+        if self._mc_dropout_predict_function is None:
+            self._mc_dropout_predict_function = K.function([self.rnn_model.layers[0].input], [self.rnn_model.output])
+        return self._mc_dropout_predict_function
+
     def get_zero_state(self):
         self.rnn_model.reset_states()
         return get_state(self.rnn_model)
@@ -388,8 +394,31 @@ class Model(object):
         new_states = []
         predictions = []
         current_input = np.expand_dims(current_input, axis=1)
-        set_state(self.rnn_model, state)
-        prediction = self.rnn_model(current_input)
+
+        if self.global_config['mc_dropout']:
+            samples = []
+            f = self._get_mc_dropout_predict_function()
+
+            for _ in range(self.global_config['mc_samples']):
+                self.rnn_model.reset_states()
+
+                # https://github.com/tensorflow/tensorflow/issues/34201
+                # ... eager execution bug with keras functions
+                # mitigation: set learning_phase=1  =>  dropout is active
+                tf.python.keras.backend.set_learning_phase(1)
+                predic = f((current_input,))[0]
+                samples.append(predic)
+
+            samples = np.array(samples)
+            sample_mean = np.sum(samples, axis=0) / float(self.global_config['mc_samples'])
+            sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(self.global_config['mc_samples'])
+
+            prediction = sample_mean
+            variances = sample_variance
+        else:
+            set_state(self.rnn_model, state)
+            prediction = self.rnn_model(current_input)
+            variances = None
 
         # ToDo: use the separation predictions! Currently I just drop them.
         if self.global_config['separation_prediction']:
@@ -397,7 +426,7 @@ class Model(object):
 
         prediction = np.squeeze(prediction)
         new_state = get_state(self.rnn_model)
-        return prediction, new_state
+        return prediction, new_state, variances
 
     def train(self):
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],

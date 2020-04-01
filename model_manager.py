@@ -23,16 +23,22 @@ class ModelManager(object):
 
     def predict_all(self):
         prediction_dict = {}
+        variances_dict = {}
+
         for batch_nr in range(len(self.current_states)):
-            # state_statetype_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
-            # state_tuple = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(state_statetype_first[0], state_statetype_first[1])
-            prediction, new_state = self.model.predict(self.current_inputs[batch_nr], self.current_states[batch_nr])
+            prediction, new_state, variances = self.model.predict(self.current_inputs[batch_nr], self.current_states[batch_nr])
             # state_batch_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
             self.current_states[batch_nr] = new_state
             for idx in range(len(self.current_is_alive[batch_nr])):
                 if self.current_is_alive[batch_nr][idx]:
                     prediction_dict[self.current_ids[batch_nr][idx]] = prediction[idx]
-        return prediction_dict
+                    if variances:
+                        variances_dict[self.current_ids[batch_nr][idx]] = variances[idx]
+
+        if len(variances_dict) == 0:
+            uncertainty_dict = None
+
+        return prediction_dict, uncertainty_dict
 
     def update_by_id(self, global_track_id, measurement):
         for batch_nr in range(len(self.current_ids)):

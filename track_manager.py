@@ -42,11 +42,11 @@ class TrackManager(object):
         return global_track_id
 
     def get_predictions(self):
-        predictions = self.model_manager.predict_all()
+        predictions, variances = self.model_manager.predict_all()
         if len(self.active_ids) != len(predictions.keys()):
             logging.error("something with the id management doesnt work in get_predictions!")
             code.interact(local=dict(globals(), **locals()))
-        return predictions
+        return predictions, variances
 
     def get_alive_probability(self, track_id):
         return self.tracks[track_id].is_alive_probability
