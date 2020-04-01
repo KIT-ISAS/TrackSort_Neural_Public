@@ -91,6 +91,9 @@ parser.add_argument('--augment_beginning', type=str2bool, default=False,
                     help='Augment the dataset by duplicating the tracks and removing initial measurements from the '
                          'duplicates')
 
+parser.add_argument('--mc_dropout', type=str2bool, default=False, help='Calculate uncertainties with MC Dropout')
+parser.add_argument('--mc_samples', type=int, default=5, help='MC Dropout: how many samples per track?')
+
 args = parser.parse_args()
 
 global_config = {
@@ -160,7 +163,11 @@ global_config = {
     'test_noise_robustness': args.test_noise_robustness,
     'experiment_series': 'independent',
     'is_alive_probability_weighting': 0.0,
-    'positional_probabilities': 0.0
+    'positional_probabilities': 0.0,
+
+    'mc_dropout': args.mc_dropout,
+    'mc_samples': args.mc_samples,
+
 }
 
 # setup logging

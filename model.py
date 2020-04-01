@@ -392,7 +392,8 @@ class Model(object):
         prediction = self.rnn_model(current_input)
 
         # ToDo: use the separation predictions! Currently I just drop them.
-        prediction = np.copy(prediction.numpy()[:, :, :2])
+        if self.global_config['separation_prediction']:
+            prediction = np.copy(prediction.numpy()[:, :, :2])
 
         prediction = np.squeeze(prediction)
         new_state = get_state(self.rnn_model)

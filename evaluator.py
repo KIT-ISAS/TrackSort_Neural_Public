@@ -19,6 +19,9 @@ class Evaluator(object):
             for particle_timestep, particle_measurement in particle_list:
                 hash_ = str(particle_measurement)
                 if hash_ in particles_hash_map:
+                    logging.error("Duplicate particle measurements")
+                    logging.error(hash_)
+                    code.interact(local=dict(globals(), **locals()))
                     raise ValueError("Duplicate particle measurements")
                 particles_hash_map[hash_] = idx
 
@@ -33,6 +36,9 @@ class Evaluator(object):
             for it, track_measurement in enumerate(track.measurements):
                 hash_ = str(track_measurement)
                 if hash_ in tracks_hash_map:
+                    logging.error("Duplicate track measurements")
+                    logging.error(hash_)
+                    code.interact(local=dict(globals(), **locals()))
                     raise ValueError("Duplicate track measurements")
                 tracks_hash_map[hash_] = idx
 
