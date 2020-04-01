@@ -20,26 +20,25 @@
         }
       }
     },
-    "experts": {
-      "LSTM_16_16": {
-        "type": "RNN",
-        "model_path": "models/pepper/LSTM_16_16.h5",
-        "options": {
-          "clear_state": true,
-          "model_structure": {
-            "num_units_first_rnn": 16,
-            "num_units_second_rnn": 16,
-            "num_units_third_rnn": 0,
-            "num_units_fourth_rnn": 0,
-            "num_units_first_dense": 0,
-            "num_units_second_dense": 0,
-            "num_units_third_dense": 0,
-            "num_units_fourth_dense": 0,
-            "rnn_model_name": "lstm",
-            "use_batchnorm_on_dense": true
-          }
+    "LSTM_16_16": {
+      "type": "RNN",
+      "model_path": "models/pepper/LSTM_16_16.h5",
+      "options": {
+        "clear_state": true,
+        "model_structure": {
+          "num_units_first_rnn": 16,
+          "num_units_second_rnn": 16,
+          "num_units_third_rnn": 0,
+          "num_units_fourth_rnn": 0,
+          "num_units_first_dense": 0,
+          "num_units_second_dense": 0,
+          "num_units_third_dense": 0,
+          "num_units_fourth_dense": 0,
+          "rnn_model_name": "lstm",
+          "use_batchnorm_on_dense": true
         }
-      },
+      }
+    },
     "KF_CV_sv3_6E-7": {
       "type": "KF",
       "sub_type": "CV",
