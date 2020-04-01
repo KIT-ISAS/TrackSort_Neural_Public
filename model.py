@@ -250,10 +250,10 @@ def train_kendall_step_generator(model, optimizer, nan_value=0.0):
             log_var_pred_y = predictions[:, :, 3]
 
             pos_loss_x = tf.keras.losses.mean_squared_error(target_x, pos_pred_x)
-            bnn_loss_x = K.exp(-log_var_pred_x) * pos_loss_x + log_var_pred_x
+            bnn_loss_x = K.exp(-log_var_pred_x) * K.reshape(pos_loss_x, [K.shape(pos_loss_x)[0], 1]) + log_var_pred_x
 
             pos_loss_y = tf.keras.losses.mean_squared_error(target_y, pos_pred_y)
-            bnn_loss_y = K.exp(-log_var_pred_y) * pos_loss_y + log_var_pred_y
+            bnn_loss_y = K.exp(-log_var_pred_y) * K.reshape(pos_loss_y, [K.shape(pos_loss_y)[0], 1]) + log_var_pred_y
 
             neg_log_likelihood = mask * (bnn_loss_x + bnn_loss_y)
             neg_log_likelihood = K.sum(neg_log_likelihood) / K.sum(mask) + tf.add_n(model.losses)
