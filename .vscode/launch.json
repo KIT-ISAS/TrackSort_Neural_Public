@@ -20,7 +20,7 @@
             "console": "integratedTerminal",
             "args": ["--is_loaded", "False", 
                      "--config_path", "configs/train_pepper.json",
-                     "--num_train_epochs", "10",
+                     "--num_train_epochs", "400",
                      "--execute_evaluation", "False",
                      "--execute_multi_target_tracking", "False"]
         },
