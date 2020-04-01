@@ -259,8 +259,8 @@ def train_kendall_step_generator(model, optimizer, nan_value=0.0):
             neg_log_likelihood = K.sum(neg_log_likelihood) / K.sum(mask) + tf.add_n(model.losses)
 
             # following lines are for logging metric
-            mse = tf.keras.losses.mean_squared_error(target, predictions[:, :, 2]) * mask
-            mae = tf.keras.losses.mean_absolute_error(target, predictions[:, :, 2]) * mask
+            mse = tf.keras.losses.mean_squared_error(target, predictions[:, :, :2]) * mask
+            mae = tf.keras.losses.mean_absolute_error(target, predictions[:, :, :2]) * mask
             mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
             mae = K.sum(mae) / K.sum(mask) + tf.add_n(model.losses)
 
@@ -804,11 +804,11 @@ class Model(object):
             target_batch_unnormalized = target_batch
             pred_batch_unnormalized = batch_predictions
 
-            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized[:, :, :2]) * mask
             num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
             batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
 
-            batch_mae = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            batch_mae = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized[:, :, :2]) * mask
             batch_mae_per_track = tf.reduce_sum(batch_mae, axis=-1) / num_time_steps_per_track
 
             # -----------
