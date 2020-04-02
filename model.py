@@ -823,10 +823,10 @@ class Model(object):
             log_var_pred_y = batch_predictions[:, :, 3]
 
             pos_loss_x = tf.keras.losses.mean_squared_error(target_x, pos_pred_x)
-            bnn_loss_x = K.exp(-log_var_pred_x) * pos_loss_x + log_var_pred_x
+            bnn_loss_x = K.exp(-log_var_pred_x) * K.reshape(pos_loss_x, [K.shape(pos_loss_x)[0], 1]) + log_var_pred_x
 
             pos_loss_y = tf.keras.losses.mean_squared_error(target_y, pos_pred_y)
-            bnn_loss_y = K.exp(-log_var_pred_y) * pos_loss_y + log_var_pred_y
+            bnn_loss_y = K.exp(-log_var_pred_y) * K.reshape(pos_loss_y, [K.shape(pos_loss_y)[0], 1]) + log_var_pred_y
 
             neg_log_likelihood = mask * (bnn_loss_x + bnn_loss_y)
             neg_log_likelihood_per_track = tf.reduce_sum(neg_log_likelihood, axis=-1) / tf.reduce_sum(mask, axis=-1) + tf.add_n(self.rnn_model.losses)
