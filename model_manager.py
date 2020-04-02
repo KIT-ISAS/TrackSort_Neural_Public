@@ -32,7 +32,7 @@ class ModelManager(object):
             for idx in range(len(self.current_is_alive[batch_nr])):
                 if self.current_is_alive[batch_nr][idx]:
                     prediction_dict[self.current_ids[batch_nr][idx]] = prediction[idx]
-                    if variances:
+                    if variances is not None:
                         variances_dict[self.current_ids[batch_nr][idx]] = variances[idx]
 
         if len(variances_dict) == 0:
