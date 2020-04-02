@@ -7,6 +7,7 @@ import os
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
 
 from tensorflow.keras import backend as K
 # issue with eager execution
@@ -506,6 +507,7 @@ class Model(object):
 
         if variances is not None:
             variances = np.squeeze(variances)
+
         prediction = np.squeeze(prediction)
         new_state = get_state(self.rnn_model)
         return prediction, new_state, variances
@@ -567,6 +569,7 @@ class Model(object):
                 logging.info(log_string)
                 test_mse, test_mae, test_nll = self._evaluate_kendall_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant, test_nll])
+                self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
             else:
                 logging.debug(log_string)
 
@@ -652,6 +655,8 @@ class Model(object):
                 logging.info(log_string)
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
+                self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
+                plt.close('all')
             else:
                 logging.debug(log_string)
 
@@ -676,6 +681,8 @@ class Model(object):
         plt.yscale('log')
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
         plt.clf()
+
+        plt.close('all')
 
     def train_separation_prediction(self):
         dataset_train, dataset_test, num_time_steps = self.data_source.get_tf_data_sets_seq2seq_with_separation_data(
@@ -1016,5 +1023,81 @@ class Model(object):
         ax1.boxplot(errors, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
         plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
+
+    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=False):
+        if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
+
+            for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
+                inp_batch = inp_batch.numpy()
+                target_batch = target_batch.numpy()
+
+                if self.global_config['mc_dropout']:
+                    k = self.global_config['mc_samples']
+                    K2.set_learning_phase(1)
+
+                    prediction_list = []
+                    samples = []
+
+                    for t_k in range(k):
+                        _ = self.rnn_model.reset_states()
+                        predic = self.rnn_model(inp_batch, training=True)
+                        samples.append(predic)
+
+                    samples = np.array(samples)
+                    sample_mean = np.sum(samples, axis=0) / float(k)
+                    sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
+
+                    concat_pred = np.concatenate((sample_mean, sample_variance), axis=-1)
+                    prediction_list.append(concat_pred)
+
+                    prediction_list = np.concatenate(prediction_list, axis=1)
+
+                    pos_predictions = prediction_list[:, :, :2]
+                    var_predictions = prediction_list[:, :, 2:]
+                else:
+                    _ = self.rnn_model.reset_states()
+                    prediction_list = self.rnn_model(inp_batch)
+
+                    pos_predictions = prediction_list[:, :, :2]
+                    var_predictions = K.exp(prediction_list[:, :, 2:])
+
+                stddev_predictions = np.sqrt(var_predictions)
+
+                start_time_step = 0
+
+                for track_idx in range(min(max_number_plots, inp_batch.shape[0])):
+                    seq_length = self.data_source.get_last_timestep_of_track(inp_batch[track_idx])
+
+                    axes = self.data_source.plot_track(inp_batch[track_idx], start=start_time_step,
+                                                       fit_scale_to_content=fit_scale_to_content,
+                                                       color='black', end=seq_length,
+                                                       label="Input truth {}".format(track_idx))
+                    axes = self.data_source.plot_track(target_batch[track_idx], start=start_time_step,
+                                                       fit_scale_to_content=fit_scale_to_content,
+                                                       color='green', end=seq_length,
+                                                       label="Output truth {}".format(track_idx))
+                    axes = self.data_source.plot_track(pos_predictions[track_idx], start=start_time_step,
+                                                       fit_scale_to_content=fit_scale_to_content,
+                                                       color='blue', end=seq_length,
+                                                       label="Prediction {}".format(track_idx))
+
+                    ax = plt.subplot(111)
+
+                    for time_step_i in range(seq_length):
+                        print(time_step_i, end='')
+                        ellipse = Ellipse(xy=pos_predictions[track_idx, time_step_i, :],
+                                          width=2 * stddev_predictions[track_idx, time_step_i, 0],
+                                          height=2 * stddev_predictions[track_idx, time_step_i, 1],
+                                          angle=0)
+
+                        ellipse.set_clip_box(ax.bbox)
+                        ellipse.set_alpha(0.3)
+                        ax.add_artist(ellipse)
+
+                    plt.title('Track with predictions')
+
+                    plt.savefig(os.path.join(self.global_config['diagrams_path'],
+                                             'Tracks_with_uncertainty_{}-{}.png'.format(epoch, track_idx)))
+                    plt.clf()
 
 
