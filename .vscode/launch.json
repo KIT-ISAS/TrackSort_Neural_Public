@@ -20,7 +20,10 @@
             "console": "integratedTerminal",
             "args": ["--is_loaded", "False", 
                      "--config_path", "configs/train_pepper.json",
+                     "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
                      "--num_train_epochs", "400",
+                     "--lr_decay_after_epochs", "100",
+                     "--lr_decay_factor", "0.1",
                      "--execute_evaluation", "False",
                      "--execute_multi_target_tracking", "False"]
         },

@@ -417,6 +417,20 @@ class RNN_Model(Expert):
         """Save the model to its model path."""
         self.rnn_model.save(self.model_path)
 
+    def change_learning_rate(self, lr_change=1):
+        """Change the learning rate of the model optimizer.
+
+        This can be used to lower the learning rate after n time steps to increase the accuracy.
+        The change is implemented multiplicative. Set lr_change > 1 to increase and < 1 to decrease the lr.
+
+        Args:
+            lr_change (double): Change in learning rate (factorial)
+        """
+        old_lr = K.get_value(self.optimizer.lr)
+        new_lr = old_lr * lr_change
+        logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+        K.set_value(self.optimizer.lr, new_lr)
+
     def train_separation_prediction(self):
         dataset_train, dataset_test, num_time_steps = self.data_source.get_tf_data_sets_seq2seq_with_separation_data(
             normalized=True,

@@ -71,6 +71,10 @@ class Expert(ABC):
         """Load the model from its model path."""
         pass
 
+    def get_type(self):
+        """Return type."""
+        return self.type
+        
 class Expert_Type(Enum):
     """Simple enumeration class for expert types."""
     

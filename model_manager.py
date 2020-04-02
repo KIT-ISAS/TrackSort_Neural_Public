@@ -90,7 +90,8 @@ class ModelManager(object):
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
     # TODO create train, test and evaluate functions for single-target tracking
-    def train_models(self, dataset_train, dataset_test, num_train_epochs = 1000, evaluate_every_n_epochs=20):
+    def train_models(self, dataset_train, dataset_test, num_train_epochs = 1000, evaluate_every_n_epochs=20,
+                    lr_decay_after_epochs = 100, lr_decay = 0.1):
         """Train all experts and the gating network.
 
         The training information of each model should be provided in the configuration json.
@@ -100,6 +101,8 @@ class ModelManager(object):
             dataset_test (dict):            All testing samples for evaluating the trained models
             num_train_epochs (int):         Number of epochs for training
             evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
+            lr_decay_after_epochs (int):    Decrease the learning rate of certain models (RNNs) after x epochs
+            lr_decay (double):              Learning rate decrease (multiplicative). Choose values < 1 to increase accuracy.
         """
         train_losses = []
         
@@ -128,15 +131,11 @@ class ModelManager(object):
 
         for epoch in range(num_train_epochs):
             start_time = time.time()
-            # TODO: Implement lr decay
-            """
-            # learning rate decay after 100 epochs
-            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
-                old_lr = K.get_value(optimizer.lr)
-                new_lr = old_lr * self.global_config['lr_decay_factor']
-                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-                K.set_value(optimizer.lr, new_lr)
-            """
+
+            # learning rate decay after x epochs
+            if (epoch + 1) % lr_decay_after_epochs == 0:
+                self.expert_manager.change_learning_rate(lr_decay)
+            
             #prediction_batch = []
             for (batch_n, (inp, target)) in enumerate(dataset_train):
                 # Train experts on a batch
@@ -167,7 +166,6 @@ class ModelManager(object):
             # Run trained models on the test set every n epochs
             if (epoch + 1) % evaluate_every_n_epochs == 0 \
                     or (epoch + 1) == num_train_epochs:
-
                 for (batch_n, (inp, target)) in enumerate(dataset_test):
                     # Train experts on a batch
                     predictions = self.expert_manager.test_batch(inp)

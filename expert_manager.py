@@ -17,6 +17,7 @@ import code
 
 from rnn_model import RNN_Model
 from cv_model import CV_Model, CV_State
+from expert import Expert, Expert_Type
 
 class Expert_Manager(object):
     """The expert manager handles all forecasting experts.
@@ -120,7 +121,21 @@ class Expert_Manager(object):
             prediction_list.append(prediction)
             
         return prediction_list
-        
+
+    def change_learning_rate(self, lr_change=1):
+        """Change the learning rate of the certain models.
+
+        Only change the learning rate of RNN models (right now).
+        This can be used to lower the learning rate after n time steps to increase the accuracy.
+        The change is implemented multiplicative. Set lr_change > 1 to increase and < 1 to decrease the lr.
+
+        Args:
+            lr_change (double): Change in learning rate (factorial)
+        """
+        for expert in self.experts:
+            if expert.get_type() == Expert_Type.RNN:
+                expert.change_learning_rate(lr_change)
+
     def test_batch(self, inp):
         """Run predictions for all experts on a batch of test data.
 

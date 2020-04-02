@@ -251,7 +251,11 @@ def run_global_config(global_config, experiment_series_names=''):
         model_manager.load_models(global_config["model_path"])
     else:
         # Train models
-        model_manager.train_models(dataset_train, dataset_test, global_config["num_train_epochs"])
+        model_manager.train_models(dataset_train, dataset_test, 
+                                   global_config.get("num_train_epochs"),
+                                   global_config.get("evaluate_every_n_epochs"),
+                                   global_config.get("lr_decay_after_epochs"),
+                                   global_config.get("lr_decay_factor"))
 
     ## Test models
     # TODO:
