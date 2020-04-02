@@ -1058,8 +1058,8 @@ class Model(object):
                     _ = self.rnn_model.reset_states()
                     prediction_list = self.rnn_model(inp_batch)
 
-                    pos_predictions = prediction_list[:, :, :2]
-                    var_predictions = K.exp(prediction_list[:, :, 2:])
+                    pos_predictions = prediction_list[:, :, :2].numpy()
+                    var_predictions = K.exp(prediction_list[:, :, 2:]).numpy()
 
                 stddev_predictions = np.sqrt(var_predictions)
 
