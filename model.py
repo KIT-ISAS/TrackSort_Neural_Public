@@ -1024,7 +1024,7 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
 
-    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=False):
+    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
