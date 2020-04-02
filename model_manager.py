@@ -91,7 +91,7 @@ class ModelManager(object):
 
     # TODO create train, test and evaluate functions for single-target tracking
     def train_models(self, dataset_train, dataset_test, num_train_epochs = 1000, evaluate_every_n_epochs=20,
-                    lr_decay_after_epochs = 100, lr_decay = 0.1):
+                    improvement_break_condition = 0.001, lr_decay_after_epochs = 100, lr_decay = 0.1):
         """Train all experts and the gating network.
 
         The training information of each model should be provided in the configuration json.
@@ -101,6 +101,7 @@ class ModelManager(object):
             dataset_test (dict):            All testing samples for evaluating the trained models
             num_train_epochs (int):         Number of epochs for training
             evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
+            improvement_break_condition (double): Break training if test loss on every expert does not improve by more than this value.
             lr_decay_after_epochs (int):    Decrease the learning rate of certain models (RNNs) after x epochs
             lr_decay (double):              Learning rate decrease (multiplicative). Choose values < 1 to increase accuracy.
         """
@@ -120,6 +121,7 @@ class ModelManager(object):
         # Define a metric for calculating the train loss: MEAN
         train_losses = []
         test_losses = []
+        old_test_losses = []
         for name in expert_names:
             train_log_dirs.append('logs/gradient_tape/' + current_time + '/' + name +'/train')
             test_log_dirs.append('logs/gradient_tape/' + current_time + '/' + name + '/test')
@@ -127,6 +129,7 @@ class ModelManager(object):
             test_summary_writers.append(tf.summary.create_file_writer(test_log_dirs[-1]))
             train_losses.append(tf.keras.metrics.Mean('train_loss', dtype=tf.float32))
             test_losses.append(tf.keras.metrics.Mean('train_loss', dtype=tf.float32))
+            old_test_losses.append(1)
 
 
         for epoch in range(num_train_epochs):
@@ -185,7 +188,22 @@ class ModelManager(object):
                 template = 'Epoch {}, Test Losses: {}'
                 logging.info((template.format(epoch+1,
                                             [test_loss.result().numpy() for test_loss in test_losses])))
-            
+
+                # Check testing break condition
+                break_condition = True
+                for i in range(len(old_test_losses)):
+                    # If the percentage improvement of one expert is higher than the threshold, we do not break.
+                    if (old_test_losses[i]-test_losses[i].result().numpy())/old_test_losses[i] >= improvement_break_condition:
+                        break_condition = False
+                    # Update old test losses
+                    old_test_losses[i] = test_losses[i].result().numpy()
+                # Break if there was no improvement in all experts
+                if break_condition:
+                    log_string = "Break training because improvement of experts on all tests was lower than {}%.".format(
+                                    improvement_break_condition*100)
+                    logging.info(log_string)
+                    break 
+
         # Save all models
         self.expert_manager.save_models()
 

@@ -54,6 +54,8 @@ parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, t
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
+parser.add_argument('--improvement_break_condition', type=float, default=0.001, 
+                    help='Break training if test loss on every expert does not improve by more than this value.')
 parser.add_argument('--lr_decay_after_epochs', type=int, default=150, help='When to decrease the lr by lr_decay_factor')
 parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='When learning rate should be decreased, '
                                                                        'multiply with this')
@@ -139,6 +141,7 @@ global_config = {
     },
     'num_train_epochs': args.num_train_epochs,
     'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
+    'improvement_break_condition': args.improvement_break_condition,
     'lr_decay_after_epochs': args.lr_decay_after_epochs,
     'lr_decay_factor': args.lr_decay_factor,
 
@@ -254,6 +257,7 @@ def run_global_config(global_config, experiment_series_names=''):
         model_manager.train_models(dataset_train, dataset_test, 
                                    global_config.get("num_train_epochs"),
                                    global_config.get("evaluate_every_n_epochs"),
+                                   global_config.get("improvement_break_condition"),
                                    global_config.get("lr_decay_after_epochs"),
                                    global_config.get("lr_decay_factor"))
 
