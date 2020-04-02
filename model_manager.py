@@ -109,6 +109,7 @@ class ModelManager(object):
         
         # Define a loss function: MSE
         loss_object = tf.keras.losses.MeanSquaredError()
+        mae_object = tf.keras.losses.MeanAbsoluteError()
         # Mask value for keras
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -120,7 +121,9 @@ class ModelManager(object):
         test_summary_writers = []
         # Define a metric for calculating the train loss: MEAN
         train_losses = []
+        train_maes = []
         test_losses = []
+        test_maes = []
         old_test_losses = []
         for name in expert_names:
             train_log_dirs.append('logs/gradient_tape/' + current_time + '/' + name +'/train')
@@ -128,7 +131,9 @@ class ModelManager(object):
             train_summary_writers.append(tf.summary.create_file_writer(train_log_dirs[-1]))
             test_summary_writers.append(tf.summary.create_file_writer(test_log_dirs[-1]))
             train_losses.append(tf.keras.metrics.Mean('train_loss', dtype=tf.float32))
-            test_losses.append(tf.keras.metrics.Mean('train_loss', dtype=tf.float32))
+            test_losses.append(tf.keras.metrics.Mean('test_loss', dtype=tf.float32))
+            train_maes.append(tf.keras.metrics.Mean('train_mae', dtype=tf.float32))
+            test_maes.append(tf.keras.metrics.Mean('test_mae', dtype=tf.float32))
             old_test_losses.append(1)
 
 
@@ -152,19 +157,24 @@ class ModelManager(object):
                 # Calculate loss for all models
                 for i in range(len(predictions)):
                     loss = loss_object(target, predictions[i], sample_weight = mask)
+                    mae = mae_object(target, predictions[i], sample_weight = mask)
                     train_losses[i](loss)
+                    train_maes[i](mae)
             
             for i in range(len(train_summary_writers)):
                 with train_summary_writers[i].as_default():
                     tf.summary.scalar('loss', train_losses[i].result(), step=epoch)
+                    tf.summary.scalar('mae', train_maes[i].result(), step=epoch)
 
-            template = 'Epoch {}, Train Losses: {}'
+            template = 'Epoch {}, Train Losses: {}, Train MAEs: {}'
             logging.info((template.format(epoch+1,
-                                          [train_loss.result().numpy() for train_loss in train_losses])))
+                                          [train_loss.result().numpy() for train_loss in train_losses],
+                                          [train_mae.result().numpy() for train_mae in train_maes])))
 
             # Reset metrics every epoch
-            for train_loss in train_losses:
-                train_loss.reset_states()
+            for i in range(len(train_losses)):
+                train_losses[i].reset_states()
+                train_maes[i].reset_states()
 
             # Run trained models on the test set every n epochs
             if (epoch + 1) % evaluate_every_n_epochs == 0 \
@@ -179,15 +189,19 @@ class ModelManager(object):
                     # Calculate loss for all models
                     for i in range(len(predictions)):
                         loss = loss_object(target, predictions[i], sample_weight = mask)
+                        mae = mae_object(target, predictions[i], sample_weight = mask)
                         test_losses[i](loss)
+                        test_maes[i](mae)
                
                 for i in range(len(test_summary_writers)):
                     with test_summary_writers[i].as_default():
                         tf.summary.scalar('loss', test_losses[i].result(), step=epoch)
+                        tf.summary.scalar('mae', test_maes[i].result(), step=epoch)
 
-                template = 'Epoch {}, Test Losses: {}'
+                template = 'Epoch {}, Test Losses: {}, Test MAEs: {}'
                 logging.info((template.format(epoch+1,
-                                            [test_loss.result().numpy() for test_loss in test_losses])))
+                                            [test_loss.result().numpy() for test_loss in test_losses],
+                                            [test_mae.result().numpy() for test_mae in test_maes])))
 
                 # Check testing break condition
                 break_condition = True
