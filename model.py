@@ -1024,7 +1024,7 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
 
-    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True):
+    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=True):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
@@ -1071,15 +1071,18 @@ class Model(object):
                     axes = self.data_source.plot_track(inp_batch[track_idx], start=start_time_step,
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='black', end=seq_length,
-                                                       label="Input truth {}".format(track_idx))
+                                                       label="Input truth {}".format(track_idx),
+                                                       normed_plot=normed_plot)
                     axes = self.data_source.plot_track(target_batch[track_idx], start=start_time_step,
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='green', end=seq_length,
-                                                       label="Output truth {}".format(track_idx))
+                                                       label="Output truth {}".format(track_idx),
+                                                       normed_plot=normed_plot)
                     axes = self.data_source.plot_track(pos_predictions[track_idx], start=start_time_step,
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='blue', end=seq_length,
-                                                       label="Prediction {}".format(track_idx))
+                                                       label="Prediction {}".format(track_idx),
+                                                       normed_plot=normed_plot)
 
                     ax = plt.subplot(111)
 

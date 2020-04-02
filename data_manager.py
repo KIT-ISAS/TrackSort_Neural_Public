@@ -157,12 +157,16 @@ class AbstractDataSet(ABC):
         data = list(map(lambda x: np.squeeze(data[x]), filter(lambda x: data[x][0][0] > 0, range(data.shape[0]))))
         return data
 
-    def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False, legend=True):
+    def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False, legend=True,
+                   normed_plot=False):
         track = track[start:end]
 
         axes = plt.gca()
         axes.set_aspect('equal')
-        if not fit_scale_to_content:
+        if normed_plot:
+            axes.set_xlim([0, 1.2])
+            axes.set_ylim([0, 1.2])
+        elif not fit_scale_to_content:
             axes.set_xlim([0, self.belt_width * 1.1])
             axes.set_ylim([0, self.belt_height * 1.1])
 
