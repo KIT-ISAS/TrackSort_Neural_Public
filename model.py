@@ -453,7 +453,10 @@ class Model(object):
 
         if self.global_config['mc_dropout']:
             samples = []
-            f = self._get_mc_dropout_predict_function()
+
+            # f = self._get_mc_dropout_predict_function()
+            f = K.function([self.rnn_model.layers[0].input], [self.rnn_model.output])
+
             mc_samples = self.global_config['mc_samples']
 
             for _ in range(mc_samples):
@@ -463,7 +466,8 @@ class Model(object):
                 # https://github.com/tensorflow/tensorflow/issues/34201
                 # ... eager execution bug with keras functions
                 # mitigation: set learning_phase=1  =>  dropout is active
-                K2.set_learning_phase(1)
+                K.set_learning_phase(1)
+                # K2.set_learning_phase(1)
                 predic = f((current_input,))[0]
                 samples.append(predic)
 
@@ -583,10 +587,6 @@ class Model(object):
         plt.yscale('log')
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'NLL.png'))
         plt.clf()
-
-
-
-
 
     def train(self):
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],

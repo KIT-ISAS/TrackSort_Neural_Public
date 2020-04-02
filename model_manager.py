@@ -83,6 +83,7 @@ class ModelManager(object):
         self.current_is_alive.append(np.zeros([self.global_config['batch_size']], dtype=bool))
         self.current_ids.append(-np.ones([self.global_config['batch_size']], dtype=np.int32))
         self.current_inputs.append(np.zeros([self.global_config['batch_size'], 2], dtype=np.float64))
+
         # fill the first element of the new entry
         self.current_is_alive[-1][0] = True
         self.current_ids[-1][0] = global_track_id
