@@ -154,7 +154,7 @@ class DataAssociation(object):
                     if variances is not None:
                         # standardized Euclidean distance
                         distance_matrix[measurement_nr][prediction_nr] = \
-                            np.linalg.norm((measurement - prediction)/variances[prediction_ids[prediction_nr]])
+                            np.sqrt(np.sum(((measurement-prediction)**2) / variances[prediction_ids[prediction_nr]]))
                     else:
                         # euclidean distance (=L2 norm)
                         distance_matrix[measurement_nr][prediction_nr] = np.linalg.norm(measurement - prediction)
@@ -212,6 +212,7 @@ class DataAssociation(object):
                     distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=0)
                     distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=1)
             #
+            # code.interact(local=dict(globals(), **locals()))
 
             if self.global_config['matching_algorithm'] == 'local':
                 measurement_idxs, prediction_idxs = nearest_neighbour(distance_matrix)
