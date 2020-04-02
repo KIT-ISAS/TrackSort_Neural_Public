@@ -36,9 +36,9 @@ class ModelManager(object):
                         variances_dict[self.current_ids[batch_nr][idx]] = variances[idx]
 
         if len(variances_dict) == 0:
-            uncertainty_dict = None
+            variances_dict = None
 
-        return prediction_dict, uncertainty_dict
+        return prediction_dict, variances_dict
 
     def update_by_id(self, global_track_id, measurement):
         for batch_nr in range(len(self.current_ids)):

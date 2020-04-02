@@ -116,8 +116,8 @@ class DataAssociation(object):
                                 label='prediction')
 
                     # predicted uncertainty as ellipse
-                    if variances:
-                        for prediction_id, prediction in enumerate(prediction_values):
+                    if variances is not None:
+                        for prediction_id, prediction in predictions.items():
                             variance = variances[prediction_id]
                             stddev = np.sqrt(variance)
                             circle = Ellipse(prediction, stddev[0] * 2, stddev[1] * 2, color='grey',
@@ -151,10 +151,10 @@ class DataAssociation(object):
             #  ... L2 distance between predictions and measurements
             for prediction_nr, prediction in enumerate(prediction_values):
                 for measurement_nr, measurement in enumerate(measurements):
-                    if variances:
+                    if variances is not None:
                         # standardized Euclidean distance
                         distance_matrix[measurement_nr][prediction_nr] = \
-                            np.linalg.norm((measurement - prediction)/variances[prediction_nr])
+                            np.linalg.norm((measurement - prediction)/variances[prediction_ids[prediction_nr]])
                     else:
                         # euclidean distance (=L2 norm)
                         distance_matrix[measurement_nr][prediction_nr] = np.linalg.norm(measurement - prediction)

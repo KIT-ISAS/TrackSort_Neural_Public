@@ -1,3 +1,5 @@
+import code
+
 import logging
 import math
 import os
@@ -449,15 +451,20 @@ class Model(object):
     def predict(self, current_input, state):
         new_states = []
         predictions = []
-        current_input = np.expand_dims(current_input, axis=1)
 
         if self.global_config['mc_dropout']:
             samples = []
 
             # f = self._get_mc_dropout_predict_function()
             f = K.function([self.rnn_model.layers[0].input], [self.rnn_model.output])
+            K2.set_learning_phase(1)
 
             mc_samples = self.global_config['mc_samples']
+
+            x_input = np.zeros([self.global_config['batch_size'], self.global_config['rnn_time_steps'], 2])
+            x_input[:, 0] = current_input
+
+            # code.interact(local=dict(globals(), **locals()))
 
             for _ in range(mc_samples):
                 self.rnn_model.reset_states()
@@ -466,10 +473,10 @@ class Model(object):
                 # https://github.com/tensorflow/tensorflow/issues/34201
                 # ... eager execution bug with keras functions
                 # mitigation: set learning_phase=1  =>  dropout is active
-                K.set_learning_phase(1)
                 # K2.set_learning_phase(1)
-                predic = f((current_input,))[0]
-                samples.append(predic)
+                # predic = f((x_input,))[0]
+                predic = self.rnn_model(x_input, training=True)
+                samples.append(predic[:, 0, :])
 
             samples = np.array(samples)
             sample_mean = np.sum(samples, axis=0) / float(mc_samples)
@@ -479,6 +486,7 @@ class Model(object):
             variances = sample_variance
 
         elif self.global_config['kendall_loss']:
+            current_input = np.expand_dims(current_input, axis=1)
             set_state(self.rnn_model, state)
             prediction_and_variance = self.rnn_model(current_input).numpy()
 
@@ -487,6 +495,7 @@ class Model(object):
             variances = np.copy(K.exp(prediction_and_variance[:, :, 2:4]))
 
         else:
+            current_input = np.expand_dims(current_input, axis=1)
             set_state(self.rnn_model, state)
             prediction = self.rnn_model(current_input)
             variances = None
@@ -495,6 +504,8 @@ class Model(object):
         if self.global_config['separation_prediction']:
             prediction = np.copy(prediction.numpy()[:, :, :2])
 
+        if variances is not None:
+            variances = np.squeeze(variances)
         prediction = np.squeeze(prediction)
         new_state = get_state(self.rnn_model)
         return prediction, new_state, variances
@@ -505,6 +516,7 @@ class Model(object):
                                                             num_time_steps=self.data_source.longest_track,
                                                             output_dim=self._label_dim,
                                                             **self.global_config['rnn_model_factory'])
+        self.global_config['rnn_time_steps'] = self.data_source.longest_track
         logging.info(self.rnn_model.summary())
 
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
@@ -584,7 +596,6 @@ class Model(object):
         plt.plot(train_losses[:, 0], train_losses[:, 3], c='blue', label="Training Negative Log Likelihood")
         plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test Negative Log Likelihood")
         plt.legend(loc="upper right")
-        plt.yscale('log')
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'NLL.png'))
         plt.clf()
 
@@ -593,6 +604,10 @@ class Model(object):
                                                             num_time_steps=self.data_source.longest_track,
                                                             output_dim=self._label_dim,
                                                             **self.global_config['rnn_model_factory'])
+        # try to compile model
+        self.rnn_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1), loss='mse', metrics=['accuracy'])
+
+        self.global_config['rnn_time_steps'] = self.data_source.longest_track
         logging.info(self.rnn_model.summary())
 
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
@@ -674,6 +689,7 @@ class Model(object):
                                                             num_time_steps=num_time_steps,
                                                             output_dim=self._label_dim,
                                                             **self.global_config['rnn_model_factory'])
+        self.global_config['rnn_time_steps'] = num_time_steps
         logging.info(self.rnn_model.summary())
 
         optimizer = tf.keras.optimizers.Adam()
