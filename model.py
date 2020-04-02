@@ -608,7 +608,7 @@ class Model(object):
                                                             output_dim=self._label_dim,
                                                             **self.global_config['rnn_model_factory'])
         # try to compile model
-        self.rnn_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1), loss='mse', metrics=['accuracy'])
+        # self.rnn_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.1), loss='mse', metrics=['accuracy'])
 
         self.global_config['rnn_time_steps'] = self.data_source.longest_track
         logging.info(self.rnn_model.summary())
