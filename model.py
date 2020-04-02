@@ -239,7 +239,7 @@ def train_kendall_step_generator(model, optimizer, nan_value=0.0):
             target = K.cast(target, tf.float64)
             predictions = model(inp)
 
-            mask = K.all(K.equal(inp, mask_value), axis=-1)
+            mask = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
@@ -310,7 +310,7 @@ def train_step_generator(model, optimizer, nan_value=0):
             target = K.cast(target, tf.float64)
             predictions = model(inp)
 
-            mask = K.all(K.equal(inp, mask_value), axis=-1)
+            mask = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
@@ -820,7 +820,7 @@ class Model(object):
             batch_predictions = self.rnn_model(input_batch)
 
             # Calculate the mask
-            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
+            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
@@ -899,7 +899,7 @@ class Model(object):
             batch_predictions = self.rnn_model(input_batch)
 
             # Calculate the mask
-            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
+            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 

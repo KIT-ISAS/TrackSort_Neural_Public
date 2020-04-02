@@ -197,14 +197,14 @@ class DataAssociation(object):
                                                                                 * math.pow(2.0, is_alive_probability_weighting)
 
                 if len(measurements) >= len(prediction_values):
-                    distance_matrix_a = 10000 * np.ones([len(measurements), len(prediction_values) + len(measurements)])
+                    distance_matrix_a = infinity * np.ones([len(measurements), len(prediction_values) + len(measurements)])
                     distance_matrix_b = 1.2 * distance_threshold * np.ones(
                         [len(measurements), len(prediction_values)]) \
                                         * math.pow(2.0, is_alive_probability_weighting)
                     distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=1)
                     distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=0)
                 else:
-                    distance_matrix_a = 10000 * np.ones(
+                    distance_matrix_a = infinity * np.ones(
                         [len(prediction_values) + len(measurements), len(prediction_values)])
                     distance_matrix_b = 1.2 * distance_threshold * np.ones(
                         [len(measurements), len(prediction_values)]) \
