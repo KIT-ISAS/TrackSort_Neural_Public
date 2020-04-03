@@ -411,6 +411,8 @@ class RNN_Model(Expert):
 
     def predict_batch(self, inp):
         """Predict a batch of input data."""
+        if self.clear_state:
+            self.rnn_model.reset_states()
         return self.rnn_model(inp)
 
     def save_model(self):
