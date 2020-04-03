@@ -252,13 +252,15 @@ def train_kendall_step_generator(model, optimizer, nan_value=0.0):
             log_var_pred_x = predictions[:, :, 2]
             log_var_pred_y = predictions[:, :, 3]
 
-            pos_loss_x = tf.keras.losses.mean_squared_error(target_x, pos_pred_x)
-            bnn_loss_x = K.exp(-log_var_pred_x) * K.reshape(pos_loss_x, [K.shape(pos_loss_x)[0], 1]) + log_var_pred_x
+            pos_loss_x = (target_x - pos_pred_x)**2
 
-            pos_loss_y = tf.keras.losses.mean_squared_error(target_y, pos_pred_y)
-            bnn_loss_y = K.exp(-log_var_pred_y) * K.reshape(pos_loss_y, [K.shape(pos_loss_y)[0], 1]) + log_var_pred_y
+            bnn_loss_x = 0.5 * K.exp(-log_var_pred_x) * pos_loss_x + 0.5 * log_var_pred_x
+
+            pos_loss_y = (target_y - pos_pred_y)**2
+            bnn_loss_y = 0.5 * K.exp(-log_var_pred_y) * pos_loss_y + 0.5 * log_var_pred_y
 
             neg_log_likelihood = mask * (bnn_loss_x + bnn_loss_y)
+
             neg_log_likelihood = K.sum(neg_log_likelihood) / K.sum(mask) + tf.add_n(model.losses)
 
             # following lines are for logging metric
@@ -314,8 +316,8 @@ def train_step_generator(model, optimizer, nan_value=0):
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
-            mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
+            mse = K.mean((target - predictions)**2, axis=-1) * mask
+            mae = K.mean((target - predictions)**2, axis=-1) * mask
 
             # take average w.r.t. the number of unmasked entries
             mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
@@ -1024,7 +1026,7 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
 
-    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=True):
+    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=False):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
