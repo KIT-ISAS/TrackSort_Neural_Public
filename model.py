@@ -314,12 +314,14 @@ def train_step_generator(model, optimizer, nan_value=0):
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
-            mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
+            # mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
+            # mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
+            se = ((target - predictions) ** 2) * mask
+            ae = ((target - predictions) ** 2) ** 0.5 * mask
 
             # take average w.r.t. the number of unmasked entries
-            mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
-            mae = K.sum(mae) / K.sum(mask) + tf.add_n(model.losses)
+            mse = K.sum(se) / K.sum(mask) + tf.add_n(model.losses)
+            mae = K.sum(ae) / K.sum(mask) + tf.add_n(model.losses)
 
         grads = tape.gradient(mse, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -906,7 +908,7 @@ class Model(object):
             target_batch_unnormalized = target_batch
             pred_batch_unnormalized = batch_predictions
 
-            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
+            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized, axis=-1) * mask
             num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
             batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
 
