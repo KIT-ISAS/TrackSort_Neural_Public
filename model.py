@@ -465,38 +465,39 @@ class Model(object):
         new_states = []
         predictions = []
 
-        if self.global_config['mc_dropout']:
+        if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
             samples = []
 
-            # f = self._get_mc_dropout_predict_function()
-            f = K.function([self.rnn_model.layers[0].input], [self.rnn_model.output])
-            K2.set_learning_phase(1)
+            k = self.global_config['mc_samples']
 
-            mc_samples = self.global_config['mc_samples']
+            current_input = np.expand_dims(current_input, axis=1)
 
-            x_input = np.zeros([self.global_config['batch_size'], self.global_config['rnn_time_steps'], 2])
-            x_input[:, 0] = current_input
-
-            # code.interact(local=dict(globals(), **locals()))
-
-            for _ in range(mc_samples):
+            for _ in range(k):
                 self.rnn_model.reset_states()
                 set_state(self.rnn_model, state)
 
                 # https://github.com/tensorflow/tensorflow/issues/34201
                 # ... eager execution bug with keras functions
                 # mitigation: set learning_phase=1  =>  dropout is active
-                # K2.set_learning_phase(1)
                 # predic = f((x_input,))[0]
-                predic = self.rnn_model(x_input, training=True)
+
+                K2.set_learning_phase(1)
+                predic = self.rnn_model(current_input, training=True)
                 samples.append(predic[:, 0, :])
 
             samples = np.array(samples)
-            sample_mean = np.sum(samples, axis=0) / float(mc_samples)
-            sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(mc_samples)
+            sample_mean = np.sum(samples, axis=0) / float(k)
+            sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
             prediction = sample_mean
             variances = sample_variance
+
+        elif self.global_config['mc_dropout'] and self.global_config['mc_dropout'] == 1:
+            current_input = np.expand_dims(current_input, axis=1)
+
+            _ = self.rnn_model.reset_states()
+            prediction = self.rnn_model(current_input, training=False).numpy()
+            variances = np.ones_like(prediction) * 0.01
 
         elif self.global_config['kendall_loss']:
             current_input = np.expand_dims(current_input, axis=1)
@@ -1326,7 +1327,6 @@ class Model(object):
                     ax = plt.subplot(111)
 
                     for time_step_i in range(seq_length):
-                        print(time_step_i, end='')
                         ellipse = Ellipse(xy=pos_predictions[track_idx, time_step_i, :],
                                           width=2 * stddev_predictions[track_idx, time_step_i, 0],
                                           height=2 * stddev_predictions[track_idx, time_step_i, 1],
