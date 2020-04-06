@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 
 from scipy.special import erf
+from scipy.stats.stats import pearsonr
 
 from tensorflow.keras import backend as K
 # issue with eager execution
@@ -1244,14 +1245,15 @@ class Model(object):
 
     def _plot_correlation_between(self, x, y, x_name, y_name, epoch=0):
         plt.scatter(x, y)
+        r = pearsonr(x, y)
 
         # calc the trend line
-        z = np.polyfit(x, y, 1)
-        p = np.poly1d(z)
-        plt.plot(x, p(x), "b--")
+        # z = np.polyfit(x, y, 1)
+        # p = np.poly1d(z)
+        # plt.plot(x, p(x), "b--")
         plt.xlabel(x_name)
         plt.ylabel(y_name)
-        plt.title('Correlation between {} and {} (epoch={})'.format(x_name, y_name, epoch))
+        plt.title('Pearson r={} between {} and {}: (epoch={})'.format(r, x_name, y_name, epoch))
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.png'.format(x_name, y_name, epoch)))
         plt.clf()
 
