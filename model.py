@@ -935,7 +935,7 @@ class Model(object):
             # mae = K.sum(ae) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
 
             mses = np.concatenate((mses, se[np_mask].reshape([-1])))
-            maes = np.concatenate((maes, ae[np_mask].numpy().reshape([-1])))
+            maes = np.concatenate((maes, ae[np_mask].reshape([-1])))
 
         test_mae = np.mean(maes)
         test_mse = np.mean(mses)
@@ -1205,6 +1205,18 @@ class Model(object):
                                        'measurement_x', 'error_x',
                                        epoch=epoch)
 
+        self._plot_correlation_between(data['time_step'], data['l2'],
+                                       'track_time_step', 'l2',
+                                       epoch=epoch)
+
+        self._plot_correlation_between(data['time_step'], data['standardized_l2'],
+                                       'track_time_step', 'standardized_l2',
+                                       epoch=epoch)
+
+        self._plot_correlation_between(data['time_step'], data['variance_area'],
+                                       'track_time_step', 'variance_area',
+                                       epoch=epoch)
+
         self._plot_correlation_between(data['absolute_error'][:, 0], data['prediction_variance'][:, 0],
                                        'error_x', 'var_x',
                                        epoch=epoch)
@@ -1226,6 +1238,9 @@ class Model(object):
         self._plot_correlation_between(data['l2'], data['variance_area'],
                                        'l2', 'var_area',
                                        epoch=epoch)
+        self._plot_correlation_between(data['l2'], data['variance_area'],
+                                       'l2', 'var_area',
+                                       epoch=epoch)
 
     def _plot_correlation_between(self, x, y, x_name, y_name, epoch=0):
         plt.scatter(x, y)
@@ -1239,12 +1254,6 @@ class Model(object):
         plt.title('Correlation between {} and {} (epoch={})'.format(x_name, y_name, epoch))
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.png'.format(x_name, y_name, epoch)))
         plt.clf()
-
-
-
-
-
-
 
     def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=False):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
