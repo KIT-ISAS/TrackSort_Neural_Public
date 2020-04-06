@@ -582,6 +582,7 @@ class Model(object):
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant, test_nll])
                 self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
                 self.plot_calibration(dataset_test, epoch=epoch)
+                self.plot_correlation(dataset_test, epoch=epoch)
             else:
                 logging.debug(log_string)
 
@@ -670,6 +671,7 @@ class Model(object):
                 self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
                 if self.global_config['mc_dropout']:
                     self.plot_calibration(dataset_test, epoch=epoch)
+                    self.plot_correlation(dataset_test, epoch=epoch)
                 plt.close('all')
             else:
                 logging.debug(log_string)
@@ -1039,19 +1041,28 @@ class Model(object):
         plt.clf()
 
     def _get_evaluation_data(self, dataset):
-        # calculate for every measurement
-        #   - measurement
-        #   - prediction
-        #   - prediction_variance
-        #
+        """
+        Returns a dict which contains all of the data necessary to calculate the calibration and correlation plots.
+
+        Calc for every measurement:
+           - measurement
+           - prediction
+           - prediction_variance
+
+        :param dataset:
+        :return:
+        """
+        data = {}
 
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
-
-            data = {}
             data['measurement'] = []
+            data['target'] = []
             data['prediction'] = []
             data['prediction_variance'] = []
+            data['variance_area'] = []
             data['standardized_l2'] = []
+            data['l2'] = []
+            data['absolute_error'] = []
             data['time_step'] = []
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset):
@@ -1095,23 +1106,34 @@ class Model(object):
                     for time_step_i in range(seq_length):
                         data['prediction'] += [pos_predictions[track_idx, time_step_i, :]]
                         data['prediction_variance'] += [var_predictions[track_idx, time_step_i, :]]
+                        # 4 * sigma_x * sigma_y
+                        data['variance_area'] += [4 * np.sqrt(var_predictions[track_idx, time_step_i, 0]) *
+                                                  np.sqrt(var_predictions[track_idx, time_step_i, 1])]
                         data['measurement'] += [inp_batch[track_idx, time_step_i, :]]
+                        data['target'] += [target_batch[track_idx, time_step_i, :]]
                         data['standardized_l2'] += [np.sqrt(np.sum(
-                            ((data['measurement'][-1] - data['prediction'][-1]) ** 2) / data['prediction_variance'][
+                            ((data['target'][-1] - data['prediction'][-1]) ** 2) / data['prediction_variance'][
                                 -1]))]
+                        data['absolute_error'] += [np.abs(data['prediction'][-1] - data['target'][-1])]
+                        data['l2'] += [np.sqrt(np.sum(
+                            (data['prediction'][-1] - data['target'][-1])**2
+                        ))]
                         data['time_step'] += [time_step_i]
 
         data['prediction'] = np.array(data['prediction'])
+        data['target'] = np.array(data['target'])
         data['prediction_variance'] = np.array(data['prediction_variance'])
+        data['variance_area'] = np.array(data['variance_area'])
         data['measurement'] = np.array(data['measurement'])
         data['standardized_l2'] = np.array(data['standardized_l2'])
+        data['l2'] = np.array(data['l2'])
+        data['absolute_error'] = np.array(data['absolute_error'])
         data['time_step'] = np.array(data['time_step'])
 
         return data
 
     def plot_calibration(self, dataset, epoch=0):
         data = self._get_evaluation_data(dataset)
-
         N = data['time_step'].shape[0]
 
         def sigma_to_conf(sigmas):
@@ -1142,33 +1164,81 @@ class Model(object):
 
 
         #
-        stddevs = []
-        cdf = []
+        # stddevs = []
+        # cdf = []
+        #
+        # for stddev in np.arange(0.0, 10.0, 0.01):
+        #     mask = np.sqrt(data['prediction_variance'][:, 0]) < stddev
+        #     mask_N = np.count_nonzero(mask)
+        #     if mask_N == 0:
+        #         continue
+        #
+        #     # vari_selected = data['prediction_variance'][:, 0][mask]
+        #     pred_selected = data['prediction'][:, 0][mask]
+        #     meas_selected = data['measurement'][:, 0][mask]
+        #
+        #     delta_x = np.abs(pred_selected - meas_selected)
+        #     count_in = np.count_nonzero(delta_x <= stddev)
+        #     proportion = count_in / mask_N
+        #     cdf.append(proportion)
+        #     stddevs.append(stddev)
+        #
+        # stddevs = sigma_to_conf(np.array(stddevs))
+        # cdf = np.array(cdf)
+        #
+        # plt.scatter(stddevs, cdf)
+        # plt.title("CDF2")
+        # plt.savefig(os.path.join(self.global_config['diagrams_path'],
+        #                                      'CDF2_{}.png'.format(epoch)))
+        # plt.clf()
 
-        for stddev in np.arange(0.0, 10.0, 0.01):
-            mask = np.sqrt(data['prediction_variance'][:, 0]) < stddev
-            mask_N = np.count_nonzero(mask)
-            if mask_N == 0:
-                continue
+    def plot_correlation(self, dataset, epoch=0):
+        data = self._get_evaluation_data(dataset)
+        N = data['time_step'].shape[0]
 
-            # vari_selected = data['prediction_variance'][:, 0][mask]
-            pred_selected = data['prediction'][:, 0][mask]
-            meas_selected = data['measurement'][:, 0][mask]
+        self._plot_correlation_between(data['measurement'][:, 0], data['absolute_error'][:, 0],
+                                       'measurement_x', 'error_x',
+                                       epoch=epoch)
 
-            delta_x = np.abs(pred_selected - meas_selected)
-            count_in = np.count_nonzero(delta_x <= stddev)
-            proportion = count_in / mask_N
-            cdf.append(proportion)
-            stddevs.append(stddev)
+        self._plot_correlation_between(data['absolute_error'][:, 0], data['prediction_variance'][:, 0],
+                                       'error_x', 'var_x',
+                                       epoch=epoch)
+        self._plot_correlation_between(data['absolute_error'][:, 1], data['prediction_variance'][:, 1],
+                                       'error_y', 'var_y',
+                                       epoch=epoch)
+        self._plot_correlation_between(data['absolute_error'][:, 1], data['prediction_variance'][:, 1],
+                                       'error_y', 'var_y',
+                                       epoch=epoch)
+        self._plot_correlation_between(data['l2'], data['prediction_variance'][:, 0],
+                                       'l2', 'var_x',
+                                       epoch=epoch)
+        self._plot_correlation_between(data['l2'], data['prediction_variance'][:, 1],
+                                       'l2', 'var_y',
+                                       epoch=epoch)
+        self._plot_correlation_between(data['l2'], data['prediction_variance'][:, 1],
+                                       'l2', 'var_y',
+                                       epoch=epoch)
+        self._plot_correlation_between(data['l2'], data['variance_area'],
+                                       'l2', 'var_area',
+                                       epoch=epoch)
 
-        stddevs = sigma_to_conf(np.array(stddevs))
-        cdf = np.array(cdf)
+    def _plot_correlation_between(self, x, y, x_name, y_name, epoch=0):
+        plt.scatter(x, y)
 
-        plt.scatter(stddevs, cdf)
-        plt.title("CDF2")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'],
-                                             'CDF2_{}.png'.format(epoch)))
+        # calc the trend line
+        z = np.polyfit(x, y, 1)
+        p = np.poly1d(z)
+        plt.plot(x, p(x), "b--")
+        plt.xlabel(x_name)
+        plt.ylabel(y_name)
+        plt.title('Correlation between {} and {} (epoch={})'.format(x_name, y_name, epoch))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.png'.format(x_name, y_name, epoch)))
         plt.clf()
+
+
+
+
+
 
 
     def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=False):
