@@ -20,6 +20,23 @@
                     "--lr_decay_factor", "0.1",
                     "--execute_evaluation", "False",
                     "--execute_multi_target_tracking", "False"]
+        },
+        {
+            "name": "Training spheres",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": ["--is_loaded", "False",
+                    "--config_path", "configs/train_pepper_rnn.json",
+                    "--dataset_dir", "data/Kugeln/trackSortResultKugeln/*_trackHistory_NothingDeleted.csv",
+                    "--num_train_epochs", "400",
+                    "--evaluate_every_n_epochs", "5",
+                    "--improvement_break_condition", "0.001",
+                    "--lr_decay_after_epochs", "100",
+                    "--lr_decay_factor", "0.1",
+                    "--execute_evaluation", "False",
+                    "--execute_multi_target_tracking", "False"]
         }
     ]
 }

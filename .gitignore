@@ -20,3 +20,4 @@ results
 # venv
 virtualenv
 
+.vscode/settings.json
