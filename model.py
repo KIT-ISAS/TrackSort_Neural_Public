@@ -919,7 +919,7 @@ class Model(object):
             mask = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
-            np_mask = (1 - (K.all(K.equal(target, mask_value), axis=-1))).numpy()
+            np_mask = ~(K.all(K.equal(target, mask_value), axis=-1)).numpy()
 
             # se = squared error
             se_x = ((target[:, :, 0] - predictions[:, :, 0]) ** 2)
