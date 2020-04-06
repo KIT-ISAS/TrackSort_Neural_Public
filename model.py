@@ -669,8 +669,8 @@ class Model(object):
                 logging.info(log_string)
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
-                self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
                 if self.global_config['mc_dropout']:
+                    self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
                     self.plot_calibration(dataset_test, epoch=epoch)
                     self.plot_correlation(dataset_test, epoch=epoch)
                 plt.close('all')
@@ -1270,11 +1270,10 @@ class Model(object):
                 inp_batch = inp_batch.numpy()
                 target_batch = target_batch.numpy()
 
-                if self.global_config['mc_dropout']:
+                if self.global_config['mc_dropout'] and self.global_config['mc_dropout'] > 1:
                     k = self.global_config['mc_samples']
                     K2.set_learning_phase(1)
 
-                    prediction_list = []
                     samples = []
 
                     for t_k in range(k):
@@ -1286,19 +1285,18 @@ class Model(object):
                     sample_mean = np.sum(samples, axis=0) / float(k)
                     sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
-                    concat_pred = np.concatenate((sample_mean, sample_variance), axis=-1)
-                    prediction_list.append(concat_pred)
-
-                    prediction_list = np.concatenate(prediction_list, axis=1)
-
-                    pos_predictions = prediction_list[:, :, :2]
-                    var_predictions = prediction_list[:, :, 2:]
+                    pos_predictions = sample_mean
+                    var_predictions = sample_variance
+                elif self.global_config['mc_dropout'] and self.global_config['mc_dropout'] == 1:
+                    _ = self.rnn_model.reset_states()
+                    pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
+                    var_predictions = np.ones_like(pos_predictions) * 0.01
                 else:
                     _ = self.rnn_model.reset_states()
-                    prediction_list = self.rnn_model(inp_batch)
+                    predictions = self.rnn_model(inp_batch)
 
-                    pos_predictions = prediction_list[:, :, :2].numpy()
-                    var_predictions = K.exp(prediction_list[:, :, 2:]).numpy()
+                    pos_predictions = predictions[:, :, :2].numpy()
+                    var_predictions = K.exp(predictions[:, :, 2:]).numpy()
 
                 stddev_predictions = np.sqrt(var_predictions)
 
