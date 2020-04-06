@@ -492,7 +492,7 @@ class Model(object):
             prediction = sample_mean
             variances = sample_variance
 
-        elif self.global_config['mc_dropout'] and self.global_config['mc_dropout'] == 1:
+        elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
             current_input = np.expand_dims(current_input, axis=1)
 
             _ = self.rnn_model.reset_states()
@@ -1078,7 +1078,7 @@ class Model(object):
                 inp_batch = inp_batch.numpy()
                 target_batch = target_batch.numpy()
 
-                if self.global_config['mc_dropout'] and self.global_config['mc_dropout'] > 1:
+                if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
                     k = self.global_config['mc_samples']
                     K2.set_learning_phase(1)
 
@@ -1095,7 +1095,7 @@ class Model(object):
 
                     pos_predictions = sample_mean
                     var_predictions = sample_variance
-                elif self.global_config['mc_dropout'] and self.global_config['mc_dropout'] == 1:
+                elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
                     _ = self.rnn_model.reset_states()
                     pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
                     var_predictions = np.ones_like(pos_predictions) * 0.01
@@ -1273,7 +1273,7 @@ class Model(object):
                 inp_batch = inp_batch.numpy()
                 target_batch = target_batch.numpy()
 
-                if self.global_config['mc_dropout'] and self.global_config['mc_dropout'] > 1:
+                if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
                     k = self.global_config['mc_samples']
                     K2.set_learning_phase(1)
 
@@ -1290,7 +1290,7 @@ class Model(object):
 
                     pos_predictions = sample_mean
                     var_predictions = sample_variance
-                elif self.global_config['mc_dropout'] and self.global_config['mc_dropout'] == 1:
+                elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
                     _ = self.rnn_model.reset_states()
                     pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
                     var_predictions = np.ones_like(pos_predictions) * 0.01
