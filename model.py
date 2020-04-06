@@ -1257,7 +1257,11 @@ class Model(object):
         # plt.plot(x, p(x), "b--")
         plt.xlabel(x_name)
         plt.ylabel(y_name)
-        plt.title('Pearson r={:.2f} between {} and {}: (epoch={})'.format(r, x_name, y_name, epoch))
+        if r is not None:
+            plt.title('Pearson r={:.2f} between {} and {}: (epoch={})'.format(r, x_name, y_name, epoch))
+        else:
+            plt.title('Pearson r=None between {} and {}: (epoch={})'.format(r, x_name, y_name, epoch))
+
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.png'.format(x_name, y_name, epoch)))
         plt.clf()
 
