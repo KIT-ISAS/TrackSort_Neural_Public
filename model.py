@@ -320,8 +320,13 @@ def train_step_generator(model, optimizer, nan_value=0.0):
 
             # mse = tf.keras.losses.mean_squared_error(target, predictions) * mask
             # mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
-            se = ((target - predictions) ** 2) * mask
-            ae = ((target - predictions) ** 2) ** 0.5 * mask
+            se_x = ((target[:, :, 0] - predictions[:, :, 0]) ** 2)
+            se_y = ((target[:, :, 1] - predictions[:, :, 1]) ** 2)
+            se = (se_x+se_y) * mask
+
+            ae_x = ((target[:, :, 0] - predictions[:, :, 0]) ** 2) ** 0.5
+            ae_y = ((target[:, :, 1] - predictions[:, :, 1]) ** 2) ** 0.5
+            ae = (ae_x + ae_y) * mask
 
             # take average w.r.t. the number of unmasked entries
             mse = K.sum(se) / K.sum(mask) + tf.add_n(model.losses)
@@ -1033,7 +1038,7 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
 
-    def plot_calibration(self, dataset, epoch=0):
+    def _get_evaluation_data(self, dataset):
         # calculate for every measurement
         #   - measurement
         #   - prediction
@@ -1091,7 +1096,9 @@ class Model(object):
                         data['prediction'] += [pos_predictions[track_idx, time_step_i, :]]
                         data['prediction_variance'] += [var_predictions[track_idx, time_step_i, :]]
                         data['measurement'] += [inp_batch[track_idx, time_step_i, :]]
-                        data['standardized_l2'] += [np.sqrt(np.sum(((data['measurement'][-1]-data['prediction'][-1])**2) / data['prediction_variance'][-1]))]
+                        data['standardized_l2'] += [np.sqrt(np.sum(
+                            ((data['measurement'][-1] - data['prediction'][-1]) ** 2) / data['prediction_variance'][
+                                -1]))]
                         data['time_step'] += [time_step_i]
 
         data['prediction'] = np.array(data['prediction'])
@@ -1099,6 +1106,11 @@ class Model(object):
         data['measurement'] = np.array(data['measurement'])
         data['standardized_l2'] = np.array(data['standardized_l2'])
         data['time_step'] = np.array(data['time_step'])
+
+        return data
+
+    def plot_calibration(self, dataset, epoch=0):
+        data = self._get_evaluation_data(dataset)
 
         N = data['time_step'].shape[0]
 
