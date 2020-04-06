@@ -1245,7 +1245,11 @@ class Model(object):
 
     def _plot_correlation_between(self, x, y, x_name, y_name, epoch=0):
         plt.scatter(x, y)
-        r = pearsonr(x, y)[0]
+        try:
+            r = pearsonr(x, y)[0]
+        except ValueError as value_error:
+            logging.error("Pearson value error")
+            r = None
 
         # calc the trend line
         # z = np.polyfit(x, y, 1)
