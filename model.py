@@ -9,6 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 
+from scipy.special import erf
+
 from tensorflow.keras import backend as K
 # issue with eager execution
 # https://github.com/tensorflow/tensorflow/issues/34201
@@ -277,7 +279,7 @@ def train_kendall_step_generator(model, optimizer, nan_value=0.0):
     return train_step
 
 
-def train_step_generator(model, optimizer, nan_value=0):
+def train_step_generator(model, optimizer, nan_value=0.0):
     """
     Build a function which returns a computational graph for tensorflow.
     This function can be called to train the given model with the given
@@ -316,8 +318,12 @@ def train_step_generator(model, optimizer, nan_value=0):
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
-            mse = K.mean((target - predictions)**2, axis=-1) * mask
-            mae = K.mean((target - predictions)**2, axis=-1) * mask
+            mse_x = (target[:, :, 0] - predictions[:, :, 0])**2
+            mse_y = (target[:, :, 1] - predictions[:, :, 1])**2
+
+            mse = (mse_x + mse_y) * mask
+
+            mae = tf.keras.losses.mean_absolute_error(target, predictions) * mask
 
             # take average w.r.t. the number of unmasked entries
             mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
@@ -572,6 +578,7 @@ class Model(object):
                 test_mse, test_mae, test_nll = self._evaluate_kendall_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant, test_nll])
                 self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
+                self.plot_calibration(dataset_test, epoch=epoch)
             else:
                 logging.debug(log_string)
 
@@ -658,6 +665,8 @@ class Model(object):
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
                 self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
+                if self.global_config['mc_dropout']:
+                    self.plot_calibration(dataset_test, epoch=epoch)
                 plt.close('all')
             else:
                 logging.debug(log_string)
@@ -1025,6 +1034,132 @@ class Model(object):
         ax1.boxplot(errors, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
         plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
         plt.clf()
+
+    def plot_calibration(self, dataset, epoch=0):
+        # calculate for every measurement
+        #   - measurement
+        #   - prediction
+        #   - prediction_variance
+        #
+
+        if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
+
+            data = {}
+            data['measurement'] = []
+            data['prediction'] = []
+            data['prediction_variance'] = []
+            data['standardized_l2'] = []
+            data['time_step'] = []
+
+            for (batch_n, (inp_batch, target_batch)) in enumerate(dataset):
+                inp_batch = inp_batch.numpy()
+                target_batch = target_batch.numpy()
+
+                if self.global_config['mc_dropout']:
+                    k = self.global_config['mc_samples']
+                    K2.set_learning_phase(1)
+
+                    prediction_list = []
+                    samples = []
+
+                    for t_k in range(k):
+                        _ = self.rnn_model.reset_states()
+                        predic = self.rnn_model(inp_batch, training=True)
+                        samples.append(predic)
+
+                    samples = np.array(samples)
+                    sample_mean = np.sum(samples, axis=0) / float(k)
+                    sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
+
+                    concat_pred = np.concatenate((sample_mean, sample_variance), axis=-1)
+                    prediction_list.append(concat_pred)
+
+                    prediction_list = np.concatenate(prediction_list, axis=1)
+
+                    pos_predictions = prediction_list[:, :, :2]
+                    var_predictions = prediction_list[:, :, 2:]
+                else:
+                    _ = self.rnn_model.reset_states()
+                    prediction_list = self.rnn_model(inp_batch)
+
+                    pos_predictions = prediction_list[:, :, :2].numpy()
+                    var_predictions = K.exp(prediction_list[:, :, 2:]).numpy()
+
+                # store data
+                for track_idx in range(inp_batch.shape[0]):
+                    seq_length = self.data_source.get_last_timestep_of_track(inp_batch[track_idx])
+
+                    for time_step_i in range(seq_length):
+                        data['prediction'] += [pos_predictions[track_idx, time_step_i, :]]
+                        data['prediction_variance'] += [var_predictions[track_idx, time_step_i, :]]
+                        data['measurement'] += [inp_batch[track_idx, time_step_i, :]]
+                        data['standardized_l2'] += [np.sqrt(np.sum(((data['measurement'][-1]-data['prediction'][-1])**2) / data['prediction_variance'][-1]))]
+                        data['time_step'] += [time_step_i] 
+
+        data['prediction'] = np.array(data['prediction'])
+        data['prediction_variance'] = np.array(data['prediction_variance'])
+        data['measurement'] = np.array(data['measurement'])
+        data['standardized_l2'] = np.array(data['standardized_l2'])
+        data['time_step'] = np.array(data['time_step'])
+
+        N = data['time_step'].shape[0]
+
+        def sigma_to_conf(sigmas):
+            return erf(sigmas/np.sqrt(2))
+
+        # evalute data
+        # 
+        stddevs = []
+        cdf = []
+
+        for stddev in np.arange(0.0, 10.0, 0.01):
+            count_falls_into = np.count_nonzero(data['standardized_l2'] <= stddev)
+            proportion = count_falls_into / N
+            cdf.append(proportion)
+            stddevs.append(stddev)
+
+        stddevs = sigma_to_conf(np.array(stddevs))
+        cdf = np.array(cdf)
+
+        plt.scatter(stddevs, cdf)
+        plt.title("Calibration plot (standardized euclidean distance)")
+        plt.xlabel("Expected confidence level")
+        plt.ylabel("Observed confidence level")
+        plt.savefig(os.path.join(self.global_config['diagrams_path'],
+                                             'CDF_{}.png'.format(epoch)))
+        plt.clf()
+
+
+
+        # 
+        stddevs = []
+        cdf = []
+
+        for stddev in np.arange(0.0, 10.0, 0.01):
+            mask = np.sqrt(data['prediction_variance'][:, 0]) < stddev
+            mask_N = np.count_nonzero(mask)
+            if mask_N == 0:
+                continue
+
+            # vari_selected = data['prediction_variance'][:, 0][mask]
+            pred_selected = data['prediction'][:, 0][mask]
+            meas_selected = data['measurement'][:, 0][mask]
+
+            delta_x = np.abs(pred_selected - meas_selected)
+            count_in = np.count_nonzero(delta_x <= stddev)
+            proportion = count_in / mask_N
+            cdf.append(proportion)
+            stddevs.append(stddev)
+
+        stddevs = sigma_to_conf(np.array(stddevs))
+        cdf = np.array(cdf)
+
+        plt.scatter(stddevs, cdf)
+        plt.title("CDF2")
+        plt.savefig(os.path.join(self.global_config['diagrams_path'],
+                                             'CDF2_{}.png'.format(epoch)))
+        plt.clf()
+
 
     def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=False):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
