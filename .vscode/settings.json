@@ -1,6 +1,0 @@
-{
-    "python.linting.pylintEnabled": false,
-    "python.linting.pydocstyleEnabled": true,
-    "python.linting.enabled": true,
-    "python.pythonPath": "/usr/bin/python3.6"
-}
