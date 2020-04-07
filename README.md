@@ -107,6 +107,52 @@ See: `python main.py --help`
     --normalization_constant 1.0 \
     --test_noise_robustness True
   ```
+  
+- Train MC Dropout
+
+    ```shell script
+  
+  python main.py \
+     --is_loaded False \
+     --num_train_epochs 500 \
+     --evaluate_every_n_epochs 10 \
+     --num_units_first_rnn 128 \
+     --num_units_second_rnn 0 \
+     --lr_decay_after_epochs 150 \
+     --dataset_dir "data/DEM_cylinder.csv" \
+     --data_is_aligned False \
+     --normalization_constant 1.0 \
+     --rotate_columns True \
+     --dropout 0.5 \
+     --augment_beginning True \
+     --additive_noise_stddev 0.0001 \
+     --mc_dropout True \
+     --mc_samples 5 \
+     --distance_threshold 20.0
+
+    ```
+  
+- Train with negative log likelihood
+
+    ```shell script
+    python main.py \
+     --is_loaded False \
+     --num_train_epochs 1000 \
+     --evaluate_every_n_epochs 10 \
+     --num_units_first_rnn 64 \
+     --num_units_second_rnn 32 \
+     --lr_decay_after_epochs 150 \
+     --dataset_dir "data/DEM_cylinder.csv" \
+     --data_is_aligned False \
+     --normalization_constant 1.0 \
+     --rotate_columns True \
+     --dropout 0.2 \
+     --augment_beginning True \
+     --additive_noise_stddev 0.0001 \
+     --kendall_loss True \
+     --distance_threshold 20.0
+    ```
+  
     
 
 ### Hyperparameter search with `python main.py`
