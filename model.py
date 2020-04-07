@@ -480,8 +480,8 @@ class Model(object):
             for track_i, track_history in enumerate(track_measurement_history):
                 # use maximum of timesteps
                 t = 0
-                offset = max(0, len(track_history) - self.data_source.longest_track - 2)
-                for i in range(len(track_history)):
+                offset = max(0, len(track_history) - self.data_source.longest_track)
+                for i in range(min(len(track_history), self.data_source.longest_track)):
                     data_input[track_i, t, 0] = track_history[i+offset][0]
                     data_input[track_i, t, 1] = track_history[i+offset][1]
                     t += 1
@@ -496,7 +496,7 @@ class Model(object):
                 # mitigation: set learning_phase=1  =>  dropout is active
                 # predic = f((x_input,))[0]
 
-                K2.set_learning_phase(1)
+                # K2.set_learning_phase(1)
                 predic = self.rnn_model(data_input, training=True)
 
                 # extract last prediction (they are the only predictions which we need)
