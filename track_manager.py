@@ -8,7 +8,7 @@ import code
 class TrackManager(object):
     def __init__(self, global_config, data_source):
         self.global_config = global_config
-        self.model_manager = ModelManager(global_config, data_source)
+        self.model_manager = ModelManager(global_config, data_source, self)
         self.tracks = {}
         self.active_ids = []
         self.currently_highest_id = 0

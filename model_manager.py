@@ -11,7 +11,7 @@ from model import Model
 
 
 class ModelManager(object):
-    def __init__(self, global_config, data_source):
+    def __init__(self, global_config, data_source, trackManager):
         self.global_config = global_config
         self.model = Model(self.global_config, data_source)
         self.zero_state = self.model.get_zero_state()
@@ -21,12 +21,24 @@ class ModelManager(object):
         self.current_ids = []
         self.current_is_alive = []
 
+        self.trackManager = trackManager
+
     def predict_all(self):
         prediction_dict = {}
         variances_dict = {}
 
         for batch_nr in range(len(self.current_states)):
-            prediction, new_state, variances = self.model.predict(self.current_inputs[batch_nr], self.current_states[batch_nr])
+
+            if self.global_config['mc_dropout']:
+                global_track_ids = self.current_ids[batch_nr]
+                tracks = [self.trackManager.tracks[global_track_id] for global_track_id in global_track_ids]
+                track_measurement_history = [track.measurements for track in tracks]
+            else:
+                track_measurement_history = None
+
+            prediction, new_state, variances = self.model.predict(self.current_inputs[batch_nr],
+                                                                  self.current_states[batch_nr],
+                                                                  track_measurement_history=track_measurement_history)
             # state_batch_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
             self.current_states[batch_nr] = new_state
             for idx in range(len(self.current_is_alive[batch_nr])):

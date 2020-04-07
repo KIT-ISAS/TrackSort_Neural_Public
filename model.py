@@ -461,7 +461,7 @@ class Model(object):
         return get_state(self.rnn_model)
 
     # expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
-    def predict(self, current_input, state):
+    def predict(self, current_input, state, track_measurement_history=None):
         new_states = []
         predictions = []
 
@@ -470,11 +470,26 @@ class Model(object):
 
             k = self.global_config['mc_samples']
 
-            current_input = np.expand_dims(current_input, axis=1)
+            # Unfortunately we cannot use the state because dropout at inference time changes and therefore the
+            #  predictions are nonsense. For this reason, we use the measurement history of the tracks.
+            data_input = np.ones([self.global_config['batch_size'], self.data_source.longest_track, 2]) * \
+                         self.data_source.nan_value
+
+            last_timestep_per_track = []
+
+            for track_i, track_history in enumerate(track_measurement_history):
+                # use maximum of timesteps
+                t = 0
+                offset = max(0, len(track_history) - self.data_source.longest_track - 2)
+                for i in range(len(track_history)):
+                    data_input[track_i, t, 0] = track_history[i+offset][0]
+                    data_input[track_i, t, 1] = track_history[i+offset][1]
+                    t += 1
+                last_timestep_per_track.append(t-1)
 
             for _ in range(k):
                 self.rnn_model.reset_states()
-                set_state(self.rnn_model, state)
+                # set_state(self.rnn_model, state)
 
                 # https://github.com/tensorflow/tensorflow/issues/34201
                 # ... eager execution bug with keras functions
@@ -482,8 +497,14 @@ class Model(object):
                 # predic = f((x_input,))[0]
 
                 K2.set_learning_phase(1)
-                predic = self.rnn_model(current_input, training=True)
-                samples.append(predic[:, 0, :])
+                predic = self.rnn_model(data_input, training=True)
+
+                # extract last prediction (they are the only predictions which we need)
+                predictions = np.zeros([self.global_config['batch_size'], 1, 2])
+                for track_i, timestep in enumerate(last_timestep_per_track):
+                    predictions[track_i, 0] = predic[track_i, timestep]
+
+                samples.append(predictions)
 
             samples = np.array(samples)
             sample_mean = np.sum(samples, axis=0) / float(k)
