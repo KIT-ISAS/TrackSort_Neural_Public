@@ -81,10 +81,14 @@ parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
 parser.add_argument('--virtual_nozzle_array_x_position', type=float, default=1550,
                     help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_first_rnn', type=int, default=1024,
-                    help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_second_rnn', type=int, default=16,
-                    help='Where should the virtual nozzle array be?')
+
+parser.add_argument('--num_units_first_rnn', type=int, default=1024)
+parser.add_argument('--num_units_second_rnn', type=int, default=16)
+
+parser.add_argument('--num_units_first_dense', type=int, default=0)
+parser.add_argument('--num_units_second_dense', type=int, default=0)
+
+
 parser.add_argument('--clear_state', type=str2bool, default=True,
                     help='Whether a new track should be initialized with empty state?')
 parser.add_argument('--overwriting_activated', type=str2bool, default=True,
@@ -145,8 +149,8 @@ global_config = {
         'num_units_second_rnn': args.num_units_second_rnn,
         'num_units_third_rnn': 0,
         'num_units_fourth_rnn': 0,
-        'num_units_first_dense': 0,
-        'num_units_second_dense': 0,
+        'num_units_first_dense': args.num_units_first_dense,
+        'num_units_second_dense': args.num_units_second_dense,
         'num_units_third_dense': 0,
         'num_units_fourth_dense': 0,
         'rnn_model_name': args.rnn_type,
