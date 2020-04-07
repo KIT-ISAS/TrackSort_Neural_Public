@@ -36,6 +36,7 @@ parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
 parser.add_argument('--matching_algorithm', default='global',
                     help='The algorithm, that is used for matching. Current options are: ["local","global"])')
+parser.add_argument('--rnn_type', default='lstm')
 parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv',
                     help='The directory of the data set. Only needed for CsvDataset.')
 parser.add_argument('--dataset_type', default='CsvDataset',
@@ -148,7 +149,7 @@ global_config = {
         'num_units_second_dense': 0,
         'num_units_third_dense': 0,
         'num_units_fourth_dense': 0,
-        'rnn_model_name': 'lstm',
+        'rnn_model_name': args.rnn_type,
         'use_batchnorm_on_dense': True,
         'dropout': args.dropout,
         'regularization': args.regularization
