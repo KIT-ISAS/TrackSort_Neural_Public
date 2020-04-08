@@ -71,6 +71,7 @@ parser.add_argument('--time_normalization_constant', type=float, default=22.0, h
 parser.add_argument('--min_number_detections', type=int, default=6,
                     help='The min_number_detections value, that is used by the DataManager')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
+parser.add_argument('--mlp_input_dim', type=int, default=5, help='The dimension of input points for the MLP')
 parser.add_argument('--data_is_aligned', type=str2bool, default=True,
                     help='Whether the data used by the DataManger is aligned or not.')
 parser.add_argument('--rotate_columns', type=str2bool, default=False,
@@ -133,6 +134,7 @@ global_config = {
         'min_number_detections': args.min_number_detections,
         'nan_value': args.nan_value,
         'input_dim': args.input_dim,
+        'mlp_input_dim': args.mlp_input_dim,
         'data_is_aligned': args.data_is_aligned,
         'birth_rate_mean': args.birth_rate_mean,
         'birth_rate_std': args.birth_rate_std,
@@ -271,9 +273,17 @@ def run_global_config(global_config, experiment_series_names=''):
                                 data_source.longest_track, global_config.get("overwriting_activated"))
 
     # Seperate dataset into train and test set
-    # TODO: Fix random seed 
-    dataset_train, dataset_test = data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+    # TODO: Ask for these arguments in main run args
+    random_seed = 0
+    test_ratio = 0.1
+    mlp_dataset_train, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
+                                    normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
+                                    random_seed = random_seed)
 
+    dataset_train, dataset_test = data_source.get_tf_data_sets_seq2seq_data(
+                                    normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
+                                    random_seed = random_seed)
+    
     ## Train or import model
     if global_config["is_loaded"]:
         model_manager.load_models(global_config["model_path"])
@@ -386,7 +396,7 @@ else:
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
         try:
             A = np.array(result_list)
-            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+            np.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
         except Exception:
             pass
         if current_score > best_score:
@@ -413,7 +423,7 @@ else:
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
         try:
             A = np.array(result_list)
-            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+            np.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
         except Exception:
             pass
         if current_score > best_score:
@@ -437,7 +447,7 @@ else:
         logging.debug(str([current_score, accuracy_of_the_first_kind, accuracy_of_the_second_kind]))
         try:
             A = np.array(result_list)
-            numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+            np.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
         except Exception:
             pass
         if current_score > best_score:
@@ -447,7 +457,7 @@ else:
 
     try:
         A = np.array(result_list)
-        numpy.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
+        np.savetxt("experiments/" + global_config['experiment_series'] + "/hyperparameter_search.csv", A)
     except Exception:
         pass
 
