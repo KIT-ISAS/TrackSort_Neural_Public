@@ -76,6 +76,7 @@ parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.
 parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
 parser.add_argument('--dropout', type=float, default=0.0)
 parser.add_argument('--regularization', type=float, default=0.0)
+parser.add_argument('--use_batchnorm_on_dense', type=str2bool, default=False)
 
 parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
@@ -154,7 +155,7 @@ global_config = {
         'num_units_third_dense': 0,
         'num_units_fourth_dense': 0,
         'rnn_model_name': args.rnn_type,
-        'use_batchnorm_on_dense': True,
+        'use_batchnorm_on_dense': args.use_batchnorm_on_dense,
         'dropout': args.dropout,
         'regularization': args.regularization
 
