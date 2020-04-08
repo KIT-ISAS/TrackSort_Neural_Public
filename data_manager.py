@@ -302,6 +302,10 @@ class AbstractDataSet(ABC):
             tracks[:, :, 3] /= self.normalization_constant
         return tracks
 
+    def normalize_data(self, data):
+        """Normalize a set of values with self.normalization_constant"""
+        return data / self.normalization_constant
+
     def denormalize_tracks(self, tracks, is_seq2seq_data=False):
         tracks[:, :, :2] *= self.normalization_constant
 
@@ -323,11 +327,16 @@ class AbstractDataSet(ABC):
 
         return input_seq, target_seq
 
-    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1, batch_size=64):
+    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1, batch_size=64, random_seed = None):
         tracks = self.get_seq2seq_data()
         if normalized:
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
-        train_tracks, test_tracks = self.split_train_test(tracks, test_ratio=test_ratio)
+        
+        # Create ids for train and test tracks with optional random seed
+        train_ids, test_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
+        
+        train_tracks = tracks[train_ids]
+        test_tracks = tracks[test_ids]
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
@@ -344,6 +353,64 @@ class AbstractDataSet(ABC):
             #  -> into two tensors (x, y) and (x_target, y_target)
             input_seq = chunk[:, :, :2]
             target_seq = chunk[:, :, 2:]
+            return input_seq, target_seq
+
+        dataset_train = minibatches_train.map(split_input_target)
+        dataset_test = minibatches_test.map(split_input_target)
+
+        return dataset_train, dataset_test
+
+    def get_tf_data_sets_mlp_data(self, normalized=True, test_ratio=0.1, batch_size=64, random_seed = None):
+        """Seperate MLP data in training and test set and convert them to Tensor data.
+
+        Set random_seed to not None to fix the shuffling of training and test data.
+
+        Args:
+            normalized (Boolean):   Normalize the data
+            test_ratio (double):    Rate of data that is turned into test data
+            batch_size (int):       Batch size for training and test data
+            random_seed (int):      None: Random shuffling; int: Fixed shuffling
+
+        Returns:
+            dataset_train, dataset_test (tf.Tensor): Train and test data in tensorflow format
+        """
+        tracks = self.aligned_track_data
+        mlp_data = self.mlp_data
+        if normalized:
+            mlp_data = self.normalize_data(mlp_data)
+        
+        # Create ids for train and test tracks with optional random seed
+        train_track_ids, test_track_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
+        
+        # Get the mlp data ids of the track ids
+        train_ids = []
+        test_ids = []
+        for track_id in train_track_ids:
+            if track_id in self.track_num_mlp_id:
+                train_ids.extend(self.track_num_mlp_id.get(track_id))
+        for track_id in test_track_ids:
+            if track_id in self.track_num_mlp_id:
+                test_ids.extend(self.track_num_mlp_id.get(track_id))
+        
+        train_data = mlp_data[train_ids]
+        test_data = mlp_data[test_ids]
+
+        raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
+        raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_data)
+
+        # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
+        if random_seed is None:
+            minibatches_train = raw_train_dataset.shuffle(train_data.shape[0]).batch(batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.shuffle(test_data.shape[0]).batch(batch_size, drop_remainder=True)
+        else:
+            minibatches_train = raw_train_dataset.batch(batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.batch(batch_size, drop_remainder=True)
+
+        def split_input_target(chunk):
+            # split the tensor (x, y, x_target, y_target)
+            #  -> into two tensors (x, y) and (x_target, y_target)
+            input_seq = chunk[:, :-2]
+            target_seq = chunk[:, -2:]
             return input_seq, target_seq
 
         dataset_train = minibatches_train.map(split_input_target)
@@ -469,6 +536,46 @@ class AbstractDataSet(ABC):
             seq2seq_data.append(seq2seq_array)
 
         return np.array(seq2seq_data)
+
+    def _create_mlp_data(self, aligned_track_data, n_inp_points = 5):
+        """Create input to target data for MLP from aligned tracks.
+
+        The MLP data format is:
+        x_input1, x_input1, ..., x_inputN, y_inputN, x_output, y_output
+
+        Create a array that matches each data instance to a track number
+        Create a dict that matches each track all its data instances
+
+        Args:
+            aligned_track_data (np.array): The tracks in format: [n_tracks, length_tracks, 2]
+            n_inp_points (int): Number of track points as input
+        """
+        assert self.longest_track is not None, "self.longest_track not set"
+
+        self.mlp_data = []
+        self.mlp_id_track_num = []
+        self.track_num_mlp_id = dict()
+        counter = 0
+        # For each track
+        for track_number in range(aligned_track_data.shape[0]):
+            last_index = self.get_last_timestep_of_track(aligned_track_data[track_number]) - 1
+            # Check if there are enough points in the track
+            if last_index >= n_inp_points:
+                self.track_num_mlp_id[track_number] = []
+                for i in range(0, last_index-n_inp_points):
+                    # Build input and target
+                    input_array = np.append(aligned_track_data[track_number, i:i+n_inp_points, 0], aligned_track_data[track_number, i:i+n_inp_points, 1])
+                    output_array = np.append(aligned_track_data[track_number, i+n_inp_points, 0], aligned_track_data[track_number, i+n_inp_points, 1])
+                    full_array = np.append(input_array, output_array)
+                    self.mlp_data.append(full_array)
+                    # Add track id and MLP dataset id to list and dict
+                    self.mlp_id_track_num.append(track_number)
+                    self.track_num_mlp_id[track_number].append(counter)
+                    counter += 1
+        
+        # convert to numpy
+        self.mlp_data = np.array(self.mlp_data)
+        self.mlp_id_track_num = np.array(self.mlp_id_track_num)
 
     def get_box_plot(self, model, dataset):
         maes = []
@@ -828,7 +935,7 @@ class FakeDataSet(AbstractDataSet):
 
 
 class CsvDataSet(AbstractDataSet):
-    def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2,
+    def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2, mlp_input_dim=5,
                  timesteps=35, data_is_aligned=True,
                  rotate_columns=False, normalization_constant=None,
                  birth_rate_mean=6, birth_rate_std=2,
@@ -864,6 +971,8 @@ class CsvDataSet(AbstractDataSet):
             logging.info("align data")
             self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
             logging.info("data is aligned")
+
+        self._create_mlp_data(self.aligned_track_data, n_inp_points = mlp_input_dim)
 
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_track_data)
 
