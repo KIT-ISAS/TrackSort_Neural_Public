@@ -98,6 +98,8 @@ parser.add_argument('--augment_beginning', type=str2bool, default=False,
                     help='Augment the dataset by duplicating the tracks and removing initial measurements from the '
                          'duplicates')
 
+parser.add_argument('--custom_variance_prediction', type=str2bool, default=False, help='MSE prediction of L2')
+
 parser.add_argument('--mc_dropout', type=str2bool, default=False, help='Calculate uncertainties with MC Dropout')
 parser.add_argument('--mc_samples', type=int, default=5, help='MC Dropout: how many samples per track?')
 
@@ -179,6 +181,8 @@ global_config = {
 
     'mc_dropout': args.mc_dropout,
     'mc_samples': args.mc_samples,
+
+    'custom_variance_prediction': args.custom_variance_prediction,
 
     'kendall_loss': args.kendall_loss,
 

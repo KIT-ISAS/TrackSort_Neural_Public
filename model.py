@@ -280,6 +280,52 @@ def train_kendall_step_generator(model, optimizer, nan_value=0.0):
     return train_step
 
 
+def train_custom_variance_step_generator(model, optimizer, nan_value=0.0):
+    mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
+
+    @tf.function
+    def train_step(inp, target):
+        with tf.GradientTape() as tape:
+            target = K.cast(target, tf.float64)
+            predictions = model(inp)
+
+            mask = K.all(K.equal(target, mask_value), axis=-1)
+            mask = 1 - K.cast(mask, tf.float64)
+            mask = K.cast(mask, tf.float64)
+
+            target_x = target[:, :, 0]
+            target_y = target[:, :, 1]
+
+            pos_pred_x = predictions[:, :, 0]
+            pos_pred_y = predictions[:, :, 1]
+
+            log_var_pred_x = predictions[:, :, 2]
+            log_var_pred_y = predictions[:, :, 3]
+
+            pos_loss_x = (target_x - pos_pred_x)**2
+            pos_loss_y = (target_y - pos_pred_y)**2
+
+            var_loss_x = (pos_loss_x - K.exp(log_var_pred_x))**2
+            var_loss_y = (pos_loss_y - K.exp(log_var_pred_y))**2
+
+            custom_loss = mask * (pos_loss_x + pos_loss_y + var_loss_x + var_loss_y)
+
+            custom_loss = K.sum(custom_loss) / K.sum(mask) + tf.add_n(model.losses)
+
+            # following lines are for logging metric
+            mse = tf.keras.losses.mean_squared_error(target, predictions[:, :, :2]) * mask
+            mae = tf.keras.losses.mean_absolute_error(target, predictions[:, :, :2]) * mask
+            mse = K.sum(mse) / K.sum(mask) + tf.add_n(model.losses)
+            mae = K.sum(mae) / K.sum(mask) + tf.add_n(model.losses)
+
+        grads = tape.gradient(custom_loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        return mse, mae, custom_loss
+
+    return train_step
+
+
 def train_step_generator(model, optimizer, nan_value=0.0):
     """
     Build a function which returns a computational graph for tensorflow.
@@ -436,6 +482,8 @@ class Model(object):
             self._label_dim += 2
         if self.global_config['separation_prediction']:
             self._label_dim += 2
+        if self.global_config['custom_variance_prediction']:
+            self._label_dim += 2
 
         self._mc_dropout_predict_function = None
 
@@ -446,6 +494,8 @@ class Model(object):
         else:
             if self.global_config['kendall_loss']:
                 self.train_kendall()
+            elif self.global_config['custom_variance_prediction']:
+                self.train_custom_variance()
             elif self.global_config['separation_prediction']:
                 self.train_separation_prediction()
             else:
@@ -636,6 +686,97 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test Negative Log Likelihood")
         plt.legend(loc="upper right")
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'NLL.png'))
+        plt.clf()
+
+    def train_custom_variance(self):
+        self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
+                                                            num_time_steps=self.data_source.longest_track,
+                                                            output_dim=self._label_dim,
+                                                            **self.global_config['rnn_model_factory'])
+        self.global_config['rnn_time_steps'] = self.data_source.longest_track
+        logging.info(self.rnn_model.summary())
+
+        dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+
+        optimizer = tf.keras.optimizers.Adam()
+
+        train_step_fn = train_custom_variance_step_generator(self.rnn_model, optimizer)
+
+        train_losses = []
+        test_losses = []
+
+        # Train model
+        for epoch in range(self.global_config['num_train_epochs']):
+            # learning rate decay
+            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
+                old_lr = K.get_value(optimizer.lr)
+                new_lr = old_lr * self.global_config['lr_decay_factor']
+                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+                K.set_value(optimizer.lr, new_lr)
+
+            # Train for one batch
+            mae_batch = []
+            mse_batch = []
+            custom_loss_batch = []
+
+            _ = self.rnn_model.reset_states()
+            for (batch_n, (inp, target)) in enumerate(dataset_train):
+                # Mini-Batches
+                if self.global_config['clear_state']:
+                    _ = self.rnn_model.reset_states()
+                mse, mae, custom_loss = train_step_fn(inp, target)
+                mse_batch.append(mse)
+                mae_batch.append(mae)
+                custom_loss_batch.append(custom_loss)
+
+            mse = np.mean(mse_batch)
+            mae = np.mean(mae_batch)
+            custom_loss = np.mean(custom_loss_batch)
+
+            train_losses.append([epoch, mse, mae * self.data_source.normalization_constant, custom_loss])
+
+            log_string = "{}/{}: \t custom_loss={} \t mse={}".format(epoch, self.global_config['num_train_epochs'],
+                                                             custom_loss, mse)
+
+            # Evaluate
+            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
+                    or (epoch + 1) == self.global_config['num_train_epochs']:
+                logging.info(log_string)
+                test_mse, test_mae, test_custom_loss = self._evaluate_custom_loss_model(dataset_test, epoch)
+                test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant, test_custom_loss])
+                self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
+                self.plot_calibration(dataset_test, epoch=epoch)
+                self.plot_correlation(dataset_test, epoch=epoch)
+            else:
+                logging.debug(log_string)
+
+        self.rnn_model.save(os.path.join(self.global_config['diagrams_path'], 'model.h5'))
+
+        # Visualize loss curve
+        train_losses = np.array(train_losses)
+        test_losses = np.array(test_losses)
+
+        # MSE
+        plt.plot(train_losses[:, 0], train_losses[:, 1], c='blue', label="Training MSE")
+        plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
+        plt.legend(loc="upper right")
+        plt.yscale('log')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
+        plt.clf()
+
+        # MAE
+        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE (not normalized)")
+        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
+        plt.legend(loc="upper right")
+        plt.yscale('log')
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
+        plt.clf()
+
+        # custom_loss
+        plt.plot(train_losses[:, 0], train_losses[:, 3], c='blue', label="Training custom_loss")
+        plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test custom_loss")
+        plt.legend(loc="upper right")
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Custom_loss.png'))
         plt.clf()
 
     def train(self):
@@ -925,6 +1066,87 @@ class Model(object):
 
         return test_mse, test_mae, test_nll
 
+    def _evaluate_custom_loss_model(self, dataset_test, epoch):
+        mses = np.array([])
+        maes = np.array([])
+        custom_losses = np.array([])
+
+        mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
+        normalization_factor = self.data_source.normalization_constant
+
+        _ = self.rnn_model.reset_states()
+        for input_batch, target_batch in dataset_test:
+            if self.global_config['clear_state']:
+                _ = self.rnn_model.reset_states()
+
+            batch_predictions = self.rnn_model(input_batch)
+
+            # Calculate the mask
+            mask = K.all(K.equal(target_batch, mask_value), axis=-1)
+            mask = 1 - K.cast(mask, tf.float64)
+            mask = K.cast(mask, tf.float64)
+
+            target_batch_unnormalized = target_batch
+            pred_batch_unnormalized = batch_predictions
+
+            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized[:, :, :2]) * mask
+            num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
+            batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
+
+            batch_mae = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized[:, :, :2]) * mask
+            batch_mae_per_track = tf.reduce_sum(batch_mae, axis=-1) / num_time_steps_per_track
+
+            # -----------
+
+            target_x = target_batch[:, :, 0]
+            target_y = target_batch[:, :, 1]
+
+            pos_pred_x = batch_predictions[:, :, 0]
+            pos_pred_y = batch_predictions[:, :, 1]
+
+            log_var_pred_x = batch_predictions[:, :, 2]
+            log_var_pred_y = batch_predictions[:, :, 3]
+
+            pos_loss_x = (target_x - pos_pred_x) ** 2
+            pos_loss_y = (target_y - pos_pred_y) ** 2
+
+            var_loss_x = (pos_loss_x - K.exp(log_var_pred_x)) ** 2
+            var_loss_y = (pos_loss_y - K.exp(log_var_pred_y)) ** 2
+
+            custom_loss = mask * (pos_loss_x + pos_loss_y + var_loss_x + var_loss_y)
+
+            custom_loss = K.sum(custom_loss) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
+
+            mses = np.concatenate((mses, batch_loss_per_track.numpy().reshape([-1])))
+            maes = np.concatenate((maes, batch_mae_per_track.numpy().reshape([-1])))
+            custom_losses = np.concatenate((custom_losses, custom_loss.numpy().reshape([-1])))
+
+        test_mae = np.mean(maes)
+        test_mse = np.mean(mses)
+        test_custom_loss = np.mean(custom_losses)
+
+        logging.info("Evaluate: MSE={}".format(test_mse))
+        logging.info("Evaluate: MAE={}".format(test_mae))
+        logging.info("Evaluate: custom_loss={}".format(test_custom_loss))
+
+        plt.rc('grid', linestyle=":")
+        fig1, ax1 = plt.subplots()
+
+        if self.data_source.normalization_constant > 2.0:
+            # ToDo: make this an argument
+            ax1.yaxis.grid(True)
+            ax1.set_ylim([0, 4.0])
+
+        name = '{:05d}epoch-NextStep-RNN ({})'.format(epoch, self.model_hash)
+        ax1.set_title(name)
+        prop = dict(linewidth=2.5)
+        ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
+                    medianprops=prop, capprops=prop)
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.png'))
+        plt.clf()
+
+        return test_mse, test_mae, test_custom_loss
+
     def _evaluate_model(self, dataset_test, epoch):
         mses = np.array([])
         maes = np.array([])
@@ -1100,7 +1322,7 @@ class Model(object):
         """
         data = {}
 
-        if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
+        if self.global_config['mc_dropout'] or self.global_config['kendall_loss'] or self.global_config['custom_variance_prediction']:
             data['measurement'] = []
             data['target'] = []
             data['prediction'] = []
@@ -1201,8 +1423,7 @@ class Model(object):
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'],
-                                             'CDF_{}.png'.format(epoch)))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'CDF_{}.png'.format(epoch)))
         plt.clf()
 
 
@@ -1235,6 +1456,7 @@ class Model(object):
         # plt.savefig(os.path.join(self.global_config['diagrams_path'],
         #                                      'CDF2_{}.png'.format(epoch)))
         # plt.clf()
+
 
     def plot_correlation(self, dataset, epoch=0):
         data = self._get_evaluation_data(dataset)
@@ -1304,7 +1526,7 @@ class Model(object):
         plt.clf()
 
     def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=False):
-        if self.global_config['mc_dropout'] or self.global_config['kendall_loss']:
+        if self.global_config['mc_dropout'] or self.global_config['kendall_loss'] or self.global_config['custom_variance_prediction']:
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
                 inp_batch = inp_batch.numpy()
