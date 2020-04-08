@@ -18,6 +18,7 @@ from data_manager import FakeDataSet, CsvDataSet
 from evaluator import Evaluator
 # Test
 from cv_model import *
+from ca_model import *
 
 tf.get_logger().setLevel('ERROR')
 #tf.enable_eager_execution()
@@ -201,26 +202,31 @@ def run_global_config(global_config, experiment_series_names=''):
     
     # calc mean vel in first time step
 
-    
+    """
     sum_v = 0
+    sum_a = 0
     c = 0
     for track in data_source.aligned_track_data:
         c = c+1
         sum_v = sum_v + (track[1,0] - track[0,0])
+        sum_a += (track[2,0]-track[1,0])-(track[1,0] - track[0,0])
     dt = 0.005
     mean_v = (sum_v/c)/dt
-    var_sum = 0
+    mean_a = (sum_a/c)/(dt**2)
+    var_v_sum = 0
+    var_a_sum = 0
     for track in data_source.aligned_track_data:
-        var_sum = var_sum + ((track[1,0] - track[0,0])/dt - mean_v)**2
-    var_v = var_sum/c
-    """
-    cv_model = CV_Model(dt = dt, s_w = 10E7)
+        var_v_sum += ((track[1,0] - track[0,0])/dt - mean_v)**2
+        var_a_sum += (((track[2,0]-track[1,0])-(track[1,0] - track[0,0]))/(dt**2) - mean_a)**2
+    var_v = var_v_sum/c
+    var_a = var_a_sum/c
+    cv_model = CV_Model(name = "CV_Model", dt = dt, s_w = 10E7)
     # Test CV model
     c = 0
     error = 0
     for track in data_source.aligned_track_data:
         cv_state = CV_State(track[0], velocity_guess=15000, velo_var_x=10E6, velo_var_y = 10E8)
-        cv_model.update(cv_state)
+        cv_model.update(cv_state, track[0,:])
         cv_model.predict(cv_state)
         for i in range(1,track.shape[0]):
             pos = track[i,:]
@@ -234,8 +240,27 @@ def run_global_config(global_config, experiment_series_names=''):
                 c = c+1
 
     print(error/c)
-    """
+    ca_model = CA_Model(name="CA_Model", dt = dt, s_w = 10E10, s_v=2)
+    # Test CA model
+    c = 0
+    error = 0
+    for track in data_source.aligned_track_data:
+        ca_state = CA_State(track[0], velocity_guess=1.5E4, velo_var_x=10E6, velo_var_y = 10E8, pos_var=2, accel_guess = 0.0, accel_var_x = 10E8, accel_var_y = 10E9)
+        ca_model.update(ca_state, track[0,:])
+        ca_model.predict(ca_state)
+        for i in range(1,track.shape[0]):
+            pos = track[i,:]
+            if np.array_equal(pos,np.array([0, 0])) == False:
+                state_pos = [ca_state.get_pos().item(0), ca_state.get_pos().item(1)]
+                error = error + np.sqrt((pos[0]-state_pos[0]) ** 2 + (pos[1]-state_pos[1]) ** 2)
+                # update
+                ca_model.update(ca_state, pos)
+                # predict
+                ca_model.predict(ca_state)
+                c = c+1
 
+    print(error/c)
+    """
     ## Import model config to json tree
     # TODO: Create json schema to check config validity
     with open(global_config["config_path"]) as f:

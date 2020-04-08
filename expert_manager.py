@@ -16,7 +16,9 @@ import code
 #tf.keras.backend.set_floatx('float64')
 
 from rnn_model import RNN_Model
+from kf_model import KF_Model, KF_State
 from cv_model import CV_Model, CV_State
+from ca_model import CA_Model, CA_State
 from expert import Expert, Expert_Type
 
 class Expert_Manager(object):
@@ -87,6 +89,11 @@ class Expert_Manager(object):
                     # Create constant velocity model
                     cv_model = CV_Model(expert_name, **expert.get("model_options"), default_state_options=expert.get("state_options"))
                     self.experts.append(cv_model)
+                    self.current_states.append([])
+                elif sub_type == 'CA':
+                    # Create constant velocity model
+                    ca_model = CA_Model(expert_name, **expert.get("model_options"), default_state_options=expert.get("state_options"))
+                    self.experts.append(ca_model)
                     self.current_states.append([])
                 else:
                     logging.warning("Kalman filter subtype " + sub_type + " not supported. Will not create model.") 
@@ -187,14 +194,19 @@ class Expert_Manager(object):
                         state_buffer = np.transpose(state_buffer, [1, 0, 2])
                         state_buffers.append(state_buffer)
                     self.current_states[i][batch_nr] = state_buffers
-            elif isinstance(expert, CV_Model):
-                # Create new entry for CV model
+            elif isinstance(expert, KF_Model):
+                # Create new entry for KF model
                 if len(self.current_states[i]) <= batch_nr:
                     # Create new batch
                     self.current_states[i].append(expert.get_zero_state(self.batch_size))
 
                 # Update existing batch
-                self.current_states[i][batch_nr][idx] = CV_State(measurement, **expert.default_state_options)
+                if isinstance(expert, CV_Model):
+                    self.current_states[i][batch_nr][idx] = CV_State(measurement, **expert.default_state_options)
+                elif isinstance(expert, CA_Model):
+                    self.current_states[i][batch_nr][idx] = CA_State(measurement, **expert.default_state_options)
+                else:
+                    logging.error("Track creation for expert not implemented!")
             else:
                 logging.error("Track creation for expert not implemented!")
 
@@ -215,9 +227,8 @@ class Expert_Manager(object):
                 prediction, new_state = expert.predict(inputs, self.current_states[i][batch_nr])
                 self.current_states[i][batch_nr] = new_state
                 all_predictions.append(prediction)
-            elif isinstance(expert, CV_Model):
+            elif isinstance(expert, KF_Model):
                 # Predict all tracks of batch with CV model
-                #TODO: Is batch wise prediction possible? --> Calculation time is very high
                 
                 prediction = []
                 for j in range(len(self.current_states[i][batch_nr])):
