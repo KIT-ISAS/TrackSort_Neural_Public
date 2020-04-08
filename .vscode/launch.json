@@ -37,6 +37,30 @@
                     "--lr_decay_factor", "0.1",
                     "--execute_evaluation", "False",
                     "--execute_multi_target_tracking", "False"]
-        }
+        },
+        {
+            "name": "Testing pepper",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": ["--is_loaded", "True",
+                    "--config_path", "configs/test_kf_pepper.json",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
+                    "--execute_evaluation", "True",
+                    "--execute_multi_target_tracking", "True"]
+        },
+        {
+            "name": "Testing spheres",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": ["--is_loaded", "True",
+                    "--config_path", "configs/test_spheres_kf.json",
+                    "--dataset_dir", "data/Kugeln/trackSortResultKugeln/*_trackHistory_NothingDeleted.csv",
+                    "--execute_evaluation", "True",
+                    "--execute_multi_target_tracking", "False"]
+        },
     ]
 }

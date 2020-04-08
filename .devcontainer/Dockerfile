@@ -14,7 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # property in devcontainer.json to use it. On Linux, the container user's GID/UIDs
 # will be updated to match your local UID/GID (when using the dockerFile property).
 # See https://aka.ms/vscode-remote/containers/non-root-user for details.
-ARG USERNAME=vscode
+ARG USERNAME=vs-code
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
@@ -71,4 +71,5 @@ RUN echo "5"
 # Switch back to dialog for any ad-hoc use of apt-get
 ENV DEBIAN_FRONTEND=dialog
 
+USER $USERNAME
 RUN echo "Image build"
