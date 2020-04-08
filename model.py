@@ -937,13 +937,29 @@ class Model(object):
             if self.global_config['clear_state']:
                 _ = self.rnn_model.reset_states()
 
-            predictions = self.rnn_model(input_batch)
-
             # Calculate the mask
             mask = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
             np_mask = ~(K.all(K.equal(target, mask_value), axis=-1)).numpy()
+
+            if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
+                samples = []
+                k = self.global_config['mc_samples']
+                for _ in range(k):
+                    self.rnn_model.reset_states()
+                    K2.set_learning_phase(1)
+                    predic = self.rnn_model(input_batch, training=True)
+                    samples.append(predic)
+
+                samples = np.array(samples)
+                sample_mean = np.sum(samples, axis=0) / float(k)
+                # sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
+
+                predictions = sample_mean
+                # variances = sample_variance
+            else:
+                predictions = self.rnn_model(input_batch)
 
             # se = squared error
             se_x = ((target[:, :, 0] - predictions[:, :, 0]) ** 2)
