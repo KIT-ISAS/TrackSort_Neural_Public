@@ -16,6 +16,7 @@ import code
 #tf.keras.backend.set_floatx('float64')
 
 from rnn_model import RNN_Model
+from mlp_model import MLP_Model
 from kf_model import KF_Model, KF_State
 from cv_model import CV_Model, CV_State
 from ca_model import CA_Model, CA_State
@@ -55,7 +56,7 @@ class Expert_Manager(object):
         self.create_models(is_loaded, model_path, batch_size, num_time_steps)
         self.n_experts = len(self.experts)
 
-    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0):
+    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 10):
         """Create list of experts.
 
         Creat experts based on self.expert_cofig.
@@ -68,6 +69,7 @@ class Expert_Manager(object):
             model_path (String):  The path of the models if is_loaded is True
             batch_size (int):     The batch size of the data
             num_time_steps (int): The number of timesteps in the longest track
+            n_mlp_features (int): The number of features for MLP networks
         """
         for expert_name in self.expert_config:
             expert = self.expert_config.get(expert_name)
@@ -97,6 +99,15 @@ class Expert_Manager(object):
                     self.current_states.append([])
                 else:
                     logging.warning("Kalman filter subtype " + sub_type + " not supported. Will not create model.") 
+            elif expert_type=='MLP':
+                model_path = expert.get("model_path")
+                mlp_model = MLP_Model(expert_name, model_path, True, expert.get("options"))
+                if is_loaded:
+                    mlp_model.load_model()
+                else:
+                    mlp_model.create_model(n_mlp_features)
+                self.experts.append(mlp_model)
+                self.current_states.append([])
             else:
                 logging.warning("Expert type " + expert_type + " not supported. Will not create model.")
 
@@ -140,8 +151,7 @@ class Expert_Manager(object):
             lr_change (double): Change in learning rate (factorial)
         """
         for expert in self.experts:
-            if expert.get_type() == Expert_Type.RNN:
-                expert.change_learning_rate(lr_change)
+            expert.change_learning_rate(lr_change)
 
     def test_batch(self, inp):
         """Run predictions for all experts on a batch of test data.

@@ -74,7 +74,11 @@ class Expert(ABC):
     def get_type(self):
         """Return type."""
         return self.type
-        
+    
+    def change_learning_rate(self, lr_change=1):
+        """Change the learning rate of the model optimizer."""
+        pass
+
 class Expert_Type(Enum):
     """Simple enumeration class for expert types."""
     

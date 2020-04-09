@@ -22,6 +22,23 @@
                     "--execute_multi_target_tracking", "False"]
         },
         {
+            "name": "Training pepper MLP",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": ["--is_loaded", "False",
+                    "--config_path", "configs/train_pepper_mlp.json",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
+                    "--num_train_epochs", "3000",
+                    "--batch_size", "500",
+                    "--evaluate_every_n_epochs", "5",
+                    "--lr_decay_after_epochs", "150",
+                    "--lr_decay_factor", "0.5",
+                    "--execute_evaluation", "False",
+                    "--execute_multi_target_tracking", "False"]
+        },
+        {
             "name": "Training spheres",
             "type": "python",
             "request": "launch",

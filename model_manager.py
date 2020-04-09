@@ -89,8 +89,8 @@ class ModelManager(object):
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
-    # TODO create train, test and evaluate functions for single-target tracking
-    def train_models(self, dataset_train, dataset_test, num_train_epochs = 1000, evaluate_every_n_epochs=20,
+    def train_models(self, dataset_train, dataset_test,
+                    num_train_epochs = 1000, evaluate_every_n_epochs = 20,
                     improvement_break_condition = 0.001, lr_decay_after_epochs = 100, lr_decay = 0.1):
         """Train all experts and the gating network.
 
@@ -151,6 +151,12 @@ class ModelManager(object):
                 # Save predictions
                 #prediction_batch.append(predictions)
                 # Create a mask for end of tracks
+                for i in range(len(predictions)):
+                    loss = loss_object(target, predictions[i])
+                    mae = mae_object(target, predictions[i])
+                    train_losses[i](loss)
+                    train_maes[i](mae)
+                """ CODE FOR RNN AND KF
                 mask = K.all(K.equal(inp, k_mask_value), axis=-1)
                 mask = 1 - K.cast(mask, tf.float64)
                 mask = K.cast(mask, tf.float64)
@@ -160,6 +166,7 @@ class ModelManager(object):
                     mae = mae_object(target, predictions[i], sample_weight = mask)
                     train_losses[i](loss)
                     train_maes[i](mae)
+                """
             
             for i in range(len(train_summary_writers)):
                 with train_summary_writers[i].as_default():
@@ -182,6 +189,12 @@ class ModelManager(object):
                 for (batch_n, (inp, target)) in enumerate(dataset_test):
                     # Train experts on a batch
                     predictions = self.expert_manager.test_batch(inp)
+                    for i in range(len(predictions)):
+                        loss = loss_object(target, predictions[i])
+                        mae = mae_object(target, predictions[i])
+                        test_losses[i](loss)
+                        test_maes[i](mae)
+                    """ CODE FOR RNN AND KF
                     # Create a mask for end of tracks
                     mask = K.all(K.equal(inp, k_mask_value), axis=-1)
                     mask = 1 - K.cast(mask, tf.float64)
@@ -192,7 +205,7 @@ class ModelManager(object):
                         mae = mae_object(target, predictions[i], sample_weight = mask)
                         test_losses[i](loss)
                         test_maes[i](mae)
-               
+                    """
                 for i in range(len(test_summary_writers)):
                     with test_summary_writers[i].as_default():
                         tf.summary.scalar('loss', test_losses[i].result(), step=epoch)
