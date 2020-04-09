@@ -417,6 +417,9 @@ class RNN_Model(Expert):
 
     def save_model(self):
         """Save the model to its model path."""
+        folder_path = os.path.dirname(self.model_path)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
         self.rnn_model.save(self.model_path)
 
     def change_learning_rate(self, lr_change=1):
