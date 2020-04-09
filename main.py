@@ -276,20 +276,23 @@ def run_global_config(global_config, experiment_series_names=''):
     # TODO: Ask for these arguments in main run args
     random_seed = 0
     test_ratio = 0.1
-    dataset_train, dataset_test = data_source.get_tf_data_sets_mlp_data(
+    mlp_dataset_train, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
                                     normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
                                     random_seed = random_seed)
 
-    """dataset_train, dataset_test = data_source.get_tf_data_sets_seq2seq_data(
+    seq2seq_dataset_train, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
                                     normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
                                     random_seed = random_seed)
-    """
+    
     ## Train or import model
     if global_config["is_loaded"]:
         model_manager.load_models(global_config["model_path"])
     else:
         # Train models
-        model_manager.train_models(dataset_train, dataset_test, 
+        model_manager.train_models(seq2seq_dataset_train = seq2seq_dataset_train,
+                                   seq2seq_dataset_test = seq2seq_dataset_test, 
+                                   mlp_dataset_train = mlp_dataset_train,
+                                   mlp_dataset_test = mlp_dataset_test,
                                    num_train_epochs = global_config.get("num_train_epochs"),
                                    evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
                                    improvement_break_condition = global_config.get("improvement_break_condition"),

@@ -89,7 +89,8 @@ class ModelManager(object):
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
-    def train_models(self, dataset_train, dataset_test,
+    def train_models(self, seq2seq_dataset_train = None, seq2seq_dataset_test = None,
+                    mlp_dataset_train = None, mlp_dataset_test = None,
                     num_train_epochs = 1000, evaluate_every_n_epochs = 20,
                     improvement_break_condition = 0.001, lr_decay_after_epochs = 100, lr_decay = 0.1):
         """Train all experts and the gating network.
@@ -144,8 +145,11 @@ class ModelManager(object):
             if (epoch + 1) % lr_decay_after_epochs == 0:
                 self.expert_manager.change_learning_rate(lr_decay)
             
+            seq2seq_iter = iter(seq2seq_dataset_train)
+            mlp_iter = iter(mlp_dataset_train)
             #prediction_batch = []
-            for (batch_n, (inp, target)) in enumerate(dataset_train):
+            for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
+                (mlp_inp, mlp_target) = next(mlp_iter)
                 # Train experts on a batch
                 predictions = self.expert_manager.train_batch(inp, target)
                 # Save predictions

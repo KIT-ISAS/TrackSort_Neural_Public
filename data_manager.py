@@ -386,11 +386,9 @@ class AbstractDataSet(ABC):
         train_ids = []
         test_ids = []
         for track_id in train_track_ids:
-            if track_id in self.track_num_mlp_id:
-                train_ids.extend(self.track_num_mlp_id.get(track_id))
+            train_ids.extend(self.track_num_mlp_id.get(track_id))
         for track_id in test_track_ids:
-            if track_id in self.track_num_mlp_id:
-                test_ids.extend(self.track_num_mlp_id.get(track_id))
+            test_ids.extend(self.track_num_mlp_id.get(track_id))
         
         train_data = mlp_data[train_ids]
         test_data = mlp_data[test_ids]
@@ -400,11 +398,12 @@ class AbstractDataSet(ABC):
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
         if random_seed is None:
-            minibatches_train = raw_train_dataset.shuffle(train_data.shape[0]).batch(batch_size, drop_remainder=True)
-            minibatches_test = raw_test_dataset.shuffle(test_data.shape[0]).batch(batch_size, drop_remainder=True)
+            minibatches_train = raw_train_dataset.shuffle(train_data.shape[0]).batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_test = raw_test_dataset.shuffle(test_data.shape[0]).batch(batch_size * self.longest_track, drop_remainder=True)
+            logging.warning("Always use a random seed if you want to combine MLPs and RNNs/KFs!")
         else:
-            minibatches_train = raw_train_dataset.batch(batch_size, drop_remainder=True)
-            minibatches_test = raw_test_dataset.batch(batch_size, drop_remainder=True)
+            minibatches_train = raw_train_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_test = raw_test_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
 
         def split_input_target(chunk):
             # split the tensor (x, y, x_target, y_target)
@@ -541,7 +540,7 @@ class AbstractDataSet(ABC):
         """Create input to target data for MLP from aligned tracks.
 
         The MLP data format is:
-        x_input1, x_input1, ..., x_inputN, y_inputN, x_output, y_output
+        x_input1, x_input2, ..., x_inputN, y_input1, y_input2, ...,y_inputN, x_output, y_output
 
         Create a array that matches each data instance to a track number
         Create a dict that matches each track all its data instances
@@ -552,30 +551,32 @@ class AbstractDataSet(ABC):
         """
         assert self.longest_track is not None, "self.longest_track not set"
 
-        self.mlp_data = []
-        self.mlp_id_track_num = []
+        n_tracks = aligned_track_data.shape[0]
+        
+        self.mlp_data = np.full([n_tracks*self.longest_track, 2 * (n_inp_points + 1)], self.nan_value)
+        self.mlp_id_track_num = np.zeros([n_tracks*self.longest_track])
         self.track_num_mlp_id = dict()
         counter = 0
         # For each track
-        for track_number in range(aligned_track_data.shape[0]):
-            last_index = self.get_last_timestep_of_track(aligned_track_data[track_number]) - 1
-            # Check if there are enough points in the track
-            if last_index >= n_inp_points:
-                self.track_num_mlp_id[track_number] = []
-                for i in range(0, last_index-n_inp_points):
-                    # Build input and target
-                    input_array = np.append(aligned_track_data[track_number, i:i+n_inp_points, 0], aligned_track_data[track_number, i:i+n_inp_points, 1])
-                    output_array = np.append(aligned_track_data[track_number, i+n_inp_points, 0], aligned_track_data[track_number, i+n_inp_points, 1])
+        for track_number in range(n_tracks):
+            self.track_num_mlp_id[track_number] = []
+            track = aligned_track_data[track_number]
+            # Last index with measurement
+            last_index = self.get_last_timestep_of_track(track) - 1
+            for i in range(self.longest_track):
+                # If there are enough values to build a vector
+                if i >= n_inp_points and i <= last_index:
+                    # x_input1, x_input2, ..., x_inputN, y_input1, y_input2, ...,y_inputN
+                    input_array = np.append(aligned_track_data[track_number, i-n_inp_points:i, 0], aligned_track_data[track_number, i-n_inp_points:i, 1])
+                    # x_output, y_output
+                    output_array = np.append(aligned_track_data[track_number, i, 0], aligned_track_data[track_number, i, 1])
                     full_array = np.append(input_array, output_array)
-                    self.mlp_data.append(full_array)
-                    # Add track id and MLP dataset id to list and dict
-                    self.mlp_id_track_num.append(track_number)
-                    self.track_num_mlp_id[track_number].append(counter)
-                    counter += 1
-        
-        # convert to numpy
-        self.mlp_data = np.array(self.mlp_data)
-        self.mlp_id_track_num = np.array(self.mlp_id_track_num)
+                    self.mlp_data[counter] = full_array
+
+                # Add track id and MLP dataset id to list and dict
+                self.mlp_id_track_num[counter]=track_number
+                self.track_num_mlp_id[track_number].append(counter)
+                counter += 1
 
     def get_box_plot(self, model, dataset):
         maes = []
