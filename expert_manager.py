@@ -125,6 +125,7 @@ class Expert_Manager(object):
         Kalman filters and RNNs need a different data format than MLPs.
 
         Args:
+            mlp_conversion_func:   Function to convert MLP format to track format
             **_inp (tf.Tensor):    Input tensor of tracks
             **_target (tf.Tensor): Target tensor of tracks
 

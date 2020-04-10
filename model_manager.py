@@ -99,8 +99,9 @@ class ModelManager(object):
         The training information of each model should be provided in the configuration json.
 
         Args:
-            dataset_train (dict):           All training samples in the correct format for various models
-            dataset_test (dict):            All testing samples for evaluating the trained models
+            mlp_conversion_func:            Function to convert MLP format to track format
+            **_dataset_train (dict):        All training samples in the correct format for various models
+            **_dataset_test (dict):         All testing samples for evaluating the trained models
             num_train_epochs (int):         Number of epochs for training
             evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
             improvement_break_condition (double): Break training if test loss on every expert does not improve by more than this value.
@@ -234,11 +235,41 @@ class ModelManager(object):
         # Save all models
         self.expert_manager.save_models()
 
-    def test_models(self, dataset_test):
+    def test_models(self, mlp_conversion_func, 
+                    seq2seq_dataset_test = None, mlp_dataset_test = None):
         """Test model performance on test dataset and create evaluations.
 
         Args:
-            dataset_test (tf.Tensor): Batches of test data
+            mlp_conversion_func: Function to convert MLP format to track format
+            **_dataset_test (tf.Tensor): Batches of test data
+        """
+         # Define a loss function: MSE
+        k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
+        loss_object = tf.keras.losses.MeanSquaredError()
+        mae_object = tf.keras.losses.MeanAbsoluteError()
+        seq2seq_iter = iter(seq2seq_dataset_test)
+        mlp_iter = iter(mlp_dataset_test)
+
+        all_losses = []; all_mlp_losses = []; all_maes = []
+
+        for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
+            (mlp_inp, mlp_target) = next(mlp_iter)
+            # Test experts on a batch
+            predictions = self.expert_manager.test_batch(mlp_conversion_func, seq2seq_inp, mlp_inp)
+            masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
+            # MLP mask to compare MLP with KF/RNN
+            mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
+            mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
+            # Calculate loss for all models
+            losses = []; mlp_losses = []; maes = []
+            for i in range(len(predictions)):
+                losses.append(loss_object(seq2seq_target, predictions[i], sample_weight = masks[i]))
+                mlp_losses.append(loss_object(seq2seq_target, predictions[i], sample_weight = mlp_mask))
+                maes.append(mae_object(seq2seq_target, predictions[i], sample_weight = masks[i]))
+            all_losses.append(losses)
+            all_mlp_losses.append(mlp_losses)
+            all_maes.append(maes)
+            
         """
         predictions = []
         targets = []
@@ -258,6 +289,7 @@ class ModelManager(object):
 
         calculate_mse(np_targets, np_predictions, self.mask_value)
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
+        """
 
     def load_models(self, model_path):
         """Load experts and gating network from path.
