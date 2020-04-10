@@ -197,6 +197,7 @@ def run_global_config(global_config, experiment_series_names=''):
 
     ## Import data
     if global_config['dataset_type'] == 'FakeDataset':
+        # TODO: Implement MLP dataset on fake data!
         data_source = FakeDataSet(timesteps=global_config['num_timesteps'], batch_size=global_config['batch_size'])
     elif global_config['dataset_type'] == 'CsvDataset':
         data_source = CsvDataSet(**global_config['CsvDataSet'])
@@ -289,7 +290,8 @@ def run_global_config(global_config, experiment_series_names=''):
         model_manager.load_models(global_config["model_path"])
     else:
         # Train models
-        model_manager.train_models(seq2seq_dataset_train = seq2seq_dataset_train,
+        model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                   seq2seq_dataset_train = seq2seq_dataset_train,
                                    seq2seq_dataset_test = seq2seq_dataset_test, 
                                    mlp_dataset_train = mlp_dataset_train,
                                    mlp_dataset_test = mlp_dataset_test,

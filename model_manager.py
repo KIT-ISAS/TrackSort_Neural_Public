@@ -89,7 +89,8 @@ class ModelManager(object):
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
-    def train_models(self, seq2seq_dataset_train = None, seq2seq_dataset_test = None,
+    def train_models(self, mlp_conversion_func, 
+                    seq2seq_dataset_train = None, seq2seq_dataset_test = None,
                     mlp_dataset_train = None, mlp_dataset_test = None,
                     num_train_epochs = 1000, evaluate_every_n_epochs = 20,
                     improvement_break_condition = 0.001, lr_decay_after_epochs = 100, lr_decay = 0.1):
@@ -125,6 +126,7 @@ class ModelManager(object):
         train_maes = []
         test_losses = []
         test_maes = []
+        test_mlp_losses = []
         old_test_losses = []
         for name in expert_names:
             train_log_dirs.append('logs/gradient_tape/' + current_time + '/' + name +'/train')
@@ -135,6 +137,7 @@ class ModelManager(object):
             test_losses.append(tf.keras.metrics.Mean('test_loss', dtype=tf.float32))
             train_maes.append(tf.keras.metrics.Mean('train_mae', dtype=tf.float32))
             test_maes.append(tf.keras.metrics.Mean('test_mae', dtype=tf.float32))
+            test_mlp_losses.append(tf.keras.metrics.Mean('test_mlp_loss', dtype=tf.float32))
             old_test_losses.append(1)
 
 
@@ -147,30 +150,20 @@ class ModelManager(object):
             
             seq2seq_iter = iter(seq2seq_dataset_train)
             mlp_iter = iter(mlp_dataset_train)
-            #prediction_batch = []
+
             for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
                 (mlp_inp, mlp_target) = next(mlp_iter)
                 # Train experts on a batch
-                predictions = self.expert_manager.train_batch(inp, target)
-                # Save predictions
-                #prediction_batch.append(predictions)
-                # Create a mask for end of tracks
-                for i in range(len(predictions)):
-                    loss = loss_object(target, predictions[i])
-                    mae = mae_object(target, predictions[i])
-                    train_losses[i](loss)
-                    train_maes[i](mae)
-                """ CODE FOR RNN AND KF
-                mask = K.all(K.equal(inp, k_mask_value), axis=-1)
-                mask = 1 - K.cast(mask, tf.float64)
-                mask = K.cast(mask, tf.float64)
+                predictions = self.expert_manager.train_batch(mlp_conversion_func, seq2seq_inp, seq2seq_target, mlp_inp, mlp_target)
+                # Create a mask for end of tracks and for beginning of tracks (MLP)
+                masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
                 # Calculate loss for all models
                 for i in range(len(predictions)):
-                    loss = loss_object(target, predictions[i], sample_weight = mask)
-                    mae = mae_object(target, predictions[i], sample_weight = mask)
+                    loss = loss_object(seq2seq_target, predictions[i], sample_weight = masks[i])
+                    mae = mae_object(seq2seq_target, predictions[i], sample_weight = masks[i])
                     train_losses[i](loss)
                     train_maes[i](mae)
-                """
+                
             
             for i in range(len(train_summary_writers)):
                 with train_summary_writers[i].as_default():
@@ -190,35 +183,38 @@ class ModelManager(object):
             # Run trained models on the test set every n epochs
             if (epoch + 1) % evaluate_every_n_epochs == 0 \
                     or (epoch + 1) == num_train_epochs:
-                for (batch_n, (inp, target)) in enumerate(dataset_test):
-                    # Train experts on a batch
-                    predictions = self.expert_manager.test_batch(inp)
-                    for i in range(len(predictions)):
-                        loss = loss_object(target, predictions[i])
-                        mae = mae_object(target, predictions[i])
-                        test_losses[i](loss)
-                        test_maes[i](mae)
-                    """ CODE FOR RNN AND KF
-                    # Create a mask for end of tracks
-                    mask = K.all(K.equal(inp, k_mask_value), axis=-1)
-                    mask = 1 - K.cast(mask, tf.float64)
-                    mask = K.cast(mask, tf.float64)
+                seq2seq_iter = iter(seq2seq_dataset_test)
+                mlp_iter = iter(mlp_dataset_test)
+
+                for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
+                    (mlp_inp, mlp_target) = next(mlp_iter)
+                    # Test experts on a batch
+                    predictions = self.expert_manager.test_batch(mlp_conversion_func, seq2seq_inp, mlp_inp)
+                    masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
+                    # MLP mask to compare MLP with KF/RNN
+                    mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
+                    mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
                     # Calculate loss for all models
+                    #TODO: Implement MLP loss as loss if all predictors would have MLP mask
                     for i in range(len(predictions)):
-                        loss = loss_object(target, predictions[i], sample_weight = mask)
-                        mae = mae_object(target, predictions[i], sample_weight = mask)
+                        loss = loss_object(seq2seq_target, predictions[i], sample_weight = masks[i])
+                        mlp_loss = loss_object(seq2seq_target, predictions[i], sample_weight = mlp_mask)
+                        mae = mae_object(seq2seq_target, predictions[i], sample_weight = masks[i])
                         test_losses[i](loss)
                         test_maes[i](mae)
-                    """
+                        test_mlp_losses[i](mlp_loss)
+                    
                 for i in range(len(test_summary_writers)):
                     with test_summary_writers[i].as_default():
                         tf.summary.scalar('loss', test_losses[i].result(), step=epoch)
+                        tf.summary.scalar('mlp loss', test_mlp_losses[i].result(), step=epoch)
                         tf.summary.scalar('mae', test_maes[i].result(), step=epoch)
 
-                template = 'Epoch {}, Test Losses: {}, Test MAEs: {}'
+                template = 'Epoch {}, Test Losses: {}, Test MAEs: {}, Test MLP Losses: {}'
                 logging.info((template.format(epoch+1,
                                             [test_loss.result().numpy() for test_loss in test_losses],
-                                            [test_mae.result().numpy() for test_mae in test_maes])))
+                                            [test_mae.result().numpy() for test_mae in test_maes],
+                                            [test_mlp_loss.result().numpy() for test_mlp_loss in test_mlp_losses])))
 
                 # Check testing break condition
                 break_condition = True

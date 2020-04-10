@@ -11,7 +11,7 @@ import tensorflow as tf
 import numpy as np
 import code
 
-#from tensorflow.keras import backend as K
+from tensorflow.keras import backend as K
 
 #tf.keras.backend.set_floatx('float64')
 
@@ -116,29 +116,61 @@ class Expert_Manager(object):
         for expert in self.experts:
             expert.save_model()
 
-    def train_batch(self, inp, target):
+    def train_batch(self, mlp_conversion_func,
+                    seq2seq_inp = None, seq2seq_target = None, 
+                    mlp_inp = None, mlp_target = None):
         """Train one batch for all experts.
 
         The training information of each model should be provided in the expert configuration.
+        Kalman filters and RNNs need a different data format than MLPs.
 
         Args:
-            inp (tf.Tensor):    Input tensor of tracks
-            target (tf.Tensor): Target tensor of tracks
+            **_inp (tf.Tensor):    Input tensor of tracks
+            **_target (tf.Tensor): Target tensor of tracks
 
         Returns:
             predictions (list): Predictions for each expert
         """
-        mse_list = []
-        mae_list = []
         prediction_list = []
         for expert in self.experts:
-            prediction = expert.train_batch(inp, target)
-            if tf.is_tensor(prediction):
-                prediction = prediction.numpy()
-
+            if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
+                prediction = expert.train_batch(seq2seq_inp, seq2seq_target) 
+                if tf.is_tensor(prediction):
+                    prediction = prediction.numpy()
+            elif expert.type == Expert_Type.MLP:
+                prediction = expert.train_batch(mlp_inp, mlp_target)
+                if tf.is_tensor(prediction):
+                    prediction = prediction.numpy()
+                prediction = mlp_conversion_func(prediction)
             prediction_list.append(prediction)
             
         return prediction_list
+
+    def get_masks(self, mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target):
+        """Return masks for each expert.
+
+        Args:
+            mlp_conversion_func: Function to convert MLP format to track format
+            k_mask_value:        Keras mask value to compare the target against to create the mask
+            seq2seq_target:      Target for seq2seq data
+            mlp_target:          Target for MLP data
+
+        Returns:
+            List of masks. One multidemensional mask for each expert.
+        """
+        masks = []
+        for expert in self.experts:
+            if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
+                mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
+            elif expert.type == Expert_Type.MLP:
+                track_target = mlp_conversion_func(mlp_target)
+                mask = K.all(K.equal(track_target, k_mask_value), axis=-1)
+
+            mask = 1 - K.cast(mask, tf.float64)
+            #mask = K.cast(mask, tf.float64)
+            masks.append(mask)
+            
+        return masks
 
     def change_learning_rate(self, lr_change=1):
         """Change the learning rate of the certain models.
@@ -153,7 +185,7 @@ class Expert_Manager(object):
         for expert in self.experts:
             expert.change_learning_rate(lr_change)
 
-    def test_batch(self, inp):
+    def test_batch(self, mlp_conversion_func, seq2seq_inp = None, mlp_inp = None):
         """Run predictions for all experts on a batch of test data.
 
         Args:
@@ -164,11 +196,17 @@ class Expert_Manager(object):
         """
         prediction_list = []
         for expert in self.experts:
-            prediction = expert.predict_batch(inp)
-            if tf.is_tensor(prediction):
-                prediction = prediction.numpy()
-
+            if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
+                prediction = expert.predict_batch(seq2seq_inp) 
+                if tf.is_tensor(prediction):
+                        prediction = prediction.numpy()
+            elif expert.type == Expert_Type.MLP:
+                prediction = expert.predict_batch(mlp_inp)
+                if tf.is_tensor(prediction):
+                    prediction = prediction.numpy()
+                prediction = mlp_conversion_func(prediction)
             prediction_list.append(prediction)
+            
         return prediction_list
 
     def create_new_track(self, batch_nr, idx, measurement):

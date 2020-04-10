@@ -417,6 +417,22 @@ class AbstractDataSet(ABC):
 
         return dataset_train, dataset_test
 
+    def mlp_target_to_track_format(self, mlp_target):
+        """Convert a batch of MLP targets/predictions into tracks
+
+        Args:
+            mlp_target (np.array):  The target array to convert
+
+        Returns:
+            track_target (np array): The target in track format
+        """ 
+        assert(mlp_target.shape[0] % self.longest_track == 0)
+
+        n_tracks = int(mlp_target.shape[0]/self.longest_track)
+        track_target = np.reshape(mlp_target, [n_tracks, self.longest_track, 2])
+        return track_target
+
+
     def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1, time_normalization=22.,
                                                       virtual_belt_edge_x_position=1200,
                                                       virtual_nozzle_array_x_position=1400, batch_size=64):
