@@ -304,8 +304,11 @@ def run_global_config(global_config, experiment_series_names=''):
     ## Test models
     # TODO:
     #   * Test with an evaluation set instead of test set.
+    #   * Implement testing functions for all three models combined
     if global_config.get('execute_evaluation'):
-        model_manager.test_models(dataset_test)
+        model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                  seq2seq_dataset_test = seq2seq_dataset_test, 
+                                  mlp_dataset_test = mlp_dataset_test)
 
     if global_config.get('execute_multi_target_tracking'):
         ## Init tracks
