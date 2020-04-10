@@ -15,7 +15,7 @@ def weighting_function(predictions, weights, position_variances = np.array([])):
 
     Args:
         predictions (np.array): A np array of predictions from multiple experts
-        weights (np.array):     The weights for each expert
+        weights (np.array):     The weights for each expert and instance
         position_variances (np.array):  Some experts output position variances. 
                                         When the entry of an expert is an empty list, the prediction has no known variance. 
 
@@ -26,5 +26,5 @@ def weighting_function(predictions, weights, position_variances = np.array([])):
     if position_variances.size > 0:
         assert(weights.shape[0] == position_variances.shape[0])
 
-    total_predictions = np.tensordot(predictions, weights, axes=(0,0))
+    total_predictions = np.sum(predictions * np.repeat(weights[:, :, np.newaxis], 2, axis=2), axis=0)
     return total_predictions       

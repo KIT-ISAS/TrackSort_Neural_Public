@@ -1,5 +1,5 @@
 {
-  "batch_size": 500,
+  "batch_size": 64,
   "experts": {
     "MLP_16_16_16": {
       "type": "MLP",

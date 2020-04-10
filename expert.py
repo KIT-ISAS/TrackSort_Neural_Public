@@ -78,6 +78,11 @@ class Expert(ABC):
     def change_learning_rate(self, lr_change=1):
         """Change the learning rate of the model optimizer."""
         pass
+    
+    @abstractmethod
+    def get_zero_state(self, batch_size):
+        """Return batch of default states."""
+        pass
 
 class Expert_Type(Enum):
     """Simple enumeration class for expert types."""

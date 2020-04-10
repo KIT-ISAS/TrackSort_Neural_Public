@@ -63,7 +63,7 @@ class MLP_Model(Expert):
             n_features (int):       The number of features as input to the model   
         """
         self.mlp_model = mlp_model_factory(input_dim=n_features, output_dim=self._label_dim, **self.model_structure)
-        
+        self.input_dim = n_features
         logging.info(self.mlp_model.summary())
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
         self.loss_object = tf.keras.losses.MeanSquaredError()
@@ -72,8 +72,8 @@ class MLP_Model(Expert):
     def load_model(self):
         """Load a MLP model from its model path."""
         self.mlp_model = tf.keras.models.load_model(self.model_path)
+        self.input_dim = self.mlp_model.input_shape[1]
         logging.info(self.mlp_model.summary())
-        self.mlp_model.reset_states()
 
     def train_batch(self, inp, target):
         """Train the MLP model on a batch of data.
@@ -89,6 +89,10 @@ class MLP_Model(Expert):
 
     def predict_batch(self, inp):
         """Predict a batch of input data."""
+        return self.predict(inp)
+
+    def predict(self, inp):
+        """Predict input data."""
         return self.mlp_model(inp)
 
     def save_model(self):
@@ -111,6 +115,43 @@ class MLP_Model(Expert):
         new_lr = old_lr * lr_change
         logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
         K.set_value(self.optimizer.lr, new_lr)
+
+    def get_zero_state(self, batch_size):
+        """Return batch of empty lists."""
+        return np.zeros([batch_size, self.input_dim])
+
+    def get_input_dim(self):
+        """Return input dimension."""
+        return self.input_dim
+
+    def build_new_state(self, measurement):
+        """Return a new state with initial measurement"""
+        state = np.zeros([self.input_dim])
+        state[0] = measurement[0]
+        state[int(self.input_dim/2)-1] = measurement[1]
+        return state
+
+    def update_state(self, state, measurement):
+        """Update a given state with a new measurement.
+        
+        The state format is 
+        x_in0, x_in1, ..., x_inN, y_in0, y_in1, ..., y_inN
+
+        So the updating with a new measurement is done by rotating the state to the left
+        x_in1, x_in2, ..., y_in0, y_in1, y_in2, ..., y_inN
+        And replacing the middle and last position
+        x_in1, x_in2, ..., x_new, y_in1, y_in2, ..., y_new
+
+        Args:
+            state (np array):           dim: [1, input_dim]
+            measurement (np array):     dim: [2]
+
+        The given state is updated. No need to return.
+        """
+        state[:-1] = state[1:]
+        state[int(self.input_dim/2)-1] = measurement[0]
+        state[-1] = measurement[1]
+        
 
 
 """Model creation and training functionality"""

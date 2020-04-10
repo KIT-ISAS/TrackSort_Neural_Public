@@ -357,7 +357,7 @@ class RNN_Model(Expert):
         self._label_dim = 2 if is_next_step else 4
         super().__init__(Expert_Type.RNN, name, model_path)
 
-    def get_zero_state(self):
+    def get_zero_state(self, batch_size):
         self.rnn_model.reset_states()
         return get_state(self.rnn_model)
 

@@ -224,11 +224,11 @@ class Expert_Manager(object):
         # Add new state
         for i in range(len(self.experts)):
             expert = self.experts[i]
-            if isinstance(expert, RNN_Model):
+            if expert.type == Expert_Type.RNN:
                 # Create new entry for RNN model
                 if len(self.current_states[i]) <= batch_nr:
                     # Create new batch
-                    self.current_states[i].append(expert.get_zero_state())
+                    self.current_states[i].append(expert.get_zero_state(self.batch_size))
                 else:
                     # Update existing batch
                     # TODO: Understand this shit
@@ -243,7 +243,7 @@ class Expert_Manager(object):
                         state_buffer = np.transpose(state_buffer, [1, 0, 2])
                         state_buffers.append(state_buffer)
                     self.current_states[i][batch_nr] = state_buffers
-            elif isinstance(expert, KF_Model):
+            elif expert.type == Expert_Type.KF:
                 # Create new entry for KF model
                 if len(self.current_states[i]) <= batch_nr:
                     # Create new batch
@@ -256,6 +256,14 @@ class Expert_Manager(object):
                     self.current_states[i][batch_nr][idx] = CA_State(measurement, **expert.default_state_options)
                 else:
                     logging.error("Track creation for expert not implemented!")
+            elif expert.type == Expert_Type.MLP:
+                # Create new entry for MLP model
+                if len(self.current_states[i]) <= batch_nr:
+                    # Create new batch
+                    self.current_states[i].append(expert.get_zero_state(self.batch_size))
+                else:
+                    # Update existing batch
+                    self.current_states[i][batch_nr][idx] = expert.build_new_state(measurement)
             else:
                 logging.error("Track creation for expert not implemented!")
 
@@ -264,6 +272,7 @@ class Expert_Manager(object):
 
         Args:
             inputs (np.array): A batch of inputs (measurements) to the predictors
+            batch_nr (int):    The number of the batch to predict
 
         Returns: 
             A numpy array of all predictions
@@ -271,14 +280,13 @@ class Expert_Manager(object):
         all_predictions = []
         for i in range(len(self.experts)):
             expert = self.experts[i]
-            if isinstance(expert, RNN_Model):
+            if expert.type == Expert_Type.RNN:
                 # Predict all tracks of batch with RNN model
                 prediction, new_state = expert.predict(inputs, self.current_states[i][batch_nr])
                 self.current_states[i][batch_nr] = new_state
                 all_predictions.append(prediction)
-            elif isinstance(expert, KF_Model):
+            elif expert.type == Expert_Type.KF:
                 # Predict all tracks of batch with CV model
-                
                 prediction = []
                 for j in range(len(self.current_states[i][batch_nr])):
                     # update
@@ -287,13 +295,44 @@ class Expert_Manager(object):
                     expert.predict(self.current_states[i][batch_nr][j])
                     prediction.append([self.current_states[i][batch_nr][j].get_pos().item(0), 
                                        self.current_states[i][batch_nr][j].get_pos().item(1)])
-
                 all_predictions.append(prediction)
-                
+            elif expert.type == Expert_Type.MLP:
+                # Predict all tracks of batch with MLP model
+                prediction = []
+                for j in range(self.current_states[i][batch_nr].shape[0]):
+                    expert.update_state(self.current_states[i][batch_nr][j], inputs[j])
+                prediction = expert.predict(self.current_states[i][batch_nr])
+                all_predictions.append(prediction)
             else:
                 logging.error("Track creation for expert not implemented!")
         
         return np.array(all_predictions)
+
+    def get_prediction_mask(self, batch_nr, batch_size=64):
+        """Return a mask for predictions of experts.
+
+        Not all expert predictions are valid all the time.
+        Right now the MLP is not able to predict values before a certain timestep of the track.
+
+        These values should be masked out.
+
+        Args:
+            batch_nr (int):    The number of the batch to predict
+            batch_size (int):  The size of the batch (only needed for KF and RNN)
+
+        Returns:
+            A list of mask values
+        """
+        mask = []
+        for i in range(len(self.experts)):
+            expert = self.experts[i]
+            if expert.type == Expert_Type.MLP:
+                zero_vals = self.current_states[i][batch_nr] != 0
+                all_zero = np.all(zero_vals, axis=1)
+                mask.append(all_zero)
+            else:
+                mask.append(np.ones([batch_size]))
+        return np.array(mask)
 
     def get_n_experts(self):
         """Return n_experts."""

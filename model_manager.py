@@ -329,17 +329,18 @@ class ModelManager(object):
                 
             # Predict the next state for all models
             all_predictions = self.expert_manager.predict_all(inputs, batch_nr)
-
+            prediction_mask = self.expert_manager.get_prediction_mask(batch_nr, batch_size=len(global_track_ids))
             # Gating
+            # TODO: Implement MLP masking in gating network!
             #weights = np.array([[1], [0]])
-            weights = self.gating_network.get_weights()
+            weights = self.gating_network.get_masked_weights(prediction_mask)
 
             # Weighting
             prediction = weighting_function(all_predictions, weights)
 
             for i in alive_tracks:
                 # TODO cleaner solution
-                prediction_dict[global_track_ids[i]] = np.array([prediction[i,0,0], prediction[i,1,0]])
+                prediction_dict[global_track_ids[i]] = prediction[i]
         return prediction_dict
 
     # These are the functions for multi-target tracking
