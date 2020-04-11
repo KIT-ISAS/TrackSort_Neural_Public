@@ -107,12 +107,14 @@ parser.add_argument('--kendall_loss', type=str2bool, default=False,
                     help='Estimate Heteroscedastic Aleatoric Uncertainty (https://arxiv.org/pdf/1703.04977.pdf)')
 
 parser.add_argument('--run_association', type=str2bool, default=True)
+parser.add_argument('--description', default='', help='Write some text here')
 
 args = parser.parse_args()
 
 assert not all((args.kendall_loss, args.mc_dropout)), "Choose either MC Dropout or kendall_loss"
 
 global_config = {
+    '_description': args.description,
     'separation_prediction': args.separation_prediction,
     'clear_state': args.clear_state,
     'time_normalization_constant': args.time_normalization_constant,

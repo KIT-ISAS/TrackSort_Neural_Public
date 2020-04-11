@@ -22,7 +22,8 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 1024-32-2, dr=0.01"
 
 
 ## dr=0.01
@@ -46,7 +47,8 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 512-64-2, dr=0.01"
 
 
 ## dr=0.01
@@ -70,7 +72,8 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 256-64-2, dr=0.01"
 
 
 ## dr=0.01
@@ -94,7 +97,8 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 64-64-2, dr=0.01"
 
 
 
@@ -119,7 +123,8 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 32-32-2, dr=0.01"
 
 
 
@@ -144,7 +149,8 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 16-16-2, dr=0.01"
 
 
 ## dr=0.01
@@ -168,7 +174,8 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 8-8-2, dr=0.01"
 
 
 ## dr=0.01
@@ -192,4 +199,5 @@ python main.py \
      --mc_dropout True \
      --mc_samples 500 \
      --distance_threshold 20.0 \
-     --run_association False
+     --run_association False \
+     --description "mc_search__net_arch.sh: lstm 8-4-2, dr=0.01"

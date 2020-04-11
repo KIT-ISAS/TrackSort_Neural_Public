@@ -20,7 +20,8 @@ python main.py \
      --mc_samples 500 \
      --distance_threshold 20.0 \
      --run_association False \
-     --regularization 0.1
+     --regularization 0.1 \
+     --description "mc_search__regularization.sh: lstm 64-32-2, reg=0.1"
 
 # lstm 64-32-2
 ## reg=0.01
@@ -44,7 +45,8 @@ python main.py \
      --mc_samples 500 \
      --distance_threshold 20.0 \
      --run_association False \
-     --regularization 0.01
+     --regularization 0.01 \
+     --description "mc_search__regularization.sh: lstm 64-32-2, reg=0.01"
 
 # lstm 64-32-2
 ## reg=0.001
@@ -68,7 +70,8 @@ python main.py \
      --mc_samples 500 \
      --distance_threshold 20.0 \
      --run_association False \
-     --regularization 0.001
+     --regularization 0.001 \
+     --description "mc_search__regularization.sh: lstm 64-32-2, reg=0.001"
 
 # lstm 64-32-2
 ## reg=0.0001
@@ -92,7 +95,8 @@ python main.py \
      --mc_samples 500 \
      --distance_threshold 20.0 \
      --run_association False \
-     --regularization 0.0001
+     --regularization 0.0001 \
+     --description "mc_search__regularization.sh: lstm 64-32-2, reg=0.0001"
 
 
 # lstm 64-32-2
@@ -117,7 +121,8 @@ python main.py \
      --mc_samples 500 \
      --distance_threshold 20.0 \
      --run_association False \
-     --regularization 0.00001
+     --regularization 0.00001 \
+     --description "mc_search__regularization.sh: lstm 64-32-2, reg=0.00001"
 
 
 
@@ -143,5 +148,6 @@ python main.py \
      --mc_samples 500 \
      --distance_threshold 20.0 \
      --run_association False \
-     --regularization 0.000001
+     --regularization 0.000001 \
+     --description "mc_search__regularization.sh: lstm 64-32-2, reg=0.000001"
 
