@@ -106,6 +106,8 @@ parser.add_argument('--mc_samples', type=int, default=5, help='MC Dropout: how m
 parser.add_argument('--kendall_loss', type=str2bool, default=False,
                     help='Estimate Heteroscedastic Aleatoric Uncertainty (https://arxiv.org/pdf/1703.04977.pdf)')
 
+parser.add_argument('--run_association', type=str2bool, default=True)
+
 args = parser.parse_args()
 
 assert not all((args.kendall_loss, args.mc_dropout)), "Choose either MC Dropout or kendall_loss"
@@ -123,6 +125,7 @@ global_config = {
     'distance_threshold': args.distance_threshold,
     'batch_size': args.batch_size,
     'matching_algorithm': args.matching_algorithm,
+    'run_association': args.run_association,
     #
     'Track': {
         'initial_is_alive_probability': 0.5,
@@ -218,9 +221,19 @@ def run_global_config(global_config, experiment_series_names=''):
     # file paths
     global_config['visualization_video_path'] = os.path.join(global_config['visualization_path'],
                                                              'matching_visualization_vid.mp4')
+
     global_config['json_file'] = os.path.join(global_config['experiment_path'], 'config.json')
+    global_config['json_file_initial'] = os.path.join(global_config['experiment_path'], 'config_initial.json')
+
+    with open(global_config['json_file_initial'], 'w') as file_:
+        json.dump(global_config, file_, sort_keys=True, indent=4)
 
     data_association = DataAssociation(global_config)
+
+    if not global_config['run_association']:
+        # do not run matching
+        return 0.0, 0.0, 0.0
+
     particles = data_association.data_source.get_particles()
     tracks = data_association.associate_data()
 
@@ -255,7 +268,7 @@ if not global_config['run_hyperparameter_search']:
     if not global_config['test_noise_robustness']:
         score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
         logging.info('data association finished!')
-        code.interact(local=dict(globals(), **locals()))
+        # code.interact(local=dict(globals(), **locals()))
     else:
         logging.info('test robustness against noise!')
         now = datetime.datetime.now()
@@ -283,7 +296,7 @@ if not global_config['run_hyperparameter_search']:
         np.savetxt(os.path.join("results", experiment_series, "noise_robustness.csv"), A)
 
         logging.info('robustness test finished!')
-        code.interact(local=dict(globals(), **locals()))
+        # code.interact(local=dict(globals(), **locals()))
 
 else:
     now = datetime.datetime.now()
@@ -315,7 +328,7 @@ else:
     global_config['distance_threshold'] = best_candidate
 
     logging.info('robustness test finished!')
-    code.interact(local=dict(globals(), **locals()))
+    # code.interact(local=dict(globals(), **locals()))
 
     pw = 1.0
     best_score = 0.0
@@ -372,4 +385,4 @@ else:
         pass
 
 logging.info('data association finished!')
-code.interact(local=dict(globals(), **locals()))
+# code.interact(local=dict(globals(), **locals()))
