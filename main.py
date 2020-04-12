@@ -109,6 +109,8 @@ parser.add_argument('--kendall_loss', type=str2bool, default=False,
 parser.add_argument('--run_association', type=str2bool, default=True)
 parser.add_argument('--description', default='', help='Write some text here')
 
+parser.add_argument('--calibrate', type=str2bool, default=False)
+
 args = parser.parse_args()
 
 assert not all((args.kendall_loss, args.mc_dropout)), "Choose either MC Dropout or kendall_loss"
@@ -121,6 +123,8 @@ global_config = {
     'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
     'virtual_nozzle_array_x_position': args.virtual_nozzle_array_x_position,
     'only_last_timestep_additional_loss': True,
+
+    'calibrate': args.calibrate,
 
     'is_loaded': args.is_loaded,
     'model_path': args.model_path,

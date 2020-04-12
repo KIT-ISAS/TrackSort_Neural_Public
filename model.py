@@ -17,6 +17,9 @@ from tensorflow.keras import backend as K
 # https://github.com/tensorflow/tensorflow/issues/34201
 from tensorflow.python.keras import backend as K2
 
+from sklearn.isotonic import IsotonicRegression
+from matplotlib.collections import LineCollection
+
 tf.keras.backend.set_floatx('float64')
 
 rnn_models = {
@@ -476,6 +479,8 @@ class Model(object):
         self.global_config = global_config
         self.data_source = data_source
 
+        self.is_calibrated = False
+
         # ToDo: implement uncertainties + separation prediction
         self._label_dim = 2
         if self.global_config['kendall_loss']:
@@ -484,8 +489,6 @@ class Model(object):
             self._label_dim += 2
         if self.global_config['custom_variance_prediction']:
             self._label_dim += 2
-
-        self._mc_dropout_predict_function = None
 
         if self.global_config['is_loaded']:
             self.rnn_model = tf.keras.models.load_model(self.global_config['model_path'])
@@ -501,10 +504,53 @@ class Model(object):
             else:
                 self.train()
 
-    def _get_mc_dropout_predict_function(self):
-        if self._mc_dropout_predict_function is None:
-            self._mc_dropout_predict_function = K.function([self.rnn_model.layers[0].input], [self.rnn_model.output])
-        return self._mc_dropout_predict_function
+        if self.global_config['calibrate']:
+            logging.info("Calibrate")
+            self.calibrate()
+
+    def calibrate(self):
+        if self.global_config['calibrate']:
+            self._calibrate()
+            self.is_calibrated = True
+
+    def _calibrate(self):
+        dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+        data = self._get_evaluation_data(dataset_test)
+        N = data['time_step'].shape[0]
+
+        def sigma_to_conf(sigmas):
+            return erf(sigmas / np.sqrt(2))
+
+        stddevs = []
+        cdf = []
+
+        for stddev in np.arange(0.0, 10.0, 0.01):
+            count_falls_into = np.count_nonzero(data['standardized_l2'] <= stddev)
+            proportion = count_falls_into / N
+            cdf.append(proportion)
+            stddevs.append(stddev)
+
+        stddevs = sigma_to_conf(np.array(stddevs))
+        cdf = np.array(cdf)
+
+        x = stddevs
+        y = cdf
+        n = x.shape[0]
+
+        ir = IsotonicRegression()
+        y_ = ir.fit_transform(x, y)
+
+        segments = [[[i, y[i]], [i, y_[i]]] for i in range(n)]
+        lc = LineCollection(segments, zorder=0)
+        lc.set_array(np.ones(len(y)))
+        lc.set_linewidths(np.full(n, 0.5))
+
+        plt.scatter(stddevs, cdf)
+        plt.title("Calibration plot (standardized euclidean distance)")
+        plt.xlabel("Expected confidence level")
+        plt.ylabel("Observed confidence level")
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration.png'))
+        plt.clf()
 
     def get_zero_state(self):
         self.rnn_model.reset_states()
@@ -1457,7 +1503,6 @@ class Model(object):
         #                                      'CDF2_{}.png'.format(epoch)))
         # plt.clf()
 
-
     def plot_correlation(self, dataset, epoch=0):
         data = self._get_evaluation_data(dataset)
         N = data['time_step'].shape[0]
@@ -1525,7 +1570,8 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.png'.format(x_name, y_name, epoch)))
         plt.clf()
 
-    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3, fit_scale_to_content=True, normed_plot=False):
+    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3,
+                                    fit_scale_to_content=True, normed_plot=False):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss'] or self.global_config['custom_variance_prediction']:
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
