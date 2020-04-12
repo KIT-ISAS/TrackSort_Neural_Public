@@ -545,6 +545,9 @@ class Model(object):
         lc.set_array(np.ones(len(y)))
         lc.set_linewidths(np.full(n, 0.5))
 
+        fig = plt.figure()
+        plt.gca().add_collection(lc)
+
         plt.scatter(stddevs, cdf)
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
