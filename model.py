@@ -561,44 +561,30 @@ class Model(object):
 
         ir = IsotonicRegression()
         y_ = ir.fit_transform(x, y)
+        y_pred = ir.predict(x)
 
-        segments = [[[i, y[i]], [i, y_[i]]] for i in range(n)]
-        lc = LineCollection(segments, zorder=0)
-        lc.set_array(np.ones(len(y)))
-        lc.set_linewidths(np.full(n, 0.5))
-
-        fig = plt.figure()
-        plt.gca().add_collection(lc)
-
-        plt.scatter(stddevs, cdf)
+        plt.scatter(stddevs, cdf, c='blue')
+        plt.plot(stddevs, y_pred, y='black')
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration.pdf'))
         plt.clf()
 
         # x and y swapped
-        code.interact(local=dict(globals(), **locals()))
 
         self._iso_regression_fn = IsotonicRegression()
-        x_ = self._iso_regression_fn.fit_transform(y, x)
+        self._iso_regression_fn.fit_transform(y, x)
+        x_pred = self._iso_regression_fn.predict(y)
 
-        segments = [[[i, x[i]], [i, x_[i]]] for i in range(n)]
-        lc = LineCollection(segments, zorder=0)
-        lc.set_array(np.ones(len(x)))
-        lc.set_linewidths(np.full(n, 0.5))
+        plt.scatter(cdf, stddevs, c='blue')
+        plt.plot(cdf, x_pred, c='black')
 
-        fig = plt.figure()
-        plt.gca().add_collection(lc)
-
-        plt.scatter(cdf, stddevs)
-        plt.title("Calibration plot (standardized euclidean distance)")
-        plt.xlabel("Expected confidence level")
-        plt.ylabel("Observed confidence level")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration2.png'))
+        plt.title("Flipped Calibration plot (standardized euclidean distance)")
+        plt.xlabel("Observed confidence level")
+        plt.ylabel("Expected confidence level")
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'CalibrationFlipped.pdf'))
         plt.clf()
-
-        code.interact(local=dict(globals(), **locals()))
 
     def get_zero_state(self):
         self.rnn_model.reset_states()
