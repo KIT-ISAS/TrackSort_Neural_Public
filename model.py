@@ -564,7 +564,7 @@ class Model(object):
         y_pred = ir.predict(x)
 
         plt.scatter(stddevs, cdf, c='blue')
-        plt.plot(stddevs, y_pred, y='black')
+        plt.plot(stddevs, y_pred, c='black')
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
