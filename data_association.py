@@ -79,7 +79,7 @@ class DataAssociation(object):
                 # calibrate the variances
                 stddevs = np.sqrt(variances)
                 sigma = 1.0
-                sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas(1)
+                sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas([1])[0]
                 stddevs = ((stddevs * sigma_new)/sigma)
                 variances = stddevs**2
 
@@ -157,7 +157,8 @@ class DataAssociation(object):
 
             if self.global_config['calibrate']:
                 # calibrate the distance threshold
-                distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(distance_threshold)
+                distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(
+                    [distance_threshold])[0]
 
             # Block matrix: A
             #  ... L2 distance between predictions and measurements
