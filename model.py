@@ -573,7 +573,7 @@ class Model(object):
 
         # x and y swapped
 
-        self._iso_regression_fn = IsotonicRegression()
+        self._iso_regression_fn = IsotonicRegression(out_of_bounds='clip')
         self._iso_regression_fn.fit_transform(y, x)
         x_pred = self._iso_regression_fn.predict(y)
 
