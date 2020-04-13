@@ -75,6 +75,14 @@ class DataAssociation(object):
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
             predictions, variances = self.track_manager.get_predictions()
 
+            if self.global_config['calibrate']:
+                # calibrate the variances
+                stddevs = np.sqrt(variances)
+                sigma = 1.0
+                sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas(1)
+                stddevs = ((stddevs * sigma_new)/sigma)
+                variances = stddevs**2
+
             prediction_ids = list(predictions.keys())
             prediction_values = list(predictions.values())
             prediction_is_alive_probabilities = list(
@@ -146,6 +154,10 @@ class DataAssociation(object):
             distance_threshold = self.global_config['distance_threshold']
             positional_probabilities = self.global_config['positional_probabilities']
             is_alive_probability_weighting = self.global_config['is_alive_probability_weighting']
+
+            if self.global_config['calibrate']:
+                # calibrate the distance threshold
+                distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(distance_threshold)
 
             # Block matrix: A
             #  ... L2 distance between predictions and measurements

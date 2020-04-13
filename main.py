@@ -42,7 +42,8 @@ parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffe
 parser.add_argument('--dataset_type', default='CsvDataset',
                     help='The type of the dataset. Current options are: ["FakeDataset","CsvDataset"].')
 parser.add_argument('--distance_threshold', type=float, default=0.02,
-                    help='The threshold used for the matching with the artificial measurements and predictions')
+                    help='The threshold used for the matching with the artificial measurements and predictions. '
+                         'Unit is (calibrated) sigmas.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--num_timesteps', type=int, default=10000,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')

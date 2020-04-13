@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 
-from scipy.special import erf
+from scipy.special import erf, erfinv
 from scipy.stats.stats import pearsonr
 
 from tensorflow.keras import backend as K
@@ -480,6 +480,7 @@ class Model(object):
         self.data_source = data_source
 
         self.is_calibrated = False
+        self._iso_regression_fn = None
 
         # ToDo: implement uncertainties + separation prediction
         self._label_dim = 2
@@ -513,13 +514,34 @@ class Model(object):
             self._calibrate()
             self.is_calibrated = True
 
+    @staticmethod
+    def sigma_to_conf(sigmas):
+        return erf(sigmas / np.sqrt(2))
+
+    @staticmethod
+    def conf_to_sigma(confs):
+        return erfinv(confs) * np.sqrt(2)
+
+    def _apply_isotonic_regression(self, confs):
+        if self._iso_regression_fn is not None:
+            return self._iso_regression_fn.predict(confs)
+        else:
+            logging.info('iso regression function was none')
+            return confs
+
+    def get_calibrated_sigmas(self, sigmas):
+        # old_sigma -> new_sigma
+        # example: if the estimator underestimates 1 sigma, then the return value might be 2 sigmas.
+        #          This signifies that the original 1 sigma radius has to be double.
+        confs = self.sigma_to_conf(sigmas)
+        calibrated_confs = self._apply_isotonic_regression(confs)
+        sigmas = self.conf_to_sigma(calibrated_confs)
+        return sigmas
+
     def _calibrate(self):
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
         data = self._get_evaluation_data(dataset_test)
         N = data['time_step'].shape[0]
-
-        def sigma_to_conf(sigmas):
-            return erf(sigmas / np.sqrt(2))
 
         stddevs = []
         cdf = []
@@ -530,7 +552,7 @@ class Model(object):
             cdf.append(proportion)
             stddevs.append(stddev)
 
-        stddevs = sigma_to_conf(np.array(stddevs))
+        stddevs = self.sigma_to_conf(np.array(stddevs))
         cdf = np.array(cdf)
 
         x = stddevs
@@ -549,6 +571,26 @@ class Model(object):
         plt.gca().add_collection(lc)
 
         plt.scatter(stddevs, cdf)
+        plt.title("Calibration plot (standardized euclidean distance)")
+        plt.xlabel("Expected confidence level")
+        plt.ylabel("Observed confidence level")
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration.png'))
+        plt.clf()
+
+        # x and y swapped
+
+        self._iso_regression_fn = IsotonicRegression()
+        x_ = self._iso_regression_fn.fit_transform(y, x)
+
+        segments = [[[i, x[i]], [i, x_[i]]] for i in range(n)]
+        lc = LineCollection(segments, zorder=0)
+        lc.set_array(np.ones(len(x)))
+        lc.set_linewidths(np.full(n, 0.5))
+
+        fig = plt.figure()
+        plt.gca().add_collection(lc)
+
+        plt.scatter(cdf, stddevs)
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
