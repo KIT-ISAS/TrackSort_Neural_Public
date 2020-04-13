@@ -578,6 +578,7 @@ class Model(object):
         plt.clf()
 
         # x and y swapped
+        code.interact(local=dict(globals(), **locals()))
 
         self._iso_regression_fn = IsotonicRegression()
         x_ = self._iso_regression_fn.fit_transform(y, x)
@@ -594,8 +595,10 @@ class Model(object):
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration2.png'))
         plt.clf()
+
+        code.interact(local=dict(globals(), **locals()))
 
     def get_zero_state(self):
         self.rnn_model.reset_states()

@@ -75,7 +75,7 @@ class DataAssociation(object):
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
             predictions, variances = self.track_manager.get_predictions()
 
-            if self.global_config['calibrate']:
+            if self.global_config['calibrate'] and variances is not None:
                 # calibrate the variances
                 stddevs = np.sqrt(variances)
                 sigma = 1.0
