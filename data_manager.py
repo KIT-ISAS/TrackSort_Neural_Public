@@ -164,14 +164,14 @@ class AbstractDataSet(ABC):
         axes = plt.gca()
         axes.set_aspect('equal')
         if normed_plot:
-            axes.set_xlim([0, 1.2])
-            axes.set_ylim([0, 1.2])
+            plt.xlim((0.3, 0.8))
+            plt.ylim((0.0, 0.2))
         elif not fit_scale_to_content:
             axes.set_xlim([0, self.belt_width * 1.1])
             axes.set_ylim([0, self.belt_height * 1.1])
 
-        plt.xlabel('x position')
-        plt.ylabel('y position')
+        plt.xlabel('x (transport direction)')
+        plt.ylabel('y (orthogonal to transport direction)')
 
         axes.scatter(track[:, 0], track[:, 1], color=color, s=point_size)
         axes.plot(track[:, 0], track[:, 1], color=color, label=label)

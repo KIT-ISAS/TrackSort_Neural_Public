@@ -744,7 +744,7 @@ class Model(object):
                 logging.info(log_string)
                 test_mse, test_mae, test_nll = self._evaluate_kendall_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant, test_nll])
-                self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
+                self.plot_track_with_uncertainty(dataset_test, epoch=epoch)
                 self.plot_calibration(dataset_test, epoch=epoch)
                 self.plot_correlation(dataset_test, epoch=epoch)
             else:
@@ -835,7 +835,7 @@ class Model(object):
                 logging.info(log_string)
                 test_mse, test_mae, test_custom_loss = self._evaluate_custom_loss_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant, test_custom_loss])
-                self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
+                self.plot_track_with_uncertainty(dataset_test, epoch=epoch)
                 self.plot_calibration(dataset_test, epoch=epoch)
                 self.plot_correlation(dataset_test, epoch=epoch)
             else:
@@ -924,7 +924,7 @@ class Model(object):
                 test_mse, test_mae = self._evaluate_model(dataset_test, epoch)
                 test_losses.append([epoch, test_mse, test_mae * self.data_source.normalization_constant])
                 if self.global_config['mc_dropout']:
-                    self.plot_track_with_uncertainty(dataset_test, epoch=epoch, max_number_plots=3)
+                    self.plot_track_with_uncertainty(dataset_test, epoch=epoch)
                     self.plot_calibration(dataset_test, epoch=epoch)
                     self.plot_correlation(dataset_test, epoch=epoch)
                 plt.close('all')
@@ -1614,8 +1614,8 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.pdf'.format(x_name, y_name, epoch)))
         plt.clf()
 
-    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3,
-                                    fit_scale_to_content=True, normed_plot=False):
+    def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=10, tracks_per_plot=3,
+                                    fit_scale_to_content=True, normed_plot=True):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss'] or self.global_config['custom_variance_prediction']:
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
@@ -1654,7 +1654,9 @@ class Model(object):
 
                 start_time_step = 0
 
-                for track_idx in range(min(max_number_plots, inp_batch.shape[0])):
+                track_in_plot = 0
+
+                for track_idx in range(min(max_number_plots*tracks_per_plot, inp_batch.shape[0]//tracks_per_plot)):
                     seq_length = self.data_source.get_last_timestep_of_track(inp_batch[track_idx])
 
                     axes = self.data_source.plot_track(inp_batch[track_idx], start=start_time_step,
@@ -1688,10 +1690,14 @@ class Model(object):
                         ellipse.set_alpha(0.3)
                         ax.add_artist(ellipse)
 
-                    plt.title('Track with predictions')
+                    plt.title('Track with Uncertainties')
 
-                    plt.savefig(os.path.join(self.global_config['diagrams_path'],
-                                             'Tracks_with_uncertainty_{}-{}.pdf'.format(epoch, track_idx)))
-                    plt.clf()
+                    track_in_plot += 1
+
+                    if track_in_plot == tracks_per_plot:
+                        track_in_plot = 0
+                        plt.savefig(os.path.join(self.global_config['diagrams_path'],
+                                                 'Tracks_with_uncertainty_{}-{}.pdf'.format(epoch, track_idx)))
+                        plt.clf()
 
 
