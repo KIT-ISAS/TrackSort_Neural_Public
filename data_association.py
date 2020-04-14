@@ -77,11 +77,13 @@ class DataAssociation(object):
 
             if self.global_config['calibrate'] and variances is not None:
                 # calibrate the variances
-                stddevs = np.sqrt(variances)
                 sigma = 1.0
                 sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas([1])[0]
-                stddevs = ((stddevs * sigma_new)/sigma)
-                variances = stddevs**2
+
+                for key in variances.keys():
+                    stddev = np.sqrt(variances[key])
+                    stddev = (stddev/sigma) * sigma_new
+                    variances[key] = stddev**2
 
             prediction_ids = list(predictions.keys())
             prediction_values = list(predictions.values())
