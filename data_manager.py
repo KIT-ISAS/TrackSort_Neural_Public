@@ -342,8 +342,15 @@ class AbstractDataSet(ABC):
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
-        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(batch_size, drop_remainder=True)
-        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(batch_size, drop_remainder=True)
+        if random_seed is None:
+            minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(batch_size, drop_remainder=True)
+            logging.warning("Always use a random seed if you want to combine MLPs and RNNs/KFs!")
+        else:
+            minibatches_train = raw_train_dataset.batch(batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.batch(batch_size, drop_remainder=True)
+
+        
 
         self.minibatches_train = minibatches_train
         self.minibatches_test = minibatches_test
@@ -581,11 +588,11 @@ class AbstractDataSet(ABC):
             last_index = self.get_last_timestep_of_track(track) - 1
             for i in range(self.longest_track):
                 # If there are enough values to build a vector
-                if i >= n_inp_points and i <= last_index:
+                if i >= n_inp_points-1 and i < last_index:
                     # x_input1, x_input2, ..., x_inputN, y_input1, y_input2, ...,y_inputN
-                    input_array = np.append(aligned_track_data[track_number, i-n_inp_points:i, 0], aligned_track_data[track_number, i-n_inp_points:i, 1])
+                    input_array = np.append(aligned_track_data[track_number, i-n_inp_points+1:i+1, 0], aligned_track_data[track_number, i+1-n_inp_points:i+1, 1])
                     # x_output, y_output
-                    output_array = np.append(aligned_track_data[track_number, i, 0], aligned_track_data[track_number, i, 1])
+                    output_array = np.append(aligned_track_data[track_number, i+1, 0], aligned_track_data[track_number, i+1, 1])
                     full_array = np.append(input_array, output_array)
                     self.mlp_data[counter] = full_array
 
