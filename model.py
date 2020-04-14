@@ -545,9 +545,11 @@ class Model(object):
 
         stddevs = []
         cdf = []
+        counter = []
 
         for stddev in np.arange(0.0, 10.0, 0.01):
             count_falls_into = np.count_nonzero(data['standardized_l2'] <= stddev)
+            counter.append(count_falls_into)
             proportion = count_falls_into / N
             cdf.append(proportion)
             stddevs.append(stddev)
@@ -563,8 +565,13 @@ class Model(object):
         y_ = ir.fit_transform(x, y)
         y_pred = ir.predict(x)
 
-        plt.scatter(stddevs, cdf, c='blue')
-        plt.plot(stddevs, y_pred, c='black')
+        fig, ax = plt.subplots(ncols=1)
+        ax1 = ax.twinx()
+        ax.hist(stddevs, weights=counter, density=True, 
+                histtype='stepfilled', alpha=0.2)
+
+        ax1.scatter(stddevs, cdf, c='blue')
+        ax1.plot(stddevs, y_pred, c='black')
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
@@ -1486,7 +1493,6 @@ class Model(object):
             return erf(sigmas/np.sqrt(2))
 
         # evalute data
-        #
         stddevs = []
         cdf = []
 
