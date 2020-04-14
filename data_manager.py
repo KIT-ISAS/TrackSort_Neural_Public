@@ -158,7 +158,7 @@ class AbstractDataSet(ABC):
         return data
 
     def plot_track(self, track, color='black', start=0, end=-1, label='track', fit_scale_to_content=False, legend=True,
-                   normed_plot=False):
+                   normed_plot=False, point_size=1.0):
         track = track[start:end]
 
         axes = plt.gca()
@@ -173,7 +173,7 @@ class AbstractDataSet(ABC):
         plt.xlabel('x position')
         plt.ylabel('y position')
 
-        axes.scatter(track[:, 0], track[:, 1], color=color)
+        axes.scatter(track[:, 0], track[:, 1], color=color, s=point_size)
         axes.plot(track[:, 0], track[:, 1], color=color, label=label)
 
         if legend:

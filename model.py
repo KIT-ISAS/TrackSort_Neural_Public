@@ -750,7 +750,7 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.pdf'))
         plt.clf()
 
         # MAE
@@ -758,14 +758,14 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.pdf'))
         plt.clf()
 
         # NLL
         plt.plot(train_losses[:, 0], train_losses[:, 3], c='blue', label="Training Negative Log Likelihood")
         plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test Negative Log Likelihood")
         plt.legend(loc="upper right")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'NLL.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'NLL.pdf'))
         plt.clf()
 
     def train_custom_variance(self):
@@ -841,7 +841,7 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.pdf'))
         plt.clf()
 
         # MAE
@@ -849,14 +849,14 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.pdf'))
         plt.clf()
 
         # custom_loss
         plt.plot(train_losses[:, 0], train_losses[:, 3], c='blue', label="Training custom_loss")
         plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test custom_loss")
         plt.legend(loc="upper right")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Custom_loss.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Custom_loss.pdf'))
         plt.clf()
 
     def train(self):
@@ -931,7 +931,7 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 1], c='red', label="Test MSE")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.pdf'))
         plt.clf()
 
         # MAE
@@ -939,7 +939,7 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE (not normalized)")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.pdf'))
         plt.clf()
 
         plt.close('all')
@@ -1054,14 +1054,14 @@ class Model(object):
         plt.plot(test_losses[:, 0], test_losses[:, 7], c='orange', label="Test MSE (sep. temporal)")
         plt.legend(loc="upper right")
         plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.pdf'))
         plt.clf()
 
         # MAEs
         plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
         plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE")
         plt.legend(loc="upper right")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.pdf'))
         plt.clf()
 
     def _evaluate_kendall_model(self, dataset_test, epoch):
@@ -1141,7 +1141,7 @@ class Model(object):
         prop = dict(linewidth=2.5)
         ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
                     medianprops=prop, capprops=prop)
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.pdf'))
         plt.clf()
 
         return test_mse, test_mae, test_nll
@@ -1222,7 +1222,7 @@ class Model(object):
         prop = dict(linewidth=2.5)
         ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
                     medianprops=prop, capprops=prop)
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.pdf'))
         plt.clf()
 
         return test_mse, test_mae, test_custom_loss
@@ -1299,7 +1299,7 @@ class Model(object):
         prop = dict(linewidth=2.5)
         ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
                     medianprops=prop, capprops=prop)
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.pdf'))
         plt.clf()
 
         return test_mse, test_mae
@@ -1385,7 +1385,7 @@ class Model(object):
         plt.ylabel(ylabel)
         prop = dict(linewidth=2.5)
         ax1.boxplot(errors, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.pdf'))
         plt.clf()
 
     def _get_evaluation_data(self, dataset):
@@ -1503,7 +1503,7 @@ class Model(object):
         plt.title("Calibration plot (standardized euclidean distance)")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'CDF_{}.png'.format(epoch)))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'CDF_{}.pdf'.format(epoch)))
         plt.clf()
 
 
@@ -1601,7 +1601,7 @@ class Model(object):
         else:
             plt.title('Pearson r=None between {} and {}: (epoch={})'.format(r, x_name, y_name, epoch))
 
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.png'.format(x_name, y_name, epoch)))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'corr_{}_{}_{}.pdf'.format(x_name, y_name, epoch)))
         plt.clf()
 
     def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=3,
@@ -1651,17 +1651,20 @@ class Model(object):
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='black', end=seq_length,
                                                        label="Input truth {}".format(track_idx),
-                                                       normed_plot=normed_plot)
+                                                       normed_plot=normed_plot,
+                                                       point_size=0.1)
                     axes = self.data_source.plot_track(target_batch[track_idx], start=start_time_step,
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='green', end=seq_length,
                                                        label="Output truth {}".format(track_idx),
-                                                       normed_plot=normed_plot)
+                                                       normed_plot=normed_plot,
+                                                       point_size=0.1)
                     axes = self.data_source.plot_track(pos_predictions[track_idx], start=start_time_step,
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='blue', end=seq_length,
                                                        label="Prediction {}".format(track_idx),
-                                                       normed_plot=normed_plot)
+                                                       normed_plot=normed_plot,
+                                                       point_size=0.1)
 
                     ax = plt.subplot(111)
 
@@ -1678,7 +1681,7 @@ class Model(object):
                     plt.title('Track with predictions')
 
                     plt.savefig(os.path.join(self.global_config['diagrams_path'],
-                                             'Tracks_with_uncertainty_{}-{}.png'.format(epoch, track_idx)))
+                                             'Tracks_with_uncertainty_{}-{}.pdf'.format(epoch, track_idx)))
                     plt.clf()
 
 
