@@ -147,6 +147,7 @@ class ModelManager(object):
 
             # learning rate decay after x epochs
             if (epoch + 1) % lr_decay_after_epochs == 0:
+                logging.info("Decreasing learning rate...")
                 self.expert_manager.change_learning_rate(lr_decay)
             
             seq2seq_iter = iter(seq2seq_dataset_train)
