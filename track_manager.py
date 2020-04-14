@@ -44,7 +44,7 @@ class TrackManager(object):
     def get_predictions(self):
         predictions, variances = self.model_manager.predict_all()
         if len(self.active_ids) != len(predictions.keys()):
-            logging.error("something with the id management doesnt work in get_predictions!")
+            logging.error("something with the id management doesn't work in get_predictions!")
             code.interact(local=dict(globals(), **locals()))
         return predictions, variances
 
