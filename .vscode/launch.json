@@ -62,9 +62,9 @@
             "program": "main.py",
             "console": "integratedTerminal",
             "args": ["--is_loaded", "True",
-                    "--config_path", "configs/test_kf_pepper.json",
-                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
-                    "--execute_evaluation", "True",
+                    "--config_path", "configs/test_pepper_all.json",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv",
+                    "--execute_evaluation", "False",
                     "--execute_multi_target_tracking", "True"]
         },
         {
