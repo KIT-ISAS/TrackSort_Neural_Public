@@ -6,8 +6,11 @@ import os
 
 import tensorflow as tf
 import numpy as np
+
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 
 from scipy.special import erf, erfinv
 from scipy.stats.stats import pearsonr
@@ -478,6 +481,9 @@ class Model(object):
     def __init__(self, global_config, data_source):
         self.global_config = global_config
         self.data_source = data_source
+
+        # styling pyplot
+        plt.style.use('bmh')
 
         self.is_calibrated = False
         self._iso_regression_fn = None
@@ -1615,7 +1621,8 @@ class Model(object):
         plt.clf()
 
     def plot_track_with_uncertainty(self, dataset, epoch=0, max_number_plots=10, tracks_per_plot=3,
-                                    fit_scale_to_content=True, normed_plot=True):
+                                    fit_scale_to_content=True, normed_plot=True, legend=False,
+                                    point_size=0.25):
         if self.global_config['mc_dropout'] or self.global_config['kendall_loss'] or self.global_config['custom_variance_prediction']:
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset.take(1)):
@@ -1664,19 +1671,22 @@ class Model(object):
                                                        color='black', end=seq_length,
                                                        label="Input truth {}".format(track_idx),
                                                        normed_plot=normed_plot,
-                                                       point_size=0.1)
+                                                       point_size=point_size,
+                                                       legend=legend)
                     axes = self.data_source.plot_track(target_batch[track_idx], start=start_time_step,
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='green', end=seq_length,
                                                        label="Output truth {}".format(track_idx),
                                                        normed_plot=normed_plot,
-                                                       point_size=0.1)
+                                                       point_size=point_size,
+                                                       legend=legend)
                     axes = self.data_source.plot_track(pos_predictions[track_idx], start=start_time_step,
                                                        fit_scale_to_content=fit_scale_to_content,
                                                        color='blue', end=seq_length,
                                                        label="Prediction {}".format(track_idx),
                                                        normed_plot=normed_plot,
-                                                       point_size=0.1)
+                                                       point_size=point_size,
+                                                       legend=legend)
 
                     ax = plt.subplot(111)
 
@@ -1696,6 +1706,18 @@ class Model(object):
 
                     if track_in_plot == tracks_per_plot:
                         track_in_plot = 0
+
+                        legend_elements = [
+                            Line2D([0], [0], marker='o', color='green', lw=2, label='True position',
+                                   markersize=8, markerfacecolor='green'),
+                            Line2D([0], [0], marker='o', color='blue', lw=2, label='Prediction mean',
+                                   markersize=8, markerfacecolor='blue'),
+                            Line2D([0], [0], marker='o', color='white', label='Prediction covariance',
+                                   markerfacecolor='lightsteelblue', markersize=15)]
+
+                        # Create the figure
+                        plt.legend(handles=legend_elements, loc='upper right')
+
                         plt.savefig(os.path.join(self.global_config['diagrams_path'],
                                                  'Tracks_with_uncertainty_{}-{}.pdf'.format(epoch, track_idx)))
                         plt.clf()

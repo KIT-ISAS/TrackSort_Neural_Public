@@ -165,7 +165,7 @@ class AbstractDataSet(ABC):
         axes.set_aspect('equal')
         if normed_plot:
             plt.xlim((0.3, 0.8))
-            plt.ylim((0.0, 0.2))
+            plt.ylim((0.0, 0.4))
         elif not fit_scale_to_content:
             axes.set_xlim([0, self.belt_width * 1.1])
             axes.set_ylim([0, self.belt_height * 1.1])

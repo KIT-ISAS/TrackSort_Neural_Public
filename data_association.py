@@ -159,8 +159,19 @@ class DataAssociation(object):
 
             if self.global_config['calibrate']:
                 # calibrate the distance threshold
-                distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(
-                    [distance_threshold])[0]
+
+                if self.global_config['distance_confidence'] > 0:
+                    # Use confidence interval
+                    distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
+                        [self.global_config['distance_confidence']]
+                    )[0]
+                    distance_threshold = self.track_manager.model_manager.model.conf_to_sigma(
+                        [distance_conf_sigma]
+                    )[0]
+                else:
+                    # Use sigma value
+                    distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(
+                        [distance_threshold])[0]
 
             # Block matrix: A
             #  ... L2 distance between predictions and measurements

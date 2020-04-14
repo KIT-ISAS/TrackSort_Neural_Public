@@ -44,6 +44,10 @@ parser.add_argument('--dataset_type', default='CsvDataset',
 parser.add_argument('--distance_threshold', type=float, default=0.02,
                     help='The threshold used for the matching with the artificial measurements and predictions. '
                          'Unit is (calibrated) sigmas.')
+parser.add_argument('--distance_confidence', type=float, default=0.00,
+                    help='Alternative to distance_threshold. Distance threshold gets calculated implicity with the '
+                         'gaussian error function (ERF).')
+
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--num_timesteps', type=int, default=10000,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
@@ -130,6 +134,7 @@ global_config = {
     'is_loaded': args.is_loaded,
     'model_path': args.model_path,
     'distance_threshold': args.distance_threshold,
+    'distance_confidence': args.distance_confidence,
     'batch_size': args.batch_size,
     'matching_algorithm': args.matching_algorithm,
     'run_association': args.run_association,
@@ -221,7 +226,6 @@ def run_global_config(global_config, experiment_series_names=''):
     global_config['diagrams_path'] = os.path.join(global_config['results_path'], 'visualizations', 'diagrams')
     global_config['visualization_path'] = os.path.join(global_config['results_path'], 'visualizations',
                                                        'matching_visualization')
-
     for config_key in ['results_path', 'experiment_path', 'diagrams_path', 'visualization_path']:
         os.makedirs(global_config[config_key], exist_ok=True)
 
