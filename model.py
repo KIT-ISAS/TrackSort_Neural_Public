@@ -567,14 +567,18 @@ class Model(object):
 
         fig, ax = plt.subplots(ncols=1)
         ax1 = ax.twinx()
-        ax.hist(stddevs, weights=counter, density=True, 
-                histtype='stepfilled', alpha=0.2)
+        ax.hist(stddevs, weights=counter, density=True, bins=50, histtype='stepfilled', alpha=0.2)
+        ax.ylabel("# Predictions in conf. interval")
 
         ax1.scatter(stddevs, cdf, c='blue')
         ax1.plot(stddevs, y_pred, c='black')
-        plt.title("Calibration plot (standardized euclidean distance)")
-        plt.xlabel("Expected confidence level")
-        plt.ylabel("Observed confidence level")
+        plt.title("Calibration Plot")
+
+        ax1.xlabel("Expected confidence level")
+        ax1.ylabel("Empirical confidence level")
+
+
+
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration.pdf'))
         plt.clf()
 
