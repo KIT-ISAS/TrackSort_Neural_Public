@@ -1,9 +1,6 @@
 """MLP model.
 
 TODO:
-    * Build model
-    * Test MLP 
-    * Integrate in Expert pipeline
 """
 
 import os
