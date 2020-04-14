@@ -567,7 +567,7 @@ class Model(object):
 
         fig, ax = plt.subplots(ncols=1)
         ax1 = ax.twinx()
-        ax.hist(stddevs, weights=counter, density=True, bins=50, histtype='stepfilled', alpha=0.2)
+        ax.hist(stddevs, weights=counter, density=False, bins=50, histtype='stepfilled', alpha=0.2)
         ax.ylabel("# Predictions in conf. interval")
 
         ax1.scatter(stddevs, cdf, c='blue')
