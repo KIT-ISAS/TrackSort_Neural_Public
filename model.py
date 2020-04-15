@@ -482,9 +482,6 @@ class Model(object):
         self.global_config = global_config
         self.data_source = data_source
 
-        # styling pyplot
-        plt.style.use('bmh')
-
         self.is_calibrated = False
         self._iso_regression_fn = None
 
@@ -574,14 +571,14 @@ class Model(object):
         fig, ax = plt.subplots(ncols=1)
         ax1 = ax.twinx()
         ax.hist(stddevs, weights=counter, density=False, bins=50, histtype='stepfilled', alpha=0.2)
-        ax.ylabel("# Predictions in conf. interval")
+        ax.set_ylabel("# Predictions in conf. interval")
 
         ax1.scatter(stddevs, cdf, c='blue')
         ax1.plot(stddevs, y_pred, c='black')
         plt.title("Calibration Plot")
 
-        ax1.xlabel("Expected confidence level")
-        ax1.ylabel("Empirical confidence level")
+        ax1.set_xlabel("Expected confidence level")
+        ax1.set_ylabel("Empirical confidence level")
 
 
 
@@ -1700,7 +1697,7 @@ class Model(object):
                         ellipse.set_alpha(0.3)
                         ax.add_artist(ellipse)
 
-                    plt.title('Track with Uncertainties')
+                    plt.title('Tracks with Uncertainties')
 
                     track_in_plot += 1
 
