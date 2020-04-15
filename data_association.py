@@ -55,8 +55,50 @@ class DataAssociation(object):
         shutil.rmtree(self.global_config['visualization_path'], ignore_errors=True)
         os.makedirs(self.global_config['visualization_path'])
 
+        # storage
         old_measurements = None
 
+        # constants
+        distance_threshold = self.global_config['distance_threshold']
+        positional_probabilities = self.global_config['positional_probabilities']
+        is_alive_probability_weighting = self.global_config['is_alive_probability_weighting']
+        # how many stddevs does the network output? -> this is a constant
+        predicted_confidence_level_sigma = 1.0
+        # default recalibration:  1 sigma = 1 sigma
+        sigma_new = 1.0
+
+        if self.global_config['calibrate']:
+            # calibrate the distance threshold
+            if self.global_config['distance_confidence'] > 0:
+                # Use confidence interval
+                distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
+                    [self.global_config['distance_confidence']])[0]
+                logging.info("Confidence interval recalibrated: {} -> {}".format(
+                    self.global_config['distance_confidence'], distance_conf_sigma))
+                distance_threshold = self.track_manager.model_manager.model.conf_to_sigma(
+                    distance_conf_sigma)
+            else:
+                # Use sigma value
+                distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(
+                    [distance_threshold])[0]
+
+            logging.info("Distance threshold: {}".format(distance_threshold))
+
+            # calculate the calibration constant: sigma_new
+            if self.global_config['distance_confidence'] > 0:
+                # use confidence interval
+                distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
+                    [self.global_config['distance_confidence']])[0]
+                sigma_new = self.track_manager.model_manager.model.conf_to_sigma(
+                    distance_conf_sigma)
+            else:
+                # use distance threshold
+                sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas([distance_threshold])[0]
+
+        #
+        logging.info("Re-Calibration constant (sigma_new): {}".format(sigma_new))
+
+        #
         for time_step in range(self.global_config['num_timesteps']):
             logging.info('step {} / {}'.format(time_step, self.global_config['num_timesteps']))
 
@@ -74,34 +116,27 @@ class DataAssociation(object):
 
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
             predictions, variances = self.track_manager.get_predictions()
-            print("PREDICTIONS")
-            print(predictions)
 
-            print("VARS")
-            print(variances)
+            logging.debug("MEASUREMENTS")
+            logging.debug(measurements)
 
+            logging.debug("predictions")
+            logging.debug(predictions)
+
+            logging.debug("variances")
+            logging.debug(variances)
+
+            # calibrate the variances
             if self.global_config['calibrate'] and variances is not None:
-                # calibrate the variances
-
-                sigma = 1.0
-
-                if self.global_config['distance_confidence'] > 0:
-                    distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
-                        [self.global_config['distance_confidence']]
-                    )[0]
-                    sigma_new = self.track_manager.model_manager.model.conf_to_sigma(
-                        distance_conf_sigma
-                    )
-                else:
-                    sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas([1])[0]
-
-                # print("xxx")
-                # code.interact(local=dict(globals(), **locals()))
+                logging.debug("Calibrate the variances")
 
                 for key in variances.keys():
+                    if sum(variances[key]) == 0.0:
+                        logging.error("Variance zero error. Adding 0.001 to avoid division by zero.")
+                        variances[key] += 0.001
                     stddev = np.sqrt(variances[key])
-                    stddev = (stddev/sigma) * sigma_new
-                    variances[key] = stddev**2
+                    stddev = (stddev/predicted_confidence_level_sigma) * sigma_new
+                    variances[key] = stddev**2.0
 
             prediction_ids = list(predictions.keys())
             prediction_values = list(predictions.values())
@@ -170,77 +205,47 @@ class DataAssociation(object):
             if distance_matrix.size == 0:
                 continue
 
-            # constants
-            distance_threshold = self.global_config['distance_threshold']
-            positional_probabilities = self.global_config['positional_probabilities']
-            is_alive_probability_weighting = self.global_config['is_alive_probability_weighting']
-
-            if self.global_config['calibrate']:
-                # calibrate the distance threshold
-
-                if self.global_config['distance_confidence'] > 0:
-                    # Use confidence interval
-                    distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
-                        [self.global_config['distance_confidence']]
-                    )[0]
-                    distance_threshold = self.track_manager.model_manager.model.conf_to_sigma(
-                        distance_conf_sigma
-                    )
-                else:
-                    # Use sigma value
-                    distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(
-                        [distance_threshold])[0]
-                # code.interact(local=dict(globals(), **locals()))
-
             # Block matrix: A
-            #  ... L2 distance between predictions and measurements
+            #  ... distance between predictions and measurements
+            #      Either L2 or standardized Euclidean distance
             for prediction_nr, prediction in enumerate(prediction_values):
                 for measurement_nr, measurement in enumerate(measurements):
                     if variances is not None:
                         # standardized Euclidean distance
-                        if sum(variances[prediction_ids[prediction_nr]]) == 0.0:
-                            logging.error("Variance was zero")
-                            variances[prediction_ids[prediction_nr]] = np.array([0.02, 0.02])
                         distance_matrix[measurement_nr][prediction_nr] = \
                             np.sqrt(np.sum(((measurement-prediction)**2) / variances[prediction_ids[prediction_nr]]))
                     else:
                         # euclidean distance (=L2 norm)
                         distance_matrix[measurement_nr][prediction_nr] = np.linalg.norm(measurement - prediction)
 
-            # ToDo: This is a fix! When the variances are used to rescale the
-            #        distances, then the distance_threshold becomes 1.0
-            # distance_threshold = 1.0
             # Block matrix: B
             # ... measurements to their artificial predictions
             for measurement_nr, measurement in enumerate(measurements):
-                distance_matrix[measurement_nr][len(prediction_values) + measurement_nr] = \
-                    distance_threshold * math.pow(1.0 + (1.0 - measurement[0]), positional_probabilities)
+                prob = distance_threshold * math.pow(1.0 + (1.0 - measurement[0]), positional_probabilities)
+                distance_matrix[measurement_nr][len(prediction_values) + measurement_nr] = prob
 
             # Block matrix: H
+            # ... artificial predictions <-> artificial, artificial measurement
             for measurement_nr, measurement in enumerate(measurements):
+                prob = 1.1 * distance_threshold * math.pow(1.0 + (1.0 - measurement[0]), positional_probabilities)
                 distance_matrix[len(measurements) + len(prediction_values) + measurement_nr][
-                    len(prediction_values) + measurement_nr] = 1.1 * distance_threshold \
-                                                               * math.pow(1.0 + (1.0 - measurement[0]),
-                                                                          positional_probabilities)
+                    len(prediction_values) + measurement_nr] = prob
 
             # Block matrix: D
+            # ... prediction <-> artificial measurement
             for prediction_nr, prediction in enumerate(prediction_values):
-                distance_matrix[len(measurements) + prediction_nr][prediction_nr] = distance_threshold \
-                                                                                    * math.pow(
-                    1.0 + prediction_is_alive_probabilities[prediction_nr],
-                    is_alive_probability_weighting) \
-                                                                                    * math.pow(
-                    1.0 + prediction_values[prediction_nr][0], positional_probabilities)
+                prob = distance_threshold * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr],
+                                                     is_alive_probability_weighting) \
+                       * math.pow(1.0 + prediction_values[prediction_nr][0], positional_probabilities)
+                distance_matrix[len(measurements) + prediction_nr][prediction_nr] = prob
 
             # Block matrix: F
             for prediction_nr, prediction in enumerate(prediction_values):
-                distance_matrix[len(measurements) + prediction_nr][
-                    len(prediction_values) + len(measurements) + prediction_nr] = 1.1 * distance_threshold \
-                                                                                  * math.pow(
-                    1.0 + prediction_is_alive_probabilities[prediction_nr],
-                    is_alive_probability_weighting) \
-                                                                                  * math.pow(
+                prob = 1.1 * distance_threshold * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr],
+                                                           is_alive_probability_weighting) * math.pow(
                     1.0 + prediction_values[prediction_nr][0], positional_probabilities)
+                distance_matrix[len(measurements) + prediction_nr][
+                    len(prediction_values) + len(measurements) + prediction_nr] = prob
 
             #
             if self.global_config['matching_algorithm'] == 'global':
