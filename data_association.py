@@ -74,11 +74,29 @@ class DataAssociation(object):
 
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
             predictions, variances = self.track_manager.get_predictions()
+            print("PREDICTIONS")
+            print(predictions)
+
+            print("VARS")
+            print(variances)
 
             if self.global_config['calibrate'] and variances is not None:
                 # calibrate the variances
+
                 sigma = 1.0
-                sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas([1])[0]
+
+                if self.global_config['distance_confidence'] > 0:
+                    distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
+                        [self.global_config['distance_confidence']]
+                    )[0]
+                    sigma_new = self.track_manager.model_manager.model.conf_to_sigma(
+                        distance_conf_sigma
+                    )
+                else:
+                    sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas([1])[0]
+
+                # print("xxx")
+                # code.interact(local=dict(globals(), **locals()))
 
                 for key in variances.keys():
                     stddev = np.sqrt(variances[key])
@@ -166,12 +184,13 @@ class DataAssociation(object):
                         [self.global_config['distance_confidence']]
                     )[0]
                     distance_threshold = self.track_manager.model_manager.model.conf_to_sigma(
-                        [distance_conf_sigma]
-                    )[0]
+                        distance_conf_sigma
+                    )
                 else:
                     # Use sigma value
                     distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(
                         [distance_threshold])[0]
+                # code.interact(local=dict(globals(), **locals()))
 
             # Block matrix: A
             #  ... L2 distance between predictions and measurements
@@ -179,12 +198,18 @@ class DataAssociation(object):
                 for measurement_nr, measurement in enumerate(measurements):
                     if variances is not None:
                         # standardized Euclidean distance
+                        if sum(variances[prediction_ids[prediction_nr]]) == 0.0:
+                            logging.error("Variance was zero")
+                            variances[prediction_ids[prediction_nr]] = np.array([0.02, 0.02])
                         distance_matrix[measurement_nr][prediction_nr] = \
                             np.sqrt(np.sum(((measurement-prediction)**2) / variances[prediction_ids[prediction_nr]]))
                     else:
                         # euclidean distance (=L2 norm)
                         distance_matrix[measurement_nr][prediction_nr] = np.linalg.norm(measurement - prediction)
 
+            # ToDo: This is a fix! When the variances are used to rescale the
+            #        distances, then the distance_threshold becomes 1.0
+            # distance_threshold = 1.0
             # Block matrix: B
             # ... measurements to their artificial predictions
             for measurement_nr, measurement in enumerate(measurements):
