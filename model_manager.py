@@ -31,16 +31,15 @@ class ModelManager(object):
 
             if self.global_config['mc_dropout']:
                 global_track_ids = self.current_ids[batch_nr]
-                tracks = [self.trackManager.tracks[global_track_id] for global_track_id in global_track_ids  if global_track_id >= 0]
-                track_measurement_history = [track.measurements for track in tracks]
+                track_measurement_history = [self.trackManager.tracks[global_track_id].measurements if global_track_id >= 0 else []
+                              for global_track_id in global_track_ids  ]
             else:
                 track_measurement_history = None
 
             prediction, new_state, variances = self.model.predict(self.current_inputs[batch_nr],
                                                                   self.current_states[batch_nr],
                                                                   track_measurement_history=track_measurement_history)
-            # code.interact(local=dict(globals(), **locals()))
-            # state_batch_first = np.transpose(self.current_states[batch_nr], [1,0,2,3])
+
             self.current_states[batch_nr] = new_state
             for idx in range(len(self.current_is_alive[batch_nr])):
                 if self.current_is_alive[batch_nr][idx]:

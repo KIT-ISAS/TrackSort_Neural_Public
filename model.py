@@ -615,7 +615,7 @@ class Model(object):
             k = self.global_config['mc_samples']
 
             # Unfortunately we cannot use the state because dropout at inference time changes and therefore the
-            #  predictions are nonsense. For this reason, we use the measurement history of the tracks.
+            #  state would be a bottleneck. For this reason, we use the measurement history of the tracks.
             data_input = np.ones([self.global_config['batch_size'], self.data_source.longest_track, 2]) * \
                          self.data_source.nan_value
 
