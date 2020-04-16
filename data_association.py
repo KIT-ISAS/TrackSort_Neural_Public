@@ -101,17 +101,6 @@ class DataAssociation(object):
         #
         for time_step in range(self.global_config['num_timesteps']):
             logging.info('step {} / {}'.format(time_step, self.global_config['num_timesteps']))
-
-            if self.global_config['visualize']:
-                plt.title('Time step: {}'.format(time_step))
-                if not self.global_config['CsvDataSet']['rotate_columns']:
-                    plt.xlim((-0.1, 1.3))  # TODO more sophisticated solution to this problem???
-                    plt.ylim((-0.1, 1.5))
-
-                if self.global_config['CsvDataSet']['rotate_columns']:
-                    plt.xlim((0.3, 0.8))
-                    plt.ylim((0.0, 0.2))
-
             self.global_config['current_time_step'] = time_step
 
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
@@ -145,6 +134,14 @@ class DataAssociation(object):
 
             # visualize:
             if self.global_config['visualize']:
+                plt.title('Time step: {}'.format(time_step))
+                if not self.global_config['CsvDataSet']['rotate_columns']:
+                    plt.xlim((-0.1, 1.3))  # TODO more sophisticated solution to this problem???
+                    plt.ylim((-0.1, 1.5))
+
+                if self.global_config['CsvDataSet']['rotate_columns']:
+                    plt.xlim((0.3, 0.8))
+                    plt.ylim((0.0, 0.2))
 
                 # old measurements, old artificial measurements
                 if old_measurements is not None:
