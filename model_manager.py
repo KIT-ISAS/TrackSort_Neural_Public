@@ -248,10 +248,7 @@ class ModelManager(object):
             normalization_constant (double):    Belt size in pixel
 
         TODO:
-            * Boxplot data for MSE loss - Denormalized to pixel
-            * Boxplot data for MAE - Denormalized to pixel
             * Boxplot data for MSE and/or MAE with respect to MLP mask
-            * Implement gating and weighting to represent ensemble performance
             * Expert diversity matrix
             * Are common errors regional?
             * Do some experts perform better than others in certain situations?
