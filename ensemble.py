@@ -18,7 +18,7 @@ class Simple_Ensemble(GatingNetwork):
 
     def __init__(self, n_experts):
         """Initialize a simple ensemble gating network."""
-        super().__init__(n_experts)
+        super().__init__(n_experts, "Simple Ensemble")
 
     def get_weights(self, batch_size):
         """Return an equal weights vector.
@@ -39,8 +39,19 @@ class Simple_Ensemble(GatingNetwork):
 
         If the mask value at an instance is 0, the experts weight is 0.
 
+        example mask arry:
+        [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+        [1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]]
+        --> Expert 6 is only active at position 0.
+        
         Returns:
             np.array with weights of shape mask.shape
         """
         weights = mask / np.sum(mask, axis=0)
+        # Replace nan values
+        weights[np.isnan(weights)] = 0
         return weights

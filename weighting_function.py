@@ -25,6 +25,8 @@ def weighting_function(predictions, weights, position_variances = np.array([])):
     assert(predictions.shape[0] == weights.shape[0])
     if position_variances.size > 0:
         assert(weights.shape[0] == position_variances.shape[0])
-
-    total_predictions = np.sum(predictions * np.repeat(weights[:, :, np.newaxis], 2, axis=2), axis=0)
+        
+    # Expand weights in the last dimension by repeating to generate the same weights for x and y.
+    # prediction = prediction_1 * weight_1 + prediction_2 * weight_2 + ... + prediction_n * weight_n
+    total_predictions = np.sum(predictions * np.repeat(np.expand_dims(weights, -1), 2, axis=-1), axis=0)
     return total_predictions       

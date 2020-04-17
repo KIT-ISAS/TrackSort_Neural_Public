@@ -236,59 +236,70 @@ class ModelManager(object):
         # Save all models
         self.expert_manager.save_models()
 
-    def test_models(self, mlp_conversion_func, 
-                    seq2seq_dataset_test = None, mlp_dataset_test = None):
+    def test_models(self, mlp_conversion_func, result_dir,
+                    seq2seq_dataset_test = None, mlp_dataset_test = None,
+                    normalization_constant = 1):
         """Test model performance on test dataset and create evaluations.
 
         Args:
-            mlp_conversion_func: Function to convert MLP format to track format
-            **_dataset_test (tf.Tensor): Batches of test data
+            mlp_conversion_func:                Function to convert MLP format to track format
+            result_dir (String):                Directory to save plots and data in
+            **_dataset_test (tf.Tensor):        Batches of test data
+            normalization_constant (double):    Belt size in pixel
+
+        TODO:
+            * Boxplot data for MSE loss - Denormalized to pixel
+            * Boxplot data for MAE - Denormalized to pixel
+            * Boxplot data for MSE and/or MAE with respect to MLP mask
+            * Implement gating and weighting to represent ensemble performance
+            * Expert diversity matrix
+            * Are common errors regional?
+            * Do some experts perform better than others in certain situations?
+            * How do experts perform when presented a different dataset? 
         """
-         # Define a loss function: MSE
+        # Create predictions for all testing batches and save prediction and target values to one list.
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
-        loss_object = tf.keras.losses.MeanSquaredError()
-        mae_object = tf.keras.losses.MeanAbsoluteError()
         seq2seq_iter = iter(seq2seq_dataset_test)
         mlp_iter = iter(mlp_dataset_test)
-
-        all_losses = []; all_mlp_losses = []; all_maes = []
-
+        all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_mlp_maks = np.array([])
         for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
             (mlp_inp, mlp_target) = next(mlp_iter)
             # Test experts on a batch
             predictions = self.expert_manager.test_batch(mlp_conversion_func, seq2seq_inp, mlp_inp)
             masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
+            # Get weighting of experts
+            weights = self.gating_network.get_masked_weights(np.array(masks))
+            total_prediction = weighting_function(np.array(predictions), weights)
+            predictions.append(total_prediction)
+            # Create a total mask to addd to list
+            total_mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
+            total_mask = 1 - K.cast(total_mask, tf.float64)
+            masks.append(total_mask)
             # MLP mask to compare MLP with KF/RNN
             mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
             mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
-            # Calculate loss for all models
-            losses = []; mlp_losses = []; maes = []
-            for i in range(len(predictions)):
-                losses.append(loss_object(seq2seq_target, predictions[i], sample_weight = masks[i]))
-                mlp_losses.append(loss_object(seq2seq_target, predictions[i], sample_weight = mlp_mask))
-                maes.append(mae_object(seq2seq_target, predictions[i], sample_weight = masks[i]))
-            all_losses.append(losses)
-            all_mlp_losses.append(mlp_losses)
-            all_maes.append(maes)
-            
-        """
-        predictions = []
-        targets = []
-        n_batches = 0
-        for (batch_n, (inp, target)) in enumerate(dataset_test):
-            prediction = self.expert_manager.test_batch(inp)
-            predictions.append(np.array(prediction))
-            targets.append(target)
-            n_batches += 1
-        
-        # Reshape the data to get rid of the batches.
-        np_predictions = np.zeros([self.expert_manager.get_n_experts(), n_batches*self.batch_size, self.num_time_steps, 2])
-        np_targets = np.zeros([n_batches*self.batch_size, self.num_time_steps, 2])
-        for i in range(n_batches):
-            np_predictions[:, i*self.batch_size:(i+1)*self.batch_size, :, :] = np.array(predictions[i])
-            np_targets[i*self.batch_size:(i+1)*self.batch_size, :, :] = targets[i].numpy()
+            # Add everything to the lists
+            if all_targets.shape[0]==0:
+                all_targets = seq2seq_target.numpy()
+                all_predictions = np.array(predictions)
+                all_masks = np.array(masks)
+                all_mlp_maks = mlp_mask.numpy()
+            else:
+                all_targets = np.concatenate((all_targets, seq2seq_target.numpy()),axis=0)
+                all_predictions = np.concatenate((all_predictions, predictions), axis=1)
+                all_masks = np.concatenate((all_masks, np.array(masks)), axis=1)
+                all_mlp_maks = np.concatenate((all_mlp_maks, mlp_mask.numpy()), axis=0)
 
-        calculate_mse(np_targets, np_predictions, self.mask_value)
+        expert_names = self.expert_manager.get_expert_names()
+        expert_names.append(self.gating_network.get_name())
+
+        create_boxplot_evaluation(target=all_targets, 
+                                  predictions=all_predictions, 
+                                  masks=all_masks, 
+                                  expert_names = expert_names, 
+                                  normalization_constant=normalization_constant, 
+                                  result_dir=result_dir)
+        """
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
         """
 

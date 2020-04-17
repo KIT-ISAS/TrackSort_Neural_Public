@@ -50,7 +50,7 @@
         }
       }
     },
-    "KF_CV_sv3_6E-7": {
+    "KF_CV_sw18": {
       "type": "KF",
       "sub_type": "CV",
       "model_options": {
@@ -65,7 +65,7 @@
         "pos_var": 3.6E-7
       }
     },
-    "KF_CA_sv3_6E-7": {
+    "KF_CA_sw18E3": {
       "type": "KF",
       "sub_type": "CA",
       "model_options": {

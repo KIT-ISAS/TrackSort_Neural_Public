@@ -47,6 +47,8 @@ parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffe
                     help='The directory of the data set. Only needed for CsvDataset.')
 parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDataset', 'CsvDataset'],
                     help='The type of the dataset.')
+parser.add_argument('--result_path', default='results/default_results/',
+                    help='The path where the model is stored or loaded from.')
 parser.add_argument('--distance_threshold', type=float, default=0.02,
                     help='The threshold used for the matching with the artificial measurements and predictions')
 parser.add_argument('--config_path', default="configs/default_config.json",
@@ -115,6 +117,7 @@ global_config = {
 
     'is_loaded': args.is_loaded,
     'model_path': args.model_path,
+    'result_path': args.result_path,
     'distance_threshold': args.distance_threshold,
     'config_path': args.config_path,
     'batch_size': args.batch_size,
@@ -187,8 +190,8 @@ def run_global_config(global_config, experiment_series_names=''):
     global_config['visualization_path'] = os.path.join(global_config['results_path'], 'visualizations',
                                                        'matching_visualization')
 
-    for config_key in ['results_path', 'experiment_path', 'diagrams_path', 'visualization_path']:
-        os.makedirs(global_config[config_key], exist_ok=True)
+    #for config_key in ['results_path', 'experiment_path', 'diagrams_path', 'visualization_path']:
+        #os.makedirs(global_config[config_key], exist_ok=True)
 
     # file paths
     global_config['visualization_video_path'] = os.path.join(global_config['visualization_path'],
@@ -307,8 +310,10 @@ def run_global_config(global_config, experiment_series_names=''):
     #   * Implement testing functions for all three models combined
     if global_config.get('execute_evaluation'):
         model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                  result_dir = global_config['result_path'],
                                   seq2seq_dataset_test = seq2seq_dataset_test, 
-                                  mlp_dataset_test = mlp_dataset_test)
+                                  mlp_dataset_test = mlp_dataset_test,
+                                  normalization_constant = data_source.normalization_constant)
 
     if global_config.get('execute_multi_target_tracking'):
         ## Init tracks
