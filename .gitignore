@@ -12,7 +12,6 @@ __pycache__
 cpu_env
 gpu_env
 experiments
-results
 
 # IDE
 .idea
