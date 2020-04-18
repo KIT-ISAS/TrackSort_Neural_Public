@@ -1419,6 +1419,7 @@ class Model(object):
             data['standardized_l2'] = []
             data['l2'] = []
             data['absolute_error'] = []
+            data['squared_error'] = []
             data['time_step'] = []
 
             for (batch_n, (inp_batch, target_batch)) in enumerate(dataset):
@@ -1472,6 +1473,7 @@ class Model(object):
                         data['l2'] += [np.sqrt(np.sum(
                             (data['prediction'][-1] - data['target'][-1])**2
                         ))]
+                        data['squared_error'] = data['l2'][-1] ** 2.0
                         data['time_step'] += [time_step_i]
 
         data['prediction'] = np.array(data['prediction'])
@@ -1553,12 +1555,16 @@ class Model(object):
                                        '# Measurements per track', 'L2',
                                        epoch=epoch, violin=True)
 
+        self._plot_correlation_between(data['time_step'], data['squared_error'],
+                                       'Observed measurements per track', 'Squared Error',
+                                       epoch=epoch, violin=True)
+
         self._plot_correlation_between(data['time_step'], data['standardized_l2'],
-                                       '# Measurements per track', 'Standardized Euclidean L2',
+                                       'Observed Measurements per track', 'Standardized Euclidean L2',
                                        epoch=epoch, violin=True)
 
         self._plot_correlation_between(data['time_step'], data['variance_area'],
-                                       '# Measurements per track', 'Variance rectangle',
+                                       'Observed Measurements per track', 'Variance rectangle',
                                        epoch=epoch, violin=True)
 
         self._plot_correlation_between(data['l2'], data['prediction_variance'][:, 0],
@@ -1576,11 +1582,18 @@ class Model(object):
         if violin:
             data = np.stack((x,y)).T
             violin_data = [data[data[:, 0] == x_val][:, 1] for x_val in set(x)]
-            plt.violinplot(violin_data, widths=0.9,
-                           showmedians=False,
-                           showmeans=False,
-                           showextrema=False,
-                           points=1000)
+            violin_parts = plt.violinplot(violin_data, widths=0.9,
+                                          showmedians=False,
+                                          showmeans=False,
+                                          showextrema=False,
+                                          points=1000)
+
+            # set transparency of violin depending of count of points in bucket
+            alpha_values = [len(violin_data_bucket) / float(data.shape[0]) for violin_data_bucket in violin_data]
+            alpha_values /= np.max(alpha_values)
+
+            for alpha, pc in zip(alpha_values, violin_parts['bodies']):
+                pc.set_alpha(alpha)
         else:
             plt.scatter(x,y)
 
