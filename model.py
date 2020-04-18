@@ -1557,10 +1557,6 @@ class Model(object):
                                        '# Measurements per track', 'L2',
                                        epoch=epoch, violin=True)
 
-        self._plot_correlation_between(data['time_step'], data['squared_error'],
-                                       'Observed measurements per track', 'Squared Error',
-                                       epoch=epoch, violin=True)
-
         self._plot_correlation_between(data['time_step'], data['standardized_l2'],
                                        'Observed Measurements per track', 'Standardized Euclidean L2',
                                        epoch=epoch, violin=True)
