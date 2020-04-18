@@ -42,11 +42,10 @@ parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffe
 parser.add_argument('--dataset_type', default='CsvDataset',
                     help='The type of the dataset. Current options are: ["FakeDataset","CsvDataset"].')
 parser.add_argument('--distance_threshold', type=float, default=0.02,
-                    help='The threshold used for the matching with the artificial measurements and predictions. '
-                         'Unit is (calibrated) sigmas.')
+                    help='The threshold used for the matching with the artificial measurements and predictions. ')
 parser.add_argument('--distance_confidence', type=float, default=0.00,
                     help='Alternative to distance_threshold. Distance threshold gets calculated implicity with the '
-                         'gaussian error function (ERF).')
+                         'chi2 function')
 
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--num_timesteps', type=int, default=10000,
@@ -119,6 +118,9 @@ parser.add_argument('--calibrate', type=str2bool, default=False)
 args = parser.parse_args()
 
 assert not all((args.kendall_loss, args.mc_dropout)), "Choose either MC Dropout or kendall_loss"
+
+assert (args.distance_confidence > 0.0 and args.calibrate) or (not args.calibrate), \
+    'Use --distance_confidence with --calibrate'
 
 global_config = {
     '_description': args.description,

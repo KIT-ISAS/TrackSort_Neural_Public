@@ -77,10 +77,6 @@ class DataAssociation(object):
                     self.global_config['distance_confidence'], distance_conf_sigma))
                 distance_threshold = self.track_manager.model_manager.model.conf_to_sigma(
                     distance_conf_sigma)
-            else:
-                # Use sigma value
-                distance_threshold = self.track_manager.model_manager.model.get_calibrated_sigmas(
-                    [distance_threshold])[0]
 
             logging.info("Distance threshold: {}".format(distance_threshold))
 
@@ -90,10 +86,7 @@ class DataAssociation(object):
                 distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
                     [self.global_config['distance_confidence']])[0]
                 sigma_new = self.track_manager.model_manager.model.conf_to_sigma(
-                    distance_conf_sigma)
-            else:
-                # use distance threshold
-                sigma_new = self.track_manager.model_manager.model.get_calibrated_sigmas([distance_threshold])[0]
+                    distance_conf_sigma, sigma=1.0)
 
         #
         logging.info("Re-Calibration constant (sigma_new): {}".format(sigma_new))

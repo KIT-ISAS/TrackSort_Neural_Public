@@ -13,6 +13,7 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 from scipy.special import erf, erfinv
+from scipy.stats import chi2
 from scipy.stats.stats import pearsonr
 
 from tensorflow.keras import backend as K
@@ -518,12 +519,9 @@ class Model(object):
             self.is_calibrated = True
 
     @staticmethod
-    def sigma_to_conf(sigmas):
-        return erf(sigmas / np.sqrt(2))
-
-    @staticmethod
-    def conf_to_sigma(confs):
-        return erfinv(confs) * np.sqrt(2)
+    def conf_to_sigma(confs, sigma=1.0):
+        return chi2.ppf(confs, df=2) * sigma
+        # return erfinv(confs) * np.sqrt(2)
 
     def _apply_isotonic_regression(self, confs):
         if self._iso_regression_fn is not None:
@@ -532,35 +530,28 @@ class Model(object):
             logging.info('iso regression function was none')
             return confs
 
-    def get_calibrated_sigmas(self, sigmas):
-        # old_sigma -> new_sigma
-        # example: if the estimator underestimates 1 sigma, then the return value might be 2 sigmas.
-        #          This signifies that the original 1 sigma radius has to be double.
-        confs = self.sigma_to_conf(sigmas)
-        calibrated_confs = self._apply_isotonic_regression(confs)
-        sigmas = self.conf_to_sigma(calibrated_confs)
-        return sigmas
-
     def _calibrate(self):
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
         data = self._get_evaluation_data(dataset_test)
         N = data['time_step'].shape[0]
 
-        stddevs = []
+        expected_confs = []
         cdf = []
         counter = []
 
-        for stddev in np.arange(0.0, 10.0, 0.01):
-            count_falls_into = np.count_nonzero(data['standardized_l2'] <= stddev)
+        for expected_confidence in np.arange(0.0, 0.9999, 0.01):
+            expected_1_sigma_distance = chi2.ppf(expected_confidence, df=2)
+
+            count_falls_into = np.count_nonzero(data['standardized_l2'] <= expected_1_sigma_distance)
             counter.append(count_falls_into)
             proportion = count_falls_into / N
             cdf.append(proportion)
-            stddevs.append(stddev)
+            expected_confs.append(expected_confidence)
 
-        stddevs = self.sigma_to_conf(np.array(stddevs))
+        expected_confs = np.array(expected_confs)
         cdf = np.array(cdf)
 
-        x = stddevs
+        x = expected_confs
         y = cdf
         n = x.shape[0]
 
@@ -570,11 +561,11 @@ class Model(object):
 
         fig, ax = plt.subplots(ncols=1)
         ax1 = ax.twinx()
-        ax.hist(stddevs, weights=counter, density=False, bins=50, histtype='stepfilled', alpha=0.2)
+        ax.hist(expected_confs, weights=counter, density=False, bins=50, histtype='stepfilled', alpha=0.2)
         ax.set_ylabel("# Predictions in conf. interval")
 
-        ax1.scatter(stddevs, cdf, c='blue')
-        ax1.plot(stddevs, y_pred, c='black')
+        ax1.scatter(expected_confs, cdf, c='blue')
+        ax1.plot(expected_confs, y_pred, c='black')
         plt.title("Calibration Plot")
 
         ax1.set_xlabel("Expected confidence level")
@@ -591,7 +582,7 @@ class Model(object):
         self._iso_regression_fn.fit_transform(y, x)
         x_pred = self._iso_regression_fn.predict(y)
 
-        plt.scatter(cdf, stddevs, c='blue')
+        plt.scatter(cdf, expected_confs, c='blue')
         plt.plot(cdf, x_pred, c='black')
 
         plt.title("Flipped Calibration plot (standardized euclidean distance)")
