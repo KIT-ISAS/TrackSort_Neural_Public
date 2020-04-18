@@ -326,10 +326,13 @@ class AbstractDataSet(ABC):
 
         return input_seq, target_seq
 
-    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1):
+    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1, seed=None):
         tracks = self.get_seq2seq_data()
         if normalized:
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
+
+        if seed is not None:
+            np.random.seed(seed)
         train_tracks, test_tracks = self.split_train_test(tracks, test_ratio=test_ratio)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)

@@ -531,7 +531,7 @@ class Model(object):
             return confs
 
     def _calibrate(self):
-        dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True)
+        dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True, seed=42)
         data = self._get_evaluation_data(dataset_test)
         N = data['time_step'].shape[0]
 
