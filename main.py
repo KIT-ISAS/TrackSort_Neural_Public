@@ -104,6 +104,8 @@ parser.add_argument('--execute_evaluation', type=str2bool, default=True,
                     help='Run evaluation after training/loading or not')
 parser.add_argument('--execute_multi_target_tracking', type=str2bool, default=True,
                     help='Run multi-target tracking after training/loading or not')
+parser.add_argument('--evaluate_mlp_mask', type=str2bool, default=False,
+                    help='Masks every model with a mlp masks to compare MLPs with other models in testing function.')
 
 args = parser.parse_args()
 
@@ -163,7 +165,9 @@ global_config = {
     'positional_probabilities': 0.0,
 
     'execute_evaluation': args.execute_evaluation,
-    'execute_multi_target_tracking': args.execute_multi_target_tracking
+    'execute_multi_target_tracking': args.execute_multi_target_tracking,
+
+    'evaluate_mlp_mask': args.evaluate_mlp_mask
 }
 
 # setup logging
@@ -313,7 +317,8 @@ def run_global_config(global_config, experiment_series_names=''):
                                   result_dir = global_config['result_path'],
                                   seq2seq_dataset_test = seq2seq_dataset_test, 
                                   mlp_dataset_test = mlp_dataset_test,
-                                  normalization_constant = data_source.normalization_constant)
+                                  normalization_constant = data_source.normalization_constant,
+                                  evaluate_mlp_mask = global_config['evaluate_mlp_mask'])
 
     if global_config.get('execute_multi_target_tracking'):
         ## Init tracks

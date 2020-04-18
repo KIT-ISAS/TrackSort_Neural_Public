@@ -12,7 +12,7 @@ import matplotlib
 import pandas as pd
 plt = matplotlib.pyplot
 
-def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, normalization_constant = 1):
+def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, normalization_constant = 1, is_mlp_mask=False):
     """Create the data for MSE and MAE boxplots.
     
     Create box plots and data of plots.
@@ -26,7 +26,9 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         expert_names (list):    Names (String) of each expert
         result_dir (String):    Directory to save the created plot data to
         normalization_constant (double): Value for denormalization
+        is_mlp_mask (Boolean):  Is this evaluation with mlp masks or standard?
     """
+    assert(len(expert_names) == predictions.shape[0])
     # Get mse and mae values
     mse_values, mae_values = calculate_mse_mae(target, predictions, masks)
     # Create box values for every expert
@@ -51,19 +53,19 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     plt.boxplot(mse_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("MSE")
     plt.grid(b=True, which='major', axis='y', linestyle='--')
-    plt.savefig(result_dir + 'mse_box_plot.pdf')  
+    plt.savefig(result_dir + ('mse_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mse_box_plot.pdf')) 
     plt.show()
     plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("MAE")
     plt.grid(b=True, which='major', axis='y', linestyle='--')
-    plt.savefig(result_dir + 'mae_box_plot.pdf')  
+    plt.savefig(result_dir + ('mae_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mae_box_plot.pdf'))  
     plt.show()
 
     # Save data to csv via pandas
     mse_df = pd.DataFrame(mse_box_values)
     mae_df = pd.DataFrame(mae_box_values)
-    mse_df.to_csv(result_dir + "mse_box_values.csv", index=False)
-    mae_df.to_csv(result_dir + "mae_box_values.csv", index=False)
+    mse_df.to_csv(result_dir + ('mse_box_values_mlp_maks.csv' if is_mlp_mask else 'mse_box_values.csv'), index=False)
+    mae_df.to_csv(result_dir + ('mae_box_values_mlp_maks.csv' if is_mlp_mask else 'mae_box_values.csv'), index=False)
 
 def get_box_values(data):
     """Obtain all box plot values from a set of numpy data.

@@ -3,7 +3,7 @@
 cd ..
 
 ### Zylinder
-: '
+
 python3 main.py \
         --is_loaded True \
         --config_path configs/test_cylinder_all.json \
@@ -60,7 +60,7 @@ python3 main.py \
         --result_path 'results/pepper_models_on_spheres_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-'
+
 python3 main.py \
         --is_loaded True \
         --config_path configs/test_pepper_all.json \
@@ -68,7 +68,6 @@ python3 main.py \
         --result_path 'results/pepper_models_on_wheat_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 ### Spheres
 python3 main.py \
@@ -78,7 +77,6 @@ python3 main.py \
         --result_path 'results/spheres_models_on_cylinder_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 python3 main.py \
         --is_loaded True \
@@ -87,7 +85,6 @@ python3 main.py \
         --result_path 'results/spheres_models_on_pepper_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 python3 main.py \
         --is_loaded True \
@@ -96,7 +93,6 @@ python3 main.py \
         --result_path 'results/spheres_all/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 python3 main.py \
         --is_loaded True \
@@ -105,7 +101,6 @@ python3 main.py \
         --result_path 'results/spheres_models_on_wheat_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 ### Wheat
 python3 main.py \
@@ -115,7 +110,6 @@ python3 main.py \
         --result_path 'results/wheat_models_on_cylinder_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 python3 main.py \
         --is_loaded True \
@@ -124,7 +118,6 @@ python3 main.py \
         --result_path 'results/wheat_models_on_pepper_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 python3 main.py \
         --is_loaded True \
@@ -133,7 +126,6 @@ python3 main.py \
         --result_path 'results/wheat_models_on_spheres_data/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()
 
 python3 main.py \
         --is_loaded True \
@@ -142,4 +134,3 @@ python3 main.py \
         --result_path 'results/wheat_all/' \
         --execute_evaluation True \
         --execute_multi_target_tracking False
-exit()

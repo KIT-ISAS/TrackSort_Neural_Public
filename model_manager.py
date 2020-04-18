@@ -238,7 +238,8 @@ class ModelManager(object):
 
     def test_models(self, mlp_conversion_func, result_dir,
                     seq2seq_dataset_test = None, mlp_dataset_test = None,
-                    normalization_constant = 1):
+                    normalization_constant = 1,
+                    evaluate_mlp_mask = False):
         """Test model performance on test dataset and create evaluations.
 
         Args:
@@ -246,13 +247,12 @@ class ModelManager(object):
             result_dir (String):                Directory to save plots and data in
             **_dataset_test (tf.Tensor):        Batches of test data
             normalization_constant (double):    Belt size in pixel
+            evaluate_mlp_mask (Boolean):        Create plots with MLP masks or standard mask
 
         TODO:
-            * Boxplot data for MSE and/or MAE with respect to MLP mask
             * Expert diversity matrix
             * Are common errors regional?
             * Do some experts perform better than others in certain situations?
-            * How do experts perform when presented a different dataset? 
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
@@ -275,27 +275,40 @@ class ModelManager(object):
             # MLP mask to compare MLP with KF/RNN
             mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
             mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
+            mlp_mask = mlp_mask.numpy()
+            mlp_masks = np.repeat(np.expand_dims(mlp_mask, 0), len(masks), axis=0)
+
             # Add everything to the lists
             if all_targets.shape[0]==0:
                 all_targets = seq2seq_target.numpy()
                 all_predictions = np.array(predictions)
                 all_masks = np.array(masks)
-                all_mlp_maks = mlp_mask.numpy()
+                all_mlp_maks = mlp_masks
             else:
                 all_targets = np.concatenate((all_targets, seq2seq_target.numpy()),axis=0)
                 all_predictions = np.concatenate((all_predictions, predictions), axis=1)
                 all_masks = np.concatenate((all_masks, np.array(masks)), axis=1)
-                all_mlp_maks = np.concatenate((all_mlp_maks, mlp_mask.numpy()), axis=0)
+                all_mlp_maks = np.concatenate((all_mlp_maks, mlp_masks), axis=1)
 
         expert_names = self.expert_manager.get_expert_names()
         expert_names.append(self.gating_network.get_name())
-
-        create_boxplot_evaluation(target=all_targets, 
-                                  predictions=all_predictions, 
-                                  masks=all_masks, 
-                                  expert_names = expert_names, 
-                                  normalization_constant=normalization_constant, 
-                                  result_dir=result_dir)
+        
+        if not evaluate_mlp_mask:
+            create_boxplot_evaluation(target=all_targets, 
+                                    predictions=all_predictions, 
+                                    masks=all_masks, 
+                                    expert_names = expert_names, 
+                                    normalization_constant=normalization_constant, 
+                                    result_dir=result_dir,
+                                    is_mlp_mask=False)
+        else:
+            create_boxplot_evaluation(target=all_targets, 
+                                    predictions=all_predictions, 
+                                    masks=all_mlp_maks, 
+                                    expert_names = expert_names, 
+                                    normalization_constant=normalization_constant, 
+                                    result_dir=result_dir,
+                                    is_mlp_mask=True)
         """
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
         """
