@@ -1545,49 +1545,37 @@ class Model(object):
         data = self._get_evaluation_data(dataset)
         N = data['time_step'].shape[0]
 
-        self._plot_correlation_between(data['measurement'][:, 0], data['absolute_error'][:, 0],
-                                       'measurement_x', 'error_x',
-                                       epoch=epoch)
-
         self._plot_correlation_between(data['time_step'], data['l2'],
-                                       'track_time_step', 'l2',
-                                       epoch=epoch)
+                                       '# Measurements per track', 'L2',
+                                       epoch=epoch, violin=True)
 
         self._plot_correlation_between(data['time_step'], data['standardized_l2'],
-                                       'track_time_step', 'standardized_l2',
-                                       epoch=epoch)
+                                       '# Measurements per track', 'Standardized Euclidean L2',
+                                       epoch=epoch, violin=True)
 
         self._plot_correlation_between(data['time_step'], data['variance_area'],
-                                       'track_time_step', 'variance_area',
-                                       epoch=epoch)
+                                       '# Measurements per track', 'Variance rectangle',
+                                       epoch=epoch, violin=True)
 
-        self._plot_correlation_between(data['absolute_error'][:, 0], data['prediction_variance'][:, 0],
-                                       'error_x', 'var_x',
-                                       epoch=epoch)
-        self._plot_correlation_between(data['absolute_error'][:, 1], data['prediction_variance'][:, 1],
-                                       'error_y', 'var_y',
-                                       epoch=epoch)
-        self._plot_correlation_between(data['absolute_error'][:, 1], data['prediction_variance'][:, 1],
-                                       'error_y', 'var_y',
-                                       epoch=epoch)
         self._plot_correlation_between(data['l2'], data['prediction_variance'][:, 0],
-                                       'l2', 'var_x',
+                                       'L2', 'Variance x',
                                        epoch=epoch)
         self._plot_correlation_between(data['l2'], data['prediction_variance'][:, 1],
-                                       'l2', 'var_y',
-                                       epoch=epoch)
-        self._plot_correlation_between(data['l2'], data['prediction_variance'][:, 1],
-                                       'l2', 'var_y',
+                                       'L2', 'Variance y',
                                        epoch=epoch)
         self._plot_correlation_between(data['l2'], data['variance_area'],
-                                       'l2', 'var_area',
-                                       epoch=epoch)
-        self._plot_correlation_between(data['l2'], data['variance_area'],
-                                       'l2', 'var_area',
+                                       'L2', 'Variance rectangle',
                                        epoch=epoch)
 
-    def _plot_correlation_between(self, x, y, x_name, y_name, epoch=0):
-        plt.scatter(x, y)
+    def _plot_correlation_between(self, x, y, x_name, y_name, epoch=0, violin=False):
+
+        if violin:
+            data = np.stack((x,y)).T
+            violin_data = [data[data[:, 0] == x_val][:, 1] for x_val in set(x)]
+            plt.violinplot(violin_data)
+        else:
+            plt.scatter(x,y)
+
         try:
             r = pearsonr(x, y)[0]
         except ValueError as value_error:
