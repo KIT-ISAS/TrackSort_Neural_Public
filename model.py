@@ -1473,7 +1473,9 @@ class Model(object):
                         data['l2'] += [np.sqrt(np.sum(
                             (data['prediction'][-1] - data['target'][-1])**2
                         ))]
-                        data['squared_error'] = data['l2'][-1] ** 2.0
+                        data['squared_error'] = [np.sum(
+                            (data['prediction'][-1] - data['target'][-1])**2
+                        )]
                         data['time_step'] += [time_step_i]
 
         data['prediction'] = np.array(data['prediction'])
