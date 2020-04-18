@@ -1576,7 +1576,11 @@ class Model(object):
         if violin:
             data = np.stack((x,y)).T
             violin_data = [data[data[:, 0] == x_val][:, 1] for x_val in set(x)]
-            plt.violinplot(violin_data)
+            plt.violinplot(violin_data, widths=0.9,
+                           showmedians=False,
+                           showmeans=False,
+                           showextrema=False, 
+                           points=data.shape[0] / len(violin_data))
         else:
             plt.scatter(x,y)
 
