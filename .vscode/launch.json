@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Training pepper",
+            "name": "Training pepper RNN",
             "type": "python",
             "request": "launch",
             "program": "main.py",
@@ -29,55 +29,35 @@
             "console": "integratedTerminal",
             "args": ["--is_loaded", "False",
                     "--config_path", "configs/train_pepper_mlp.json",
-                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
                     "--num_train_epochs", "3000",
                     "--batch_size", "64",
-                    "--evaluate_every_n_epochs", "5",
+                    "--evaluate_every_n_epochs", "20",
                     "--lr_decay_after_epochs", "150",
                     "--lr_decay_factor", "0.5",
                     "--execute_evaluation", "False",
                     "--execute_multi_target_tracking", "False"]
         },
         {
-            "name": "Training spheres",
-            "type": "python",
-            "request": "launch",
-            "program": "main.py",
-            "console": "integratedTerminal",
-            "args": ["--is_loaded", "False",
-                    "--config_path", "configs/train_pepper_rnn.json",
-                    "--dataset_dir", "data/Kugeln/trackSortResultKugeln/*_trackHistory_NothingDeleted.csv",
-                    "--num_train_epochs", "400",
-                    "--evaluate_every_n_epochs", "5",
-                    "--improvement_break_condition", "0.001",
-                    "--lr_decay_after_epochs", "100",
-                    "--lr_decay_factor", "0.1",
-                    "--execute_evaluation", "False",
-                    "--execute_multi_target_tracking", "False"]
-        },
-        {
-            "name": "Testing pepper",
+            "name": "Testing cylinder",
             "type": "python",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "args": ["--is_loaded", "True",
-                    "--config_path", "configs/test_pepper_all.json",
-                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv",
-                    "--execute_evaluation", "False",
-                    "--execute_multi_target_tracking", "True"]
-        },
-        {
-            "name": "Testing spheres",
-            "type": "python",
-            "request": "launch",
-            "program": "main.py",
-            "console": "integratedTerminal",
-            "args": ["--is_loaded", "True",
-                    "--config_path", "configs/test_spheres_kf.json",
-                    "--dataset_dir", "data/Kugeln/trackSortResultKugeln/*_trackHistory_NothingDeleted.csv",
+                    "--config_path", "configs/test_cylinder_all.json",
+                    "--dataset_dir", "data/Zylinder/trackSortResultZylinder/*_trackHistory_NothingDeleted.csv",
+                    "--result_path", "results/cylinder_all/",
                     "--execute_evaluation", "True",
                     "--execute_multi_target_tracking", "False"]
         },
+        {
+            "name": "Plot activation",
+            "type": "python",
+            "request": "launch",
+            "program": "plot_functions/activation_functions.py",
+            "console": "integratedTerminal",
+            "args": []
+        }
     ]
 }

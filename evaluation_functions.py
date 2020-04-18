@@ -8,9 +8,9 @@ import logging
 import os
 
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib
 import pandas as pd
-
+plt = matplotlib.pyplot
 
 def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, normalization_constant = 1):
     """Create the data for MSE and MAE boxplots.
@@ -41,24 +41,29 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         mse_boxplot_inputs.append(compressed_mse_values)
         mae_boxplot_inputs.append(compressed_mae_values)
 
+    # Check if result folder exists and create it if not.
+    save_path = os.path.dirname(result_dir)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
     # Show plot
-    #reshaped_mse = np.ma.reshape(mse_values, (mse_values.shape[0], mse_values.shape[1]*mse_values.shape[2]))
+    plt.figure()
     plt.boxplot(mse_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("MSE")
+    plt.grid(b=True, which='major', axis='y', linestyle='--')
+    plt.savefig(result_dir + 'mse_box_plot.pdf')  
     plt.show()
     plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("MAE")
+    plt.grid(b=True, which='major', axis='y', linestyle='--')
+    plt.savefig(result_dir + 'mae_box_plot.pdf')  
     plt.show()
 
     # Save data to csv via pandas
     mse_df = pd.DataFrame(mse_box_values)
     mae_df = pd.DataFrame(mae_box_values)
-    save_path = os.path.dirname(result_dir)
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
     mse_df.to_csv(result_dir + "mse_box_values.csv", index=False)
     mae_df.to_csv(result_dir + "mae_box_values.csv", index=False)
-    stop=0
 
 def get_box_values(data):
     """Obtain all box plot values from a set of numpy data.
