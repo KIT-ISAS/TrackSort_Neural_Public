@@ -591,6 +591,9 @@ class Model(object):
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'CalibrationFlipped.pdf'))
         plt.clf()
 
+        # Plot correlations
+        self.plot_correlation(None, data=data)
+
     def get_zero_state(self):
         self.rnn_model.reset_states()
         return get_state(self.rnn_model)
@@ -1541,8 +1544,9 @@ class Model(object):
         #                                      'CDF2_{}.png'.format(epoch)))
         # plt.clf()
 
-    def plot_correlation(self, dataset, epoch=0):
-        data = self._get_evaluation_data(dataset)
+    def plot_correlation(self, dataset, epoch=0, data=None):
+        if data is None:
+            data = self._get_evaluation_data(dataset)
         N = data['time_step'].shape[0]
 
         self._plot_correlation_between(data['time_step'], data['l2'],
