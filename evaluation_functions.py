@@ -37,7 +37,7 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         compressed_mse_values = normalization_constant**2 * np.ma.reshape(mse_values[i],(mse_values.shape[1]*mse_values.shape[2])).compressed()
         mse_box_values[expert_names[i]] = get_box_values(compressed_mse_values)
         compressed_mae_values = normalization_constant * np.ma.reshape(mae_values[i],(mae_values.shape[1]*mae_values.shape[2])).compressed()
-        mae_box_values[expert_names[i]] = get_box_values(mae_values[i])
+        mae_box_values[expert_names[i]] = get_box_values(compressed_mae_values)
         mse_boxplot_inputs.append(compressed_mse_values)
         mae_boxplot_inputs.append(compressed_mae_values)
 
