@@ -1579,8 +1579,8 @@ class Model(object):
             plt.violinplot(violin_data, widths=0.9,
                            showmedians=False,
                            showmeans=False,
-                           showextrema=False, 
-                           points=data.shape[0] / len(violin_data))
+                           showextrema=False,
+                           points=1000)
         else:
             plt.scatter(x,y)
 
