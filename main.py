@@ -80,6 +80,9 @@ parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.
 parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
 parser.add_argument('--dropout', type=float, default=0.0)
 parser.add_argument('--regularization', type=float, default=0.0)
+parser.add_argument('--tau_backup', type=float, default=10000000.0,
+                    help="Use this, if tau can't be calculated. Adds data noise to MC Dropout with VAR=1/tau.")
+parser.add_argument('--length_scale', type=float, default=1.0)
 parser.add_argument('--use_batchnorm_on_dense', type=str2bool, default=False)
 
 parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
@@ -184,6 +187,11 @@ global_config = {
     'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
     'lr_decay_after_epochs': args.lr_decay_after_epochs,
     'lr_decay_factor': args.lr_decay_factor,
+
+    'length_scale': args.length_scale,
+    'regularization': args.regularization,
+    'dropout': args.dropout,
+    'tau_backup': args.tau_backup,
 
     'state_overwriting_started': False,
     'overwriting_activated': args.overwriting_activated,

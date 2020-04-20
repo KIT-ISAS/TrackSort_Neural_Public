@@ -15,6 +15,7 @@ from matplotlib.lines import Line2D
 from scipy.special import erf, erfinv
 from scipy.stats import chi2
 from scipy.stats.stats import pearsonr
+from scipy.stats import multivariate_normal
 
 from tensorflow.keras import backend as K
 # issue with eager execution
@@ -485,6 +486,7 @@ class Model(object):
 
         self.is_calibrated = False
         self._iso_regression_fn = None
+        self.tau = None
 
         # ToDo: implement uncertainties + separation prediction
         self._label_dim = 2
@@ -598,7 +600,6 @@ class Model(object):
         self.rnn_model.reset_states()
         return get_state(self.rnn_model)
 
-    # expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
     def predict(self, current_input, state, track_measurement_history=None):
         new_states = []
         predictions = []
@@ -607,6 +608,9 @@ class Model(object):
             samples = []
 
             k = self.global_config['mc_samples']
+
+            if self.tau is None:
+                self._calc_tau()
 
             # Unfortunately we cannot use the state because dropout at inference time changes and therefore the
             #  state would be a bottleneck. For this reason, we use the measurement history of the tracks.
@@ -649,7 +653,7 @@ class Model(object):
             sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
             prediction = sample_mean
-            variances = sample_variance
+            variances = sample_variance + self.tau
 
         elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
             current_input = np.expand_dims(current_input, axis=1)
@@ -1430,6 +1434,9 @@ class Model(object):
                     k = self.global_config['mc_samples']
                     K2.set_learning_phase(1)
 
+                    if self.tau is None:
+                        self._calc_tau()
+
                     samples = []
 
                     for t_k in range(k):
@@ -1442,7 +1449,7 @@ class Model(object):
                     sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
                     pos_predictions = sample_mean
-                    var_predictions = sample_variance
+                    var_predictions = sample_variance + self.tau
                 elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
                     _ = self.rnn_model.reset_states()
                     pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
@@ -1477,6 +1484,9 @@ class Model(object):
                             (data['prediction'][-1] - data['target'][-1])**2
                         )]
                         data['time_step'] += [time_step_i]
+                        ar = multivariate_normal(mean=data['prediction'][-1], cov=np.diag(data['prediction_variance'][-1]))
+                        data['log_likelihood'] = ar.logpdf(data['target'][-1])
+                        del ar
 
         data['prediction'] = np.array(data['prediction'])
         data['target'] = np.array(data['target'])
@@ -1487,6 +1497,10 @@ class Model(object):
         data['l2'] = np.array(data['l2'])
         data['absolute_error'] = np.array(data['absolute_error'])
         data['time_step'] = np.array(data['time_step'])
+        data['log_likelihood'] = np.array(data['log_likelihood'])
+
+        self.global_config['sum_log_likelihood'] = np.sum(data['log_likelihood'])
+        logging.info('Sum of Log Likelihoods: {}'.format(self.global_config['sum_log_likelihood']))
 
         return data
 
@@ -1628,6 +1642,9 @@ class Model(object):
                     k = self.global_config['mc_samples']
                     K2.set_learning_phase(1)
 
+                    if self.tau is None:
+                        self._calc_tau()
+
                     samples = []
 
                     for t_k in range(k):
@@ -1640,7 +1657,7 @@ class Model(object):
                     sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
                     pos_predictions = sample_mean
-                    var_predictions = sample_variance
+                    var_predictions = sample_variance + self.tau
                 elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
                     _ = self.rnn_model.reset_states()
                     pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
@@ -1716,5 +1733,24 @@ class Model(object):
                         plt.savefig(os.path.join(self.global_config['diagrams_path'],
                                                  'Tracks_with_uncertainty_{}-{}.pdf'.format(epoch, track_idx)))
                         plt.clf()
+
+    def _calc_tau(self):
+        dropout_prob = self.global_config['dropout']
+        number_of_training_samples = self.global_config['number_of_training_samples'] or None
+        lambda_ = self.global_config['regularization']
+        length_scale = self.global_config['length_scale']
+
+        logging.info("Calc tau")
+        if dropout_prob != 0 and number_of_training_samples is not None and lambda_ > 0:
+            logging.info("Dropout_prob = {}, length_scale={}, N={}, lambda={}".format(dropout_prob, length_scale,
+                                                                                      number_of_training_samples,
+                                                                                      lambda_))
+            self.tau = ((1 - dropout_prob) * length_scale ** 2) / (2 * number_of_training_samples * lambda_)
+        else:
+            self.tau = self.global_config['tau_backup']
+            logging.info("Missing arguments for tau calc")
+
+        logging.info("tau={}".format(self.tau))
+        self.global_config['tau_calculated'] = self.tau
 
 
