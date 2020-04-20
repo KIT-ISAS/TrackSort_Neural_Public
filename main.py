@@ -110,6 +110,9 @@ parser.add_argument('--custom_variance_prediction', type=str2bool, default=False
 parser.add_argument('--mc_dropout', type=str2bool, default=False, help='Calculate uncertainties with MC Dropout')
 parser.add_argument('--mc_samples', type=int, default=5, help='MC Dropout: how many samples per track?')
 
+parser.add_argument('--number_of_training_samples', type=int, default=5, help='How many tracks in the training set?'
+                                                                              'Necessary for tau.')
+
 parser.add_argument('--kendall_loss', type=str2bool, default=False,
                     help='Estimate Heteroscedastic Aleatoric Uncertainty (https://arxiv.org/pdf/1703.04977.pdf)')
 
@@ -188,6 +191,7 @@ global_config = {
     'lr_decay_after_epochs': args.lr_decay_after_epochs,
     'lr_decay_factor': args.lr_decay_factor,
 
+    'number_of_training_samples': args.number_of_training_samples,
     'length_scale': args.length_scale,
     'regularization': args.regularization,
     'dropout': args.dropout,
