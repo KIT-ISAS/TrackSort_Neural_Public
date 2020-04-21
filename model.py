@@ -1284,12 +1284,20 @@ class Model(object):
             ae_y = ((target[:, :, 1] - predictions[:, :, 1]) ** 2) ** 0.5
             ae = (((ae_x + ae_y) * mask) / K.sum(mask))
 
+            batch_mae = tf.keras.losses.mean_absolute_error(target, predictions[:, :, :2]) * mask
+            batch_mae_per_track = tf.reduce_sum(batch_mae, axis=-1) / tf.reduce_sum(mask, axis=-1)
+
+            batch_mse = tf.keras.losses.mean_squared_error(target, predictions[:, :, :2]) * mask
+            batch_loss_per_track = tf.reduce_sum(batch_mse, axis=-1) / tf.reduce_sum(mask, axis=-1)
+
             # take average w.r.t. the number of unmasked entries
             # mse = K.sum(se) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
             # mae = K.sum(ae) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
 
-            mses = np.concatenate((mses, se[mask_int].numpy().reshape([-1])))
-            maes = np.concatenate((maes, ae[mask_int].numpy().reshape([-1])))
+            # mses = np.concatenate((mses, se[mask_int].numpy().reshape([-1])))
+            # maes = np.concatenate((maes, ae[mask_int].numpy().reshape([-1])))
+            mses = np.concatenate((mses, batch_loss_per_track.numpy().reshape([-1])))
+            maes = np.concatenate((maes, batch_mae_per_track.numpy().reshape([-1])))
 
         test_mae = np.mean(maes)
         test_mse = np.mean(mses)
