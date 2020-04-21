@@ -1254,6 +1254,7 @@ class Model(object):
             # Calculate the mask
             mask = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
+            mask_int = K.cast(mask, tf.int64)
             mask = K.cast(mask, tf.float64)
 
             if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
@@ -1288,8 +1289,8 @@ class Model(object):
             # mse = K.sum(se) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
             # mae = K.sum(ae) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
 
-            mses = np.concatenate((mses, se[mask].numpy().reshape([-1])))
-            maes = np.concatenate((maes, ae[mask].numpy().reshape([-1])))
+            mses = np.concatenate((mses, se[mask_int].numpy().reshape([-1])))
+            maes = np.concatenate((maes, ae[mask_int].numpy().reshape([-1])))
 
         test_mae = np.mean(maes)
         test_mse = np.mean(mses)
