@@ -1255,7 +1255,6 @@ class Model(object):
             mask = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
-            np_mask = ~(K.all(K.equal(target, mask_value), axis=-1)).numpy()
 
             if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
                 samples = []
@@ -1278,19 +1277,19 @@ class Model(object):
             # se = squared error
             se_x = ((target[:, :, 0] - predictions[:, :, 0]) ** 2)
             se_y = ((target[:, :, 1] - predictions[:, :, 1]) ** 2)
-            se = (((se_x + se_y) * mask) / K.sum(mask)).numpy()
+            se = (((se_x + se_y) * mask) / K.sum(mask))
 
             # ae = absolute error
             ae_x = ((target[:, :, 0] - predictions[:, :, 0]) ** 2) ** 0.5
             ae_y = ((target[:, :, 1] - predictions[:, :, 1]) ** 2) ** 0.5
-            ae = (((ae_x + ae_y) * mask) / K.sum(mask)).numpy()
+            ae = (((ae_x + ae_y) * mask) / K.sum(mask))
 
             # take average w.r.t. the number of unmasked entries
             # mse = K.sum(se) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
             # mae = K.sum(ae) / K.sum(mask) + tf.add_n(self.rnn_model.losses)
 
-            mses = np.concatenate((mses, se[np_mask].reshape([-1])))
-            maes = np.concatenate((maes, ae[np_mask].reshape([-1])))
+            mses = np.concatenate((mses, se[mask].numpy().reshape([-1])))
+            maes = np.concatenate((maes, ae[mask].numpy().reshape([-1])))
 
         test_mae = np.mean(maes)
         test_mse = np.mean(mses)
