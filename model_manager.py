@@ -15,6 +15,7 @@ import datetime
 from tensorflow.keras import backend as K
 
 from expert_manager import Expert_Manager
+from expert import Expert_Type
 from weighting_function import weighting_function
 from ensemble import Simple_Ensemble
 from evaluation_functions import *
@@ -292,6 +293,23 @@ class ModelManager(object):
 
         expert_names = self.expert_manager.get_expert_names()
         expert_names.append(self.gating_network.get_name())
+
+        # Diversity measurement evaluations
+        create_diversity_evaluation(target=all_targets, 
+                                    predictions=all_predictions, 
+                                    masks=all_masks, 
+                                    expert_names = expert_names,
+                                    result_dir=result_dir,
+                                    is_mlp_mask=False)
+        # It makes sense to run both evaluations if there is one MLP model in the expert set
+        if self.expert_manager.is_type_in_experts(expert_type=Expert_Type.MLP):
+            create_diversity_evaluation(target=all_targets, 
+                                        predictions=all_predictions, 
+                                        masks=all_mlp_maks, 
+                                        expert_names = expert_names,
+                                        result_dir=result_dir,
+                                        is_mlp_mask=True)
+
         
         if not evaluate_mlp_mask:
             create_boxplot_evaluation(target=all_targets, 

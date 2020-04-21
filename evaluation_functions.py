@@ -17,7 +17,6 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     
     Create box plots and data of plots.
     Save plots and data to result directory.
-    There will be a logging info about the most important evaluation values.
 
     Args:
         target (np.array):      Target values
@@ -64,8 +63,8 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     # Save data to csv via pandas
     mse_df = pd.DataFrame(mse_box_values)
     mae_df = pd.DataFrame(mae_box_values)
-    mse_df.to_csv(result_dir + ('mse_box_values_mlp_maks.csv' if is_mlp_mask else 'mse_box_values.csv'), index=False)
-    mae_df.to_csv(result_dir + ('mae_box_values_mlp_maks.csv' if is_mlp_mask else 'mae_box_values.csv'), index=False)
+    mse_df.to_csv(result_dir + ('mse_box_values_mlp_mask.csv' if is_mlp_mask else 'mse_box_values.csv'), index=False)
+    mae_df.to_csv(result_dir + ('mae_box_values_mlp_mask.csv' if is_mlp_mask else 'mae_box_values.csv'), index=False)
 
 def get_box_values(data):
     """Obtain all box plot values from a set of numpy data.
@@ -115,7 +114,62 @@ def calculate_mse_mae(target, predictions, masks):
     #log_string = 'Mean Squared Error (MSE) for all experts was: \n {}'.format(mse_list)
     #logging.info(log_string)
     return np.ma.array(mse_list), np.ma.array(mae_list)
+
+def create_diversity_evaluation(target, predictions, masks, expert_names, result_dir, is_mlp_mask=False):
+    """Create the data for diversity measurement comparison.
+
+    Save data to result directory.
+
+    Args:
+        target (np.array):      Target values
+        predictions (np.array): Predicted values
+        masks (np.array):       Masks for every expert
+        expert_names (list):    Names (String) of each expert
+        result_dir (String):    Directory to save the created plot data to
+        is_mlp_mask (Boolean):  Is this evaluation with mlp masks or standard?
+    """
+    n_experts = len(expert_names)
+    assert(predictions.shape[0] == n_experts)
+    ## Disagreement Measure (D)
+    # Calculate difference between forecaster and target -> calculate Root Mean Squared Error for each forecaster
+    mse_values, mae_values = calculate_mse_mae(target, predictions, masks)
+    rmse_values = []
+    error_values = np.ma.zeros(mae_values.shape)
+    for i in range(n_experts):
+        rmse_value = np.sqrt(mse_values[i].mean(axis=1).mean(axis=0))
+        # Determine when the forecaster made an error.
+        # Error := abs(y_prediction - y_target) > rmse
+        error_values[i] = mae_values[i]>rmse_value
+        rmse_values.append(rmse_value)
     
+    # Calculate error table for every expert combination
+    disagreement_measures = dict()
+    disagreement_measures['Expert names'] = expert_names
+    double_fault = dict()
+    double_fault['Expert names'] = expert_names
+    #              M_i correct | M_i error
+    # M_j correct       N11         N01
+    # M_j error         N10         N00
+    for i in range(n_experts):
+        disagreement_measure_vec = np.zeros(n_experts)
+        double_fault_vec = np.zeros(n_experts)
+        for j in range(n_experts):
+            N11 = np.ma.sum((error_values[i] == 0) & (error_values[j] == 0))
+            N01 = np.ma.sum((error_values[i] == 1) & (error_values[j] == 0))
+            N10 = np.ma.sum((error_values[i] == 0) & (error_values[j] == 1))
+            N00 = np.ma.sum((error_values[i] == 1) & (error_values[j] == 1))
+            disagreement_measure_vec[j] = (N01 + N10) / (N00 + N10 + N01 + N11)
+            double_fault_vec[j] = N00 / (N00 + N10 + N01 + N11)
+        disagreement_measures[expert_names[i]] = disagreement_measure_vec
+        double_fault[expert_names[i]] = double_fault_vec
+
+    disagreement_measures_df = pd.DataFrame(disagreement_measures)
+    double_fault_df = pd.DataFrame(double_fault)
+    disagreement_measures_df.to_csv(result_dir + ('disagreement_measures_mlp_mask.csv' if is_mlp_mask else 'disagreement_measures.csv'), index=False)
+    double_fault_df.to_csv(result_dir + ('double_fault_mlp_mask.csv' if is_mlp_mask else 'double_fault.csv'), index=False)
+
+
+
 
 def find_worst_predictions(target, predictions, mask_value):
     """Find the worst predictions for each expert.

@@ -341,3 +341,19 @@ class Expert_Manager(object):
     def get_expert_names(self):
         """Return list of names."""
         return [expert.name for expert in self.experts]
+
+    def is_type_in_experts(self, expert_type):
+        """Check if at least one expert is of given type.
+
+        Args: 
+            expert_type (Expert_Type): The expert type
+
+        Returns:
+            Boolean
+        """
+        assert(isinstance(expert_type, Expert_Type))
+        
+        for expert in self.experts:
+            if expert.type == expert_type:
+                return True 
+        return False
