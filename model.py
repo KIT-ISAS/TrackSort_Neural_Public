@@ -1253,7 +1253,7 @@ class Model(object):
 
             # Calculate the mask
             mask = K.all(K.equal(target, mask_value), axis=-1)
-            mask_int = mask
+            mask_int = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
 
             if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
