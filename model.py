@@ -653,7 +653,7 @@ class Model(object):
             sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
             prediction = sample_mean
-            variances = sample_variance + self.tau
+            variances = sample_variance + 1.0/self.tau
 
         elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
             current_input = np.expand_dims(current_input, axis=1)
@@ -1449,7 +1449,7 @@ class Model(object):
                     sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
                     pos_predictions = sample_mean
-                    var_predictions = sample_variance + self.tau
+                    var_predictions = sample_variance + 1.0/self.tau
                 elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
                     _ = self.rnn_model.reset_states()
                     pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
