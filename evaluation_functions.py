@@ -147,13 +147,17 @@ def create_diversity_evaluation(target, predictions, masks, expert_names, result
     disagreement_measures['Expert names'] = expert_names
     double_fault = dict()
     double_fault['Expert names'] = expert_names
+    correlation_coefficients = dict()
+    correlation_coefficients['Expert names'] = expert_names
     #              M_i correct | M_i error
     # M_j correct       N11         N01
     # M_j error         N10         N00
     for i in range(n_experts):
         disagreement_measure_vec = np.zeros(n_experts)
         double_fault_vec = np.zeros(n_experts)
+        correlation_coefficient_vec = np.zeros(n_experts)
         for j in range(n_experts):
+            correlation_coefficient_vec[j] = calculate_correlation_coefficient(target, predictions[i], predictions[j], masks[i], masks[j])
             N11 = np.ma.sum((error_values[i] == 0) & (error_values[j] == 0))
             N01 = np.ma.sum((error_values[i] == 1) & (error_values[j] == 0))
             N10 = np.ma.sum((error_values[i] == 0) & (error_values[j] == 1))
@@ -162,14 +166,46 @@ def create_diversity_evaluation(target, predictions, masks, expert_names, result
             double_fault_vec[j] = N00 / (N00 + N10 + N01 + N11)
         disagreement_measures[expert_names[i]] = disagreement_measure_vec
         double_fault[expert_names[i]] = double_fault_vec
+        correlation_coefficients[expert_names[i]] = correlation_coefficient_vec
 
     disagreement_measures_df = pd.DataFrame(disagreement_measures)
     double_fault_df = pd.DataFrame(double_fault)
+    correlation_coefficient_df = pd.DataFrame(correlation_coefficients)
     disagreement_measures_df.to_csv(result_dir + ('disagreement_measures_mlp_mask.csv' if is_mlp_mask else 'disagreement_measures.csv'), index=False)
     double_fault_df.to_csv(result_dir + ('double_fault_mlp_mask.csv' if is_mlp_mask else 'double_fault.csv'), index=False)
+    correlation_coefficient_df.to_csv(result_dir + ('correlation_coefficients_mlp_mask.csv' if is_mlp_mask else 'correlation_coefficients.csv'), index=False)
 
+def calculate_correlation_coefficient(target, prediction_1, prediction_2, mask_1, mask_2):
+    """Calculate the correlation coefficient between two predictions.
 
+    Calculates pearsons correlation coefficient in x and y direction (rho_x, rho_y).
+    https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
+    The total correlation is rho = sqrt(1/2 * (rho_x^2 + rho_y^2))
 
+    Args: 
+        target (np.array):      Target values
+        prediction_1, prediction_2 (np.array): Predicted values
+        mask_1, mask_2 (np.array): Masks for predictions
+
+    Returns:
+        Correlation coefficient (double)
+    """
+    # Calculate errors
+    mask_1 = 1 - np.stack([mask_1, mask_1], axis=-1)
+    masked_prediction = np.ma.array(prediction_1, mask=mask_1)
+    masked_target = np.ma.array(target, mask=mask_1)
+    error_1 = masked_target - masked_prediction
+    mask_2 = 1 - np.stack([mask_2, mask_2], axis=-1)
+    masked_prediction = np.ma.array(prediction_2, mask=mask_2)
+    masked_target = np.ma.array(target, mask=mask_2)
+    error_2 = masked_target - masked_prediction
+    # Calculate correlation in x direction
+    rho_x = np.ma.sum(np.ma.multiply(error_1[:,:,0], error_2[:,:,0])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,0],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,0],2))))
+    # Calculate correlation in y direction
+    rho_y = np.ma.sum(np.ma.multiply(error_1[:,:,1], error_2[:,:,1])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,1],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,1],2))))
+    # Calculate correlation - normalization to 1
+    rho = np.sqrt(1/2 * (rho_x**2 + rho_y**2))
+    return rho    
 
 def find_worst_predictions(target, predictions, mask_value):
     """Find the worst predictions for each expert.
