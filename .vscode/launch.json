@@ -39,18 +39,19 @@
                     "--execute_multi_target_tracking", "False"]
         },
         {
-            "name": "Testing cylinder mlp mask",
+            "name": "Testing pepper",
             "type": "python",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "args": ["--is_loaded", "True",
-                    "--config_path", "configs/test_cylinder_all.json",
-                    "--dataset_dir", "data/Zylinder/trackSortResultZylinder/*_trackHistory_NothingDeleted.csv",
-                    "--result_path", "results/cylinder_all/",
+                    "--config_path", "configs/test_pepper_all.json",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
+                    "--result_path", "results/pepper_all/",
                     "--execute_evaluation", "True",
                     "--execute_multi_target_tracking", "False",
-                    "--evaluate_mlp_mask", "True"]
+                    "--evaluate_mlp_mask", "False",
+                    "--no_show", "True"]
         },
         {
             "name": "Plot activation",
