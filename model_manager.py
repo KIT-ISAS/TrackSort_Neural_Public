@@ -240,7 +240,8 @@ class ModelManager(object):
     def test_models(self, mlp_conversion_func, result_dir,
                     seq2seq_dataset_test = None, mlp_dataset_test = None,
                     normalization_constant = 1,
-                    evaluate_mlp_mask = False):
+                    evaluate_mlp_mask = False,
+                    no_show = False):
         """Test model performance on test dataset and create evaluations.
 
         Args:
@@ -249,10 +250,7 @@ class ModelManager(object):
             **_dataset_test (tf.Tensor):        Batches of test data
             normalization_constant (double):    Belt size in pixel
             evaluate_mlp_mask (Boolean):        Create plots with MLP masks or standard mask
-
-        TODO:
-            * Are common errors regional?
-            * Do some experts perform better than others in certain situations?
+            no_show (Boolean):                  Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
@@ -301,7 +299,8 @@ class ModelManager(object):
                                     result_dir=result_dir,
                                     is_normalized=normalization_constant>1,
                                     normalization_constant = normalization_constant,
-                                    rastering = [15, 20])
+                                    rastering = [15, 20],
+                                    no_show = no_show)
 
         # Diversity measurement evaluations
         create_diversity_evaluation(target=all_targets, 
@@ -326,7 +325,8 @@ class ModelManager(object):
                                     expert_names = expert_names, 
                                     normalization_constant=normalization_constant, 
                                     result_dir=result_dir,
-                                    is_mlp_mask=False)
+                                    is_mlp_mask=False,
+                                    no_show = no_show)
         else:
             create_boxplot_evaluation(target=all_targets, 
                                     predictions=all_predictions, 
@@ -334,7 +334,8 @@ class ModelManager(object):
                                     expert_names = expert_names, 
                                     normalization_constant=normalization_constant, 
                                     result_dir=result_dir,
-                                    is_mlp_mask=True)
+                                    is_mlp_mask=True,
+                                    no_show = no_show)
         """
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
         """

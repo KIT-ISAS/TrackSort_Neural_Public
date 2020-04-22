@@ -12,7 +12,8 @@ import matplotlib
 import pandas as pd
 plt = matplotlib.pyplot
 
-def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, normalization_constant = 1, is_mlp_mask=False):
+def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, 
+                              normalization_constant = 1, is_mlp_mask=False, no_show = False):
     """Create the data for MSE and MAE boxplots.
     
     Create box plots and data of plots.
@@ -26,6 +27,7 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         result_dir (String):    Directory to save the created plot data to
         normalization_constant (double): Value for denormalization
         is_mlp_mask (Boolean):  Is this evaluation with mlp masks or standard?
+        no_show (Boolean):      Do not show the figures. The figures will still be saved.
     """
     assert(len(expert_names) == predictions.shape[0])
     # Get mse and mae values
@@ -53,67 +55,21 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     plt.ylabel("MSE")
     plt.grid(b=True, which='major', axis='y', linestyle='--')
     plt.savefig(result_dir + ('mse_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mse_box_plot.pdf')) 
-    plt.show()
+    if not no_show:
+        plt.show()
+    plt.figure()
     plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("MAE")
     plt.grid(b=True, which='major', axis='y', linestyle='--')
     plt.savefig(result_dir + ('mae_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mae_box_plot.pdf'))  
-    plt.show()
+    if not no_show:
+        plt.show()
 
     # Save data to csv via pandas
     mse_df = pd.DataFrame(mse_box_values)
     mae_df = pd.DataFrame(mae_box_values)
     mse_df.to_csv(result_dir + ('mse_box_values_mlp_mask.csv' if is_mlp_mask else 'mse_box_values.csv'), index=False)
     mae_df.to_csv(result_dir + ('mae_box_values_mlp_mask.csv' if is_mlp_mask else 'mae_box_values.csv'), index=False)
-
-def get_box_values(data):
-    """Obtain all box plot values from a set of numpy data.
-    
-    Args:
-        data: numpy array
-
-    Returns
-        [median, upper_quartile, lower_quartile, upper_whisker, lower_whisker]
-    """
-    median = np.median(data)
-    lower_quartile, upper_quartile = np.percentile(data, (25, 75))
-    iqr = upper_quartile - lower_quartile
-    upper_whisker = np.max(data[data<=upper_quartile+1.5*iqr])
-    lower_whisker = np.min(data[data>=lower_quartile-1.5*iqr])
-    return [median, upper_quartile, lower_quartile, upper_whisker, lower_whisker]
-
-def calculate_mse_mae(target, predictions, masks):
-    """Calculate the Mean Squared Error and Mean Absolut Error for each expert.
-
-    Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values
-        masks (np.array):       Masks for every expert
-
-    Returns:
-        MSE (np.array): One mse value per expert prediction (Same size as masks)
-        MAE (np.array): One mae value per expert prediction (Same size as masks)
-    """
-    mse_list = []
-    mae_list = []
-    # Duplicate mask to be valid for x_target and y_target and invert mask to fit numpy mask format
-    masks = 1 - np.stack([masks, masks], axis=-1)
-    # For each expert
-    for i in range(predictions.shape[0]):
-        # Mask expert prediction
-        masked_prediction = np.ma.array(predictions[i], mask=masks[i])
-        # Mask target for specific expert
-        masked_target = np.ma.array(target, mask=masks[i])
-        masked_mse_pos = ((masked_target - masked_prediction)**2).mean(axis=2)
-        masked_mae_pos = np.ma.abs(masked_target - masked_prediction).mean(axis=2)
-        # Calculate mean mse error
-        #mse_expert = masked_mse_pos.mean(axis=1).mean(axis=0)
-        mse_list.append(masked_mse_pos)
-        mae_list.append(masked_mae_pos)
-
-    #log_string = 'Mean Squared Error (MSE) for all experts was: \n {}'.format(mse_list)
-    #logging.info(log_string)
-    return np.ma.array(mse_list), np.ma.array(mae_list)
 
 def create_diversity_evaluation(target, predictions, masks, expert_names, result_dir, is_mlp_mask=False):
     """Create the data for diversity measurement comparison.
@@ -175,40 +131,8 @@ def create_diversity_evaluation(target, predictions, masks, expert_names, result
     double_fault_df.to_csv(result_dir + ('double_fault_mlp_mask.csv' if is_mlp_mask else 'double_fault.csv'), index=False)
     correlation_coefficient_df.to_csv(result_dir + ('correlation_coefficients_mlp_mask.csv' if is_mlp_mask else 'correlation_coefficients.csv'), index=False)
 
-def calculate_correlation_coefficient(target, prediction_1, prediction_2, mask_1, mask_2):
-    """Calculate the correlation coefficient between two predictions.
-
-    Calculates pearsons correlation coefficient in x and y direction (rho_x, rho_y).
-    https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
-    The total correlation is rho = sqrt(1/2 * (rho_x^2 + rho_y^2))
-
-    Args: 
-        target (np.array):      Target values
-        prediction_1, prediction_2 (np.array): Predicted values
-        mask_1, mask_2 (np.array): Masks for predictions
-
-    Returns:
-        Correlation coefficient (double)
-    """
-    # Calculate errors
-    mask_1 = 1 - np.stack([mask_1, mask_1], axis=-1)
-    masked_prediction = np.ma.array(prediction_1, mask=mask_1)
-    masked_target = np.ma.array(target, mask=mask_1)
-    error_1 = masked_target - masked_prediction
-    mask_2 = 1 - np.stack([mask_2, mask_2], axis=-1)
-    masked_prediction = np.ma.array(prediction_2, mask=mask_2)
-    masked_target = np.ma.array(target, mask=mask_2)
-    error_2 = masked_target - masked_prediction
-    # Calculate correlation in x direction
-    rho_x = np.ma.sum(np.ma.multiply(error_1[:,:,0], error_2[:,:,0])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,0],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,0],2))))
-    # Calculate correlation in y direction
-    rho_y = np.ma.sum(np.ma.multiply(error_1[:,:,1], error_2[:,:,1])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,1],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,1],2))))
-    # Calculate correlation - normalization to 1
-    rho = np.sqrt(1/2 * (rho_x**2 + rho_y**2))
-    return rho    
-
 def create_error_region_evaluation(target, predictions, masks, expert_names, result_dir, 
-                                   normalization_constant = 1, is_normalized = False, rastering = [10, 10]):
+                                   normalization_constant = 1, is_normalized = False, rastering = [10, 10], no_show = False):
     """Create the error region evaluation.
     
     Normalizes the data if it is not normalized.
@@ -226,6 +150,7 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
         normalization_constant (double): Value for denormalization
         is_normalized (Boolean): Is the data normalized to [0, 1]?
         rastering (list):       Number of raster fields in x and y dimension
+        no_show (Boolean):      Do not show the figures. The figures will still be saved.
     """
     # Calculate MSE and MAE
     _, mae_list = calculate_mse_mae(target, predictions, masks)
@@ -257,6 +182,7 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
                 if count_error_map[x, y] < 10:
                     median_error_map[x, y] = np.nan
         # Plot error map
+        plt.figure()
         plt.pcolor(median_error_map, cmap="Reds", vmin=0, vmax=3)
         plt.colorbar()
         x_ticks = np.linspace(0, rastering[1], num=5, endpoint=True)
@@ -269,8 +195,91 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
         title = "Median MAE mapped over belt for expert " + expert_names[i]
         plt.title(title)
         plt.savefig(result_dir + "median_mae_map_{}.pdf".format(expert_names[i].replace(" ", "_")))
-        plt.show()
+        if not no_show:
+            plt.show()
         np.savetxt(result_dir + "median_mae_map_{}.csv".format(expert_names[i].replace(" ", "_")), median_error_map, delimiter=',')
+
+
+def get_box_values(data):
+    """Obtain all box plot values from a set of numpy data.
+    
+    Args:
+        data: numpy array
+
+    Returns
+        [median, upper_quartile, lower_quartile, upper_whisker, lower_whisker]
+    """
+    median = np.median(data)
+    lower_quartile, upper_quartile = np.percentile(data, (25, 75))
+    iqr = upper_quartile - lower_quartile
+    upper_whisker = np.max(data[data<=upper_quartile+1.5*iqr])
+    lower_whisker = np.min(data[data>=lower_quartile-1.5*iqr])
+    return [median, upper_quartile, lower_quartile, upper_whisker, lower_whisker]
+
+def calculate_mse_mae(target, predictions, masks):
+    """Calculate the Mean Squared Error and Mean Absolut Error for each expert.
+
+    Args:
+        target (np.array):      Target values
+        predictions (np.array): Predicted values
+        masks (np.array):       Masks for every expert
+
+    Returns:
+        MSE (np.array): One mse value per expert prediction (Same size as masks)
+        MAE (np.array): One mae value per expert prediction (Same size as masks)
+    """
+    mse_list = []
+    mae_list = []
+    # Duplicate mask to be valid for x_target and y_target and invert mask to fit numpy mask format
+    masks = 1 - np.stack([masks, masks], axis=-1)
+    # For each expert
+    for i in range(predictions.shape[0]):
+        # Mask expert prediction
+        masked_prediction = np.ma.array(predictions[i], mask=masks[i])
+        # Mask target for specific expert
+        masked_target = np.ma.array(target, mask=masks[i])
+        masked_mse_pos = ((masked_target - masked_prediction)**2).mean(axis=2)
+        masked_mae_pos = np.ma.abs(masked_target - masked_prediction).mean(axis=2)
+        # Calculate mean mse error
+        #mse_expert = masked_mse_pos.mean(axis=1).mean(axis=0)
+        mse_list.append(masked_mse_pos)
+        mae_list.append(masked_mae_pos)
+
+    #log_string = 'Mean Squared Error (MSE) for all experts was: \n {}'.format(mse_list)
+    #logging.info(log_string)
+    return np.ma.array(mse_list), np.ma.array(mae_list)
+
+def calculate_correlation_coefficient(target, prediction_1, prediction_2, mask_1, mask_2):
+    """Calculate the correlation coefficient between two predictions.
+
+    Calculates pearsons correlation coefficient in x and y direction (rho_x, rho_y).
+    https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
+    The total correlation is rho = sqrt(1/2 * (rho_x^2 + rho_y^2))
+
+    Args: 
+        target (np.array):      Target values
+        prediction_1, prediction_2 (np.array): Predicted values
+        mask_1, mask_2 (np.array): Masks for predictions
+
+    Returns:
+        Correlation coefficient (double)
+    """
+    # Calculate errors
+    mask_1 = 1 - np.stack([mask_1, mask_1], axis=-1)
+    masked_prediction = np.ma.array(prediction_1, mask=mask_1)
+    masked_target = np.ma.array(target, mask=mask_1)
+    error_1 = masked_target - masked_prediction
+    mask_2 = 1 - np.stack([mask_2, mask_2], axis=-1)
+    masked_prediction = np.ma.array(prediction_2, mask=mask_2)
+    masked_target = np.ma.array(target, mask=mask_2)
+    error_2 = masked_target - masked_prediction
+    # Calculate correlation in x direction
+    rho_x = np.ma.sum(np.ma.multiply(error_1[:,:,0], error_2[:,:,0])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,0],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,0],2))))
+    # Calculate correlation in y direction
+    rho_y = np.ma.sum(np.ma.multiply(error_1[:,:,1], error_2[:,:,1])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,1],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,1],2))))
+    # Calculate correlation - normalization to 1
+    rho = np.sqrt(1/2 * (rho_x**2 + rho_y**2))
+    return rho    
 
 def find_worst_predictions(target, predictions, mask_value):
     """Find the worst predictions for each expert.
