@@ -675,7 +675,11 @@ class Model(object):
             current_input = np.expand_dims(current_input, axis=1)
             set_state(self.rnn_model, state)
             prediction = self.rnn_model(current_input)
-            variances = None
+            if self.global_config['calibrate']:
+                # default: variance=1.0
+                variances = prediction * 0 + 1.0
+            else:
+                variances = None
 
         # ToDo: use the separation predictions! Currently I just drop them.
         if self.global_config['separation_prediction']:
@@ -1421,79 +1425,85 @@ class Model(object):
         """
         data = {}
 
-        if self.global_config['mc_dropout'] or self.global_config['kendall_loss'] or self.global_config['custom_variance_prediction']:
-            data['measurement'] = []
-            data['target'] = []
-            data['prediction'] = []
-            data['prediction_variance'] = []
-            data['variance_area'] = []
-            data['standardized_l2'] = []
-            data['l2'] = []
-            data['absolute_error'] = []
-            data['squared_error'] = []
-            data['time_step'] = []
+        data['measurement'] = []
+        data['target'] = []
+        data['prediction'] = []
+        data['prediction_variance'] = []
+        data['variance_area'] = []
+        data['standardized_l2'] = []
+        data['l2'] = []
+        data['absolute_error'] = []
+        data['squared_error'] = []
+        data['time_step'] = []
 
-            for (batch_n, (inp_batch, target_batch)) in enumerate(dataset):
-                inp_batch = inp_batch.numpy()
-                target_batch = target_batch.numpy()
+        for (batch_n, (inp_batch, target_batch)) in enumerate(dataset):
+            inp_batch = inp_batch.numpy()
+            target_batch = target_batch.numpy()
 
-                if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
-                    k = self.global_config['mc_samples']
-                    K2.set_learning_phase(1)
+            if self.global_config['mc_dropout'] and self.global_config['mc_samples'] > 1:
+                k = self.global_config['mc_samples']
+                K2.set_learning_phase(1)
 
-                    if self.tau is None:
-                        self._calc_tau()
+                if self.tau is None:
+                    self._calc_tau()
 
-                    samples = []
+                samples = []
 
-                    for t_k in range(k):
-                        _ = self.rnn_model.reset_states()
-                        predic = self.rnn_model(inp_batch, training=True)
-                        samples.append(predic)
-
-                    samples = np.array(samples)
-                    sample_mean = np.sum(samples, axis=0) / float(k)
-                    sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
-
-                    pos_predictions = sample_mean
-                    var_predictions = sample_variance + 1.0/self.tau
-                elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
+                for t_k in range(k):
                     _ = self.rnn_model.reset_states()
-                    pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
-                    var_predictions = np.ones_like(pos_predictions) * 0.01
-                else:
-                    _ = self.rnn_model.reset_states()
-                    predictions = self.rnn_model(inp_batch)
+                    predic = self.rnn_model(inp_batch, training=True)
+                    samples.append(predic)
 
-                    pos_predictions = predictions[:, :, :2].numpy()
-                    var_predictions = K.exp(predictions[:, :, 2:]).numpy()
+                samples = np.array(samples)
+                sample_mean = np.sum(samples, axis=0) / float(k)
+                sample_variance = np.sum((samples - sample_mean) ** 2, axis=0) / float(k)
 
-                # store data
-                for track_idx in range(inp_batch.shape[0]):
-                    seq_length = self.data_source.get_last_timestep_of_track(inp_batch[track_idx])
+                pos_predictions = sample_mean
+                var_predictions = sample_variance + 1.0/self.tau
+            elif self.global_config['mc_dropout'] and self.global_config['mc_samples'] == 1:
+                _ = self.rnn_model.reset_states()
+                pos_predictions = self.rnn_model(inp_batch, training=False).numpy()
+                var_predictions = np.ones_like(pos_predictions) * 0.01
+            elif self.global_config['kendall_loss']:
+                _ = self.rnn_model.reset_states()
+                predictions = self.rnn_model(inp_batch)
 
-                    for time_step_i in range(seq_length):
-                        data['prediction'] += [pos_predictions[track_idx, time_step_i, :]]
-                        data['prediction_variance'] += [var_predictions[track_idx, time_step_i, :]]
-                        # 4 * sigma_x * sigma_y
-                        data['variance_area'] += [4 * np.sqrt(var_predictions[track_idx, time_step_i, 0]) *
-                                                  np.sqrt(var_predictions[track_idx, time_step_i, 1])]
-                        data['measurement'] += [inp_batch[track_idx, time_step_i, :]]
-                        data['target'] += [target_batch[track_idx, time_step_i, :]]
-                        data['standardized_l2'] += [np.sqrt(np.sum(
-                            ((data['target'][-1] - data['prediction'][-1]) ** 2) / data['prediction_variance'][
-                                -1]))]
-                        data['absolute_error'] += [np.abs(data['prediction'][-1] - data['target'][-1])]
-                        data['l2'] += [np.sqrt(np.sum(
-                            (data['prediction'][-1] - data['target'][-1])**2
-                        ))]
-                        data['squared_error'] = [np.sum(
-                            (data['prediction'][-1] - data['target'][-1])**2
-                        )]
-                        data['time_step'] += [time_step_i]
-                        ar = multivariate_normal(mean=data['prediction'][-1], cov=np.diag(data['prediction_variance'][-1]))
-                        data['log_likelihood'] = ar.logpdf(data['target'][-1])
-                        del ar
+                pos_predictions = predictions[:, :, :2].numpy()
+                var_predictions = K.exp(predictions[:, :, 2:]).numpy()
+            else:
+                _ = self.rnn_model.reset_states()
+                predictions = self.rnn_model(inp_batch)
+
+                pos_predictions = predictions[:, :, :2].numpy()
+                # default: variance=1.0
+                var_predictions = pos_predictions * 0 + 1.0
+
+            # store data
+            for track_idx in range(inp_batch.shape[0]):
+                seq_length = self.data_source.get_last_timestep_of_track(inp_batch[track_idx])
+
+                for time_step_i in range(seq_length):
+                    data['prediction'] += [pos_predictions[track_idx, time_step_i, :]]
+                    data['prediction_variance'] += [var_predictions[track_idx, time_step_i, :]]
+                    # 4 * sigma_x * sigma_y
+                    data['variance_area'] += [4 * np.sqrt(var_predictions[track_idx, time_step_i, 0]) *
+                                              np.sqrt(var_predictions[track_idx, time_step_i, 1])]
+                    data['measurement'] += [inp_batch[track_idx, time_step_i, :]]
+                    data['target'] += [target_batch[track_idx, time_step_i, :]]
+                    data['standardized_l2'] += [np.sqrt(np.sum(
+                        ((data['target'][-1] - data['prediction'][-1]) ** 2) / data['prediction_variance'][
+                            -1]))]
+                    data['absolute_error'] += [np.abs(data['prediction'][-1] - data['target'][-1])]
+                    data['l2'] += [np.sqrt(np.sum(
+                        (data['prediction'][-1] - data['target'][-1])**2
+                    ))]
+                    data['squared_error'] = [np.sum(
+                        (data['prediction'][-1] - data['target'][-1])**2
+                    )]
+                    data['time_step'] += [time_step_i]
+                    ar = multivariate_normal(mean=data['prediction'][-1], cov=np.diag(data['prediction_variance'][-1]))
+                    data['log_likelihood'] = ar.logpdf(data['target'][-1])
+                    del ar
 
         data['prediction'] = np.array(data['prediction'])
         data['target'] = np.array(data['target'])

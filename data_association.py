@@ -99,15 +99,6 @@ class DataAssociation(object):
             measurements = self.data_source.get_measurement_at_timestep_list(time_step)
             predictions, variances = self.track_manager.get_predictions()
 
-            logging.debug("MEASUREMENTS")
-            logging.debug(measurements)
-
-            logging.debug("predictions")
-            logging.debug(predictions)
-
-            logging.debug("variances")
-            logging.debug(variances)
-
             # calibrate the variances
             if self.global_config['calibrate'] and variances is not None:
                 logging.debug("Calibrate the variances")
