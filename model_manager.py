@@ -251,7 +251,6 @@ class ModelManager(object):
             evaluate_mlp_mask (Boolean):        Create plots with MLP masks or standard mask
 
         TODO:
-            * Expert diversity matrix
             * Are common errors regional?
             * Do some experts perform better than others in certain situations?
         """
@@ -294,6 +293,16 @@ class ModelManager(object):
         expert_names = self.expert_manager.get_expert_names()
         expert_names.append(self.gating_network.get_name())
 
+        # Error regions plot
+        create_error_region_evaluation(target=all_targets, 
+                                    predictions=all_predictions, 
+                                    masks=all_masks, 
+                                    expert_names = expert_names,
+                                    result_dir=result_dir,
+                                    is_normalized=normalization_constant>1,
+                                    normalization_constant = normalization_constant,
+                                    rastering = [15, 20])
+
         # Diversity measurement evaluations
         create_diversity_evaluation(target=all_targets, 
                                     predictions=all_predictions, 
@@ -309,8 +318,7 @@ class ModelManager(object):
                                         expert_names = expert_names,
                                         result_dir=result_dir,
                                         is_mlp_mask=True)
-
-        
+        # MSE and MSA box plots
         if not evaluate_mlp_mask:
             create_boxplot_evaluation(target=all_targets, 
                                     predictions=all_predictions, 

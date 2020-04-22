@@ -207,6 +207,71 @@ def calculate_correlation_coefficient(target, prediction_1, prediction_2, mask_1
     rho = np.sqrt(1/2 * (rho_x**2 + rho_y**2))
     return rho    
 
+def create_error_region_evaluation(target, predictions, masks, expert_names, result_dir, 
+                                   normalization_constant = 1, is_normalized = False, rastering = [10, 10]):
+    """Create the error region evaluation.
+    
+    Normalizes the data if it is not normalized.
+    Place a raster over the belt region and associate each prediction to a raster field.
+    Calculate the median MAE error in each raster field.
+    Denormalizes the data.
+    Display the median MAE errors on a 2D color plot.
+
+    Args:
+        target (np.array):      Target values
+        predictions (np.array): Predicted values
+        masks (np.array):       Masks for every expert
+        expert_names (list):    Names (String) of each expert
+        result_dir (String):    Directory to save the created plot data to
+        normalization_constant (double): Value for denormalization
+        is_normalized (Boolean): Is the data normalized to [0, 1]?
+        rastering (list):       Number of raster fields in x and y dimension
+    """
+    # Calculate MSE and MAE
+    _, mae_list = calculate_mse_mae(target, predictions, masks)
+    # Create evaluation for each expert individually
+    for i in range(predictions.shape[0]):
+        # Mask prediction and target
+        mask = 1 - np.stack([masks[i], masks[i]], axis=-1)
+        masked_prediction = np.ma.array(predictions[i], mask=mask)
+        masked_target = np.ma.array(target, mask=mask)
+        # The data must be normalized in order to perform the algorithm
+        if not is_normalized:
+            normalization_constant = np.ma.max(masked_prediction)
+            masked_prediction = masked_prediction / normalization_constant
+            masked_target = masked_target / normalization_constant
+
+        median_error_map = np.zeros(rastering)
+        count_error_map = np.zeros(rastering)
+        # Get raster field for every prediction
+        idx = np.ma.floor(masked_prediction[:,:,0] * rastering[0])
+        idy = np.ma.floor(masked_prediction[:,:,1] * rastering[1])
+        # Place each error to its raster field
+        for x in range(rastering[0]):
+            for y in range(rastering[1]):
+                ids = (idx==x) & (idy==y)
+                errors = mae_list[i, ids]
+                median_error_map[x, y] = np.median(errors) * normalization_constant
+                count_error_map[x, y] = errors.shape[0]
+                # There must be at least 10 predictions in a field to show the error in the plot
+                if count_error_map[x, y] < 10:
+                    median_error_map[x, y] = np.nan
+        # Plot error map
+        plt.pcolor(median_error_map, cmap="Reds", vmin=0, vmax=3)
+        plt.colorbar()
+        x_ticks = np.linspace(0, rastering[1], num=5, endpoint=True)
+        x_labels = np.floor(x_ticks/rastering[1] * normalization_constant)
+        plt.xticks(ticks=x_ticks, labels=x_labels)
+        y_ticks = np.linspace(0, rastering[0], num=5, endpoint=True)
+        y_ticks = y_ticks[::-1]
+        y_labels = np.floor(y_ticks/rastering[0] * normalization_constant)
+        plt.yticks(ticks=y_ticks, labels=y_labels)
+        title = "Median MAE mapped over belt for expert " + expert_names[i]
+        plt.title(title)
+        plt.savefig(result_dir + "median_mae_map_{}.pdf".format(expert_names[i].replace(" ", "_")))
+        plt.show()
+        np.savetxt(result_dir + "median_mae_map_{}.csv".format(expert_names[i].replace(" ", "_")), median_error_map, delimiter=',')
+
 def find_worst_predictions(target, predictions, mask_value):
     """Find the worst predictions for each expert.
     
