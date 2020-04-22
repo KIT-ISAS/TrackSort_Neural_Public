@@ -166,8 +166,8 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
             masked_prediction = masked_prediction / normalization_constant
             masked_target = masked_target / normalization_constant
 
-        median_error_map = np.zeros(rastering)
-        count_error_map = np.zeros(rastering)
+        median_error_map = np.zeros([rastering[1],rastering[0]])
+        count_error_map = np.zeros([rastering[1],rastering[0]])
         # Get raster field for every prediction
         idx = np.ma.floor(masked_prediction[:,:,0] * rastering[0])
         idy = np.ma.floor(masked_prediction[:,:,1] * rastering[1])
@@ -176,11 +176,11 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
             for y in range(rastering[1]):
                 ids = (idx==x) & (idy==y)
                 errors = mae_list[i, ids]
-                median_error_map[x, y] = np.median(errors) * normalization_constant
-                count_error_map[x, y] = errors.shape[0]
+                median_error_map[y, x] = np.median(errors) * normalization_constant
+                count_error_map[y, x] = errors.shape[0]
                 # There must be at least 10 predictions in a field to show the error in the plot
-                if count_error_map[x, y] < 10:
-                    median_error_map[x, y] = np.nan
+                if count_error_map[y, x] < 10:
+                    median_error_map[y, x] = np.nan
         # Plot error map
         plt.figure()
         plt.pcolor(median_error_map, cmap="Reds", vmin=0, vmax=3)

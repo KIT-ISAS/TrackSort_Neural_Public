@@ -51,7 +51,7 @@
                     "--execute_evaluation", "True",
                     "--execute_multi_target_tracking", "False",
                     "--evaluate_mlp_mask", "False",
-                    "--no_show", "True"]
+                    "--no_show", "False"]
         },
         {
             "name": "Plot activation",

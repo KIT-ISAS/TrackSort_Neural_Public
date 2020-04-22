@@ -367,7 +367,7 @@ if not global_config['run_hyperparameter_search']:
     if not global_config['test_noise_robustness']:
         score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
         logging.info('data association finished!')
-        code.interact(local=dict(globals(), **locals()))
+        #code.interact(local=dict(globals(), **locals()))
     else:
         logging.info('test robustness against noise!')
         now = datetime.datetime.now()
@@ -395,7 +395,7 @@ if not global_config['run_hyperparameter_search']:
         np.savetxt(os.path.join("results", experiment_series, "noise_robustness.csv"), A)
 
         logging.info('robustness test finished!')
-        code.interact(local=dict(globals(), **locals()))
+        #code.interact(local=dict(globals(), **locals()))
 
 else:
     now = datetime.datetime.now()
@@ -427,7 +427,7 @@ else:
     global_config['distance_threshold'] = best_candidate
 
     logging.info('robustness test finished!')
-    code.interact(local=dict(globals(), **locals()))
+    #code.interact(local=dict(globals(), **locals()))
 
     pw = 1.0
     best_score = 0.0
@@ -484,4 +484,4 @@ else:
         pass
 
 logging.info('data association finished!')
-code.interact(local=dict(globals(), **locals()))
+#code.interact(local=dict(globals(), **locals()))
