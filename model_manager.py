@@ -12,6 +12,7 @@ import code  # code.interact(local=dict(globals(), **locals()))
 import time
 import datetime
 import os
+import pickle
 
 from tensorflow.keras import backend as K
 
@@ -265,12 +266,16 @@ class ModelManager(object):
                                           predictions = all_predictions, 
                                           masks = all_masks)
         # Save gating network
-        pass
+        filehandler = open(self.gating_network_model_path, 'wb') 
+        pickle.dump(self.gating_network, filehandler)
 
     def load_gating_network(self):
         """Load the gating network from path defined in config file."""
-        # TODO: Implement gating network loading
-        pass
+        try:
+            filehandler = open(self.gating_network_model_path, 'rb') 
+            self.gating_network = pickle.load(filehandler)
+        except:
+            logging.error("Could not load gating network from path {}".format(self.gating_network_model_path))
 
     def test_models(self, mlp_conversion_func, result_dir,
                     seq2seq_dataset_test = None, mlp_dataset_test = None,
