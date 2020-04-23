@@ -299,7 +299,7 @@ class ModelManager(object):
                                     result_dir=result_dir,
                                     is_normalized=normalization_constant>1,
                                     normalization_constant = normalization_constant,
-                                    rastering = [15, 20],
+                                    rastering = [15, 10],
                                     no_show = no_show)
 
         # Diversity measurement evaluations

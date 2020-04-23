@@ -60,6 +60,7 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     plt.figure()
     plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("MAE")
+    plt.ylim([0, 5])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
     plt.savefig(result_dir + ('mae_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mae_box_plot.pdf'))  
     if not no_show:
@@ -185,12 +186,12 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
         plt.figure()
         plt.pcolor(median_error_map, cmap="Reds", vmin=0, vmax=3)
         plt.colorbar()
-        x_ticks = np.linspace(0, rastering[1], num=5, endpoint=True)
-        x_labels = np.floor(x_ticks/rastering[1] * normalization_constant)
+        x_ticks = np.linspace(0, rastering[0], num=5, endpoint=True)
+        x_labels = np.floor(x_ticks/rastering[0] * normalization_constant)
         plt.xticks(ticks=x_ticks, labels=x_labels)
-        y_ticks = np.linspace(0, rastering[0], num=5, endpoint=True)
+        y_ticks = np.linspace(1, rastering[1], num=5, endpoint=True)
         y_ticks = y_ticks[::-1]
-        y_labels = np.floor(y_ticks/rastering[0] * normalization_constant)
+        y_labels = np.floor(y_ticks/rastering[1] * normalization_constant)
         plt.yticks(ticks=y_ticks, labels=y_labels)
         title = "Median MAE mapped over belt for expert " + expert_names[i]
         plt.title(title)
