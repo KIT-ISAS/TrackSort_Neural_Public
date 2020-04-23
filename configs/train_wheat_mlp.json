@@ -15,6 +15,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
+    "model_path": "models/wheat/simple_gating.pkl",
     "options": {
 
     }

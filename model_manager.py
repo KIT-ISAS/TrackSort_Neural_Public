@@ -11,13 +11,14 @@ import numpy as np
 import code  # code.interact(local=dict(globals(), **locals()))
 import time
 import datetime
+import os
 
 from tensorflow.keras import backend as K
 
 from expert_manager import Expert_Manager
 from expert import Expert_Type
 from weighting_function import weighting_function
-from ensemble import Simple_Ensemble
+from ensemble import *
 from evaluation_functions import *
 
 #tf.keras.backend.set_floatx('float64')
@@ -61,6 +62,7 @@ class ModelManager(object):
                                              model_config.get('batch_size'), num_time_steps)
         # The gating network that calculates all weights
         self.create_gating_network(model_config.get('gating'))
+        self.gating_network_model_path = model_config.get('gating').get('model_path')
         self.overwriting_activated = overwriting_activated
         self.batch_size = model_config.get('batch_size')
         self.num_time_steps = num_time_steps
@@ -87,6 +89,8 @@ class ModelManager(object):
         gating_type = gating_config.get("type")
         if gating_type == "Simple_Ensemble":
             self.gating_network = Simple_Ensemble(self.expert_manager.n_experts)
+        elif gating_type == "Covariance_Weighting":
+            self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts)
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
@@ -95,7 +99,7 @@ class ModelManager(object):
                     mlp_dataset_train = None, mlp_dataset_test = None,
                     num_train_epochs = 1000, evaluate_every_n_epochs = 20,
                     improvement_break_condition = 0.001, lr_decay_after_epochs = 100, lr_decay = 0.1):
-        """Train all experts and the gating network.
+        """Train all experts.
 
         The training information of each model should be provided in the configuration json.
 
@@ -106,7 +110,7 @@ class ModelManager(object):
             num_train_epochs (int):         Number of epochs for training
             evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
             improvement_break_condition (double): Break training if test loss on every expert does not improve by more than this value.
-            lr_decay_after_epochs (int):    Decrease the learning rate of certain models (RNNs) after x epochs
+            lr_decay_after_epochs (int):    Decrease the learning rate of certain models after x epochs
             lr_decay (double):              Learning rate decrease (multiplicative). Choose values < 1 to increase accuracy.
         """
         train_losses = []
@@ -237,6 +241,37 @@ class ModelManager(object):
         # Save all models
         self.expert_manager.save_models()
 
+    def train_gating_network(self, mlp_conversion_func, 
+                             seq2seq_dataset_train = None,
+                             mlp_dataset_train = None):
+        """Train the gating network.
+
+        The individual training information of the gating network should be provided in the configuration json.
+        The training is highly dependent on the gating structure,
+        so the actual training itself should be done by the gating network.
+
+        Args:
+            mlp_conversion_func:            Function to convert MLP format to track format
+            **_dataset_train (dict):        All training samples in the correct format for various models
+        """
+        # Create predictions for all training batches and save prediction and target values to one list.
+        _, all_targets, all_predictions, all_masks, _ = self.get_full_target_prediction_mask_from_dataset(
+            mlp_conversion_func = mlp_conversion_func,
+            seq2seq_dataset = seq2seq_dataset_train,
+            mlp_dataset = mlp_dataset_train,
+            create_weighted_output = False)
+        # Call training of gating network
+        self.gating_network.train_network(target = all_targets, 
+                                          predictions = all_predictions, 
+                                          masks = all_masks)
+        # Save gating network
+        pass
+
+    def load_gating_network(self):
+        """Load the gating network from path defined in config file."""
+        # TODO: Implement gating network loading
+        pass
+
     def test_models(self, mlp_conversion_func, result_dir,
                     seq2seq_dataset_test = None, mlp_dataset_test = None,
                     normalization_constant = 1,
@@ -253,44 +288,16 @@ class ModelManager(object):
             no_show (Boolean):                  Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
-        k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
-        seq2seq_iter = iter(seq2seq_dataset_test)
-        mlp_iter = iter(mlp_dataset_test)
-        all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_mlp_maks = np.array([])
-        for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
-            (mlp_inp, mlp_target) = next(mlp_iter)
-            # Test experts on a batch
-            predictions = self.expert_manager.test_batch(mlp_conversion_func, seq2seq_inp, mlp_inp)
-            masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
-            # Get weighting of experts
-            weights = self.gating_network.get_masked_weights(np.array(masks))
-            total_prediction = weighting_function(np.array(predictions), weights)
-            predictions.append(total_prediction)
-            # Create a total mask to addd to list
-            total_mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
-            total_mask = 1 - K.cast(total_mask, tf.float64)
-            masks.append(total_mask)
-            # MLP mask to compare MLP with KF/RNN
-            mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
-            mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
-            mlp_mask = mlp_mask.numpy()
-            mlp_masks = np.repeat(np.expand_dims(mlp_mask, 0), len(masks), axis=0)
+        expert_names, all_targets, all_predictions, all_masks, all_mlp_maks = self.get_full_target_prediction_mask_from_dataset(
+            mlp_conversion_func = mlp_conversion_func,
+            seq2seq_dataset = seq2seq_dataset_test,
+            mlp_dataset = mlp_dataset_test,
+            create_weighted_output = True)
 
-            # Add everything to the lists
-            if all_targets.shape[0]==0:
-                all_targets = seq2seq_target.numpy()
-                all_predictions = np.array(predictions)
-                all_masks = np.array(masks)
-                all_mlp_maks = mlp_masks
-            else:
-                all_targets = np.concatenate((all_targets, seq2seq_target.numpy()),axis=0)
-                all_predictions = np.concatenate((all_predictions, predictions), axis=1)
-                all_masks = np.concatenate((all_masks, np.array(masks)), axis=1)
-                all_mlp_maks = np.concatenate((all_mlp_maks, mlp_masks), axis=1)
-
-        expert_names = self.expert_manager.get_expert_names()
-        expert_names.append(self.gating_network.get_name())
-
+        # Check if result folder exists and create it if not.
+        save_path = os.path.dirname(result_dir)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         # Error regions plot
         create_error_region_evaluation(target=all_targets, 
                                     predictions=all_predictions, 
@@ -340,16 +347,63 @@ class ModelManager(object):
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
         """
 
-    def load_models(self, model_path):
-        """Load experts and gating network from path.
+    def get_full_target_prediction_mask_from_dataset(self, mlp_conversion_func,
+                    seq2seq_dataset, mlp_dataset, create_weighted_output = False):
+        """Create predictions for all models on the given dataset.
 
         Args:
-            model_path (string): Path to saved models
+            mlp_conversion_func:    Function to convert MLP format to track format
+            **_dataset (tf.Tensor): Batches of test data
+            create_weighted_output (Boolean): Calculates the combined weighted prediction using the gating network 
+                                              and appends this ouput as a new expert 
 
-        Todo:
-            Implement load function
+        Returns:
+            expert_names (list):        List of expert names
+            all_targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
+            all_predictions (np.array): All predictions for all experts, shape: [n_experts (+1), n_tracks, track_length, 2]
+            all_masks (np.array):       Masks for each expert, shape: [n_experts (+1), n_tracks, track_length]
+            all_mlp_maks  (np.array):   MLP masks for each expert (first n instances are masked out), shape: [n_experts (+1), n_tracks, track_length]
         """
-        pass
+        k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
+        seq2seq_iter = iter(seq2seq_dataset)
+        mlp_iter = iter(mlp_dataset)
+        all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_mlp_maks = np.array([])
+        for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
+            (mlp_inp, mlp_target) = next(mlp_iter)
+            # Test experts on a batch
+            predictions = self.expert_manager.test_batch(mlp_conversion_func, seq2seq_inp, mlp_inp)
+            masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
+            # Get weighting of experts
+            if create_weighted_output:
+                weights = self.gating_network.get_masked_weights(np.array(masks))
+                total_prediction = weighting_function(np.array(predictions), weights)
+                predictions.append(total_prediction)
+            # Create a total mask to addd to list
+            total_mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
+            total_mask = 1 - K.cast(total_mask, tf.float64)
+            masks.append(total_mask)
+            # MLP mask to compare MLP with KF/RNN
+            mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
+            mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
+            mlp_mask = mlp_mask.numpy()
+            mlp_masks = np.repeat(np.expand_dims(mlp_mask, 0), len(masks), axis=0)
+            # Add everything to the lists
+            if all_targets.shape[0]==0:
+                all_targets = seq2seq_target.numpy()
+                all_predictions = np.array(predictions)
+                all_masks = np.array(masks)
+                all_mlp_maks = mlp_masks
+            else:
+                all_targets = np.concatenate((all_targets, seq2seq_target.numpy()),axis=0)
+                all_predictions = np.concatenate((all_predictions, predictions), axis=1)
+                all_masks = np.concatenate((all_masks, np.array(masks)), axis=1)
+                all_mlp_maks = np.concatenate((all_mlp_maks, mlp_masks), axis=1)
+        # Create expert name list
+        expert_names = self.expert_manager.get_expert_names()
+        if create_weighted_output:
+            expert_names.append(self.gating_network.get_name())
+        # Return all the stuff
+        return expert_names, all_targets, all_predictions, all_masks, all_mlp_maks
 
     def predict_all(self):
         """Predict the next position with all experts.

@@ -1,5 +1,4 @@
 {
-  "model_path": "models/default_model.h5",
   "batch_size": 64,
   "experts": {
     "kf1": {
@@ -20,6 +19,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
+    "model_path": "models/simple_gating.pkl",
     "options": {
 
     }

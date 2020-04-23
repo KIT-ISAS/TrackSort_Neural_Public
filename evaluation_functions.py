@@ -44,11 +44,6 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         mse_boxplot_inputs.append(compressed_mse_values)
         mae_boxplot_inputs.append(compressed_mae_values)
 
-    # Check if result folder exists and create it if not.
-    save_path = os.path.dirname(result_dir)
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-
     # Show plot
     plt.figure()
     plt.boxplot(mse_boxplot_inputs, sym='', labels=expert_names)

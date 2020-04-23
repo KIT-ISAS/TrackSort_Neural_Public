@@ -86,6 +86,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
+    "model_path": "models/cylinder/simple_gating.pkl",
     "options": {
 
     }

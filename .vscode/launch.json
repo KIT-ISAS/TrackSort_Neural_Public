@@ -39,6 +39,21 @@
                     "--execute_multi_target_tracking", "False"]
         },
         {
+            "name": "Train pepper cov weighting",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": ["--is_loaded", "True",
+                    "--is_loaded_gating_network", "False",
+                    "--config_path", "configs/pepper_cov_weighting.json",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
+                    "--result_path", "results/pepper_all/cov_gating/",
+                    "--evaluate_mlp_mask", "False",
+                    "--execute_evaluation", "True",
+                    "--execute_multi_target_tracking", "False"]
+        },
+        {
             "name": "Testing pepper",
             "type": "python",
             "request": "launch",
@@ -50,7 +65,7 @@
                     "--result_path", "results/pepper_all/",
                     "--execute_evaluation", "True",
                     "--execute_multi_target_tracking", "False",
-                    "--evaluate_mlp_mask", "False",
+                    "--evaluate_mlp_mask", "True",
                     "--no_show", "False"]
         },
         {

@@ -40,7 +40,9 @@ def str2bool(v):
 
 # the possible arguments you can give to the model
 parser.add_argument('--is_loaded', type=str2bool, default=True,
-                    help='Whether the model is loaded or created + trained.')
+                    help='Whether the models should be loaded or trained.')
+parser.add_argument('--is_loaded_gating_network', type=str2bool, default=True,
+                    help='Whether the gating network should be loaded or trained.')
 parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
                     help='The path where the model is stored or loaded from.')
 parser.add_argument('--matching_algorithm', default='global', choices=['local', 'global'],
@@ -121,6 +123,7 @@ global_config = {
     'only_last_timestep_additional_loss': True,
 
     'is_loaded': args.is_loaded,
+    'is_loaded_gating_network': args.is_loaded_gating_network,
     'model_path': args.model_path,
     'result_path': args.result_path,
     'distance_threshold': args.distance_threshold,
@@ -296,11 +299,8 @@ def run_global_config(global_config, experiment_series_names=''):
                                     normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
                                     random_seed = random_seed)
     
-    ## Train or import model
-    if global_config["is_loaded"]:
-        model_manager.load_models(global_config["model_path"])
-    else:
-        # Train models
+    ## Train models
+    if not global_config["is_loaded"]:
         model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
                                    seq2seq_dataset_train = seq2seq_dataset_train,
                                    seq2seq_dataset_test = seq2seq_dataset_test, 
@@ -311,6 +311,12 @@ def run_global_config(global_config, experiment_series_names=''):
                                    improvement_break_condition = global_config.get("improvement_break_condition"),
                                    lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
                                    lr_decay = global_config.get("lr_decay_factor"))
+    if global_config["is_loaded_gating_network"]:
+        model_manager.load_gating_network()
+    else:
+        model_manager.train_gating_network(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                            seq2seq_dataset_train = seq2seq_dataset_train,
+                                            mlp_dataset_train = mlp_dataset_train)
 
     ## Test models
     # TODO:

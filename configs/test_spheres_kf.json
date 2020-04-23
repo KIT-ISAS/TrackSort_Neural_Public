@@ -55,6 +55,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
+    "model_path": "models/spheres/simple_gating.pkl",
     "options": {
 
     }

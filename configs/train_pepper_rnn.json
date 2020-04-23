@@ -57,6 +57,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating.pkl",
     "options": {
 
     }
@@ -75,4 +76,3 @@
     }
   }
 }
-

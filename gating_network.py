@@ -26,8 +26,18 @@ class GatingNetwork(ABC):
         self.name = name
 
     @abstractmethod
+    def train_network(self, **kwargs):
+        """Train the network."""
+        pass
+
+    @abstractmethod
     def get_weights(self, **kwargs):
         """Return the weights for all experts."""
+        pass
+
+    @abstractmethod
+    def get_masked_weights(self, mask, **kwargs):
+        """Return a weight vector for all non masked experts."""
         pass
 
     def get_name(self):
