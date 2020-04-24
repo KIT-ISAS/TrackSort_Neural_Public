@@ -20,6 +20,7 @@ from expert_manager import Expert_Manager
 from expert import Expert_Type
 from weighting_function import weighting_function
 from ensemble import *
+from mixture_of_experts import *
 from evaluation_functions import *
 
 #tf.keras.backend.set_floatx('float64')
@@ -94,6 +95,8 @@ class ModelManager(object):
             self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts)
         elif gating_type == "SMAPE_Weighting":
             self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.n_experts)
+        elif gating_type == "Mixture_of_Experts":
+            self.gating_network = MixtureOfExperts(self.expert_manager.n_experts, gating_config.get('options'))
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
@@ -258,7 +261,7 @@ class ModelManager(object):
             **_dataset_train (dict):        All training samples in the correct format for various models
         """
         # Create predictions for all training batches and save prediction and target values to one list.
-        _, all_targets, all_predictions, all_masks, _ = self.get_full_target_prediction_mask_from_dataset(
+        _, all_inputs, all_targets, all_predictions, all_masks, _ = self.get_full_input_target_prediction_mask_from_dataset(
             mlp_conversion_func = mlp_conversion_func,
             seq2seq_dataset = seq2seq_dataset_train,
             mlp_dataset = mlp_dataset_train,
@@ -267,6 +270,7 @@ class ModelManager(object):
         self.gating_network.train_network(target = all_targets, 
                                           predictions = all_predictions, 
                                           masks = all_masks,
+                                          input_data = all_inputs,
                                           expert_types = self.expert_manager.get_expert_types())
         # Save gating network
         filehandler = open(self.gating_network_model_path, 'wb') 
@@ -296,7 +300,7 @@ class ModelManager(object):
             no_show (Boolean):                  Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, all_targets, all_predictions, all_masks, all_mlp_maks = self.get_full_target_prediction_mask_from_dataset(
+        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks = self.get_full_input_target_prediction_mask_from_dataset(
             mlp_conversion_func = mlp_conversion_func,
             seq2seq_dataset = seq2seq_dataset_test,
             mlp_dataset = mlp_dataset_test,
@@ -355,7 +359,7 @@ class ModelManager(object):
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
         """
 
-    def get_full_target_prediction_mask_from_dataset(self, mlp_conversion_func,
+    def get_full_input_target_prediction_mask_from_dataset(self, mlp_conversion_func,
                     seq2seq_dataset, mlp_dataset, create_weighted_output = False):
         """Create predictions for all models on the given dataset.
 
@@ -367,6 +371,7 @@ class ModelManager(object):
 
         Returns:
             expert_names (list):        List of expert names
+            all_inputs (np.array):      All input values of the given dataset, shape: [n_tracks, track_length, 2]
             all_targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
             all_predictions (np.array): All predictions for all experts, shape: [n_experts (+1), n_tracks, track_length, 2]
             all_masks (np.array):       Masks for each expert, shape: [n_experts (+1), n_tracks, track_length]
@@ -375,7 +380,7 @@ class ModelManager(object):
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
         seq2seq_iter = iter(seq2seq_dataset)
         mlp_iter = iter(mlp_dataset)
-        all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_mlp_maks = np.array([])
+        all_inputs = np.array([]); all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_mlp_maks = np.array([])
         for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
             (mlp_inp, mlp_target) = next(mlp_iter)
             # Test experts on a batch
@@ -397,11 +402,13 @@ class ModelManager(object):
             mlp_masks = np.repeat(np.expand_dims(mlp_mask, 0), len(masks), axis=0)
             # Add everything to the lists
             if all_targets.shape[0]==0:
+                all_inputs = seq2seq_inp.numpy()
                 all_targets = seq2seq_target.numpy()
                 all_predictions = np.array(predictions)
                 all_masks = np.array(masks)
                 all_mlp_maks = mlp_masks
             else:
+                all_inputs = np.concatenate((all_inputs, seq2seq_inp.numpy()),axis=0)
                 all_targets = np.concatenate((all_targets, seq2seq_target.numpy()),axis=0)
                 all_predictions = np.concatenate((all_predictions, predictions), axis=1)
                 all_masks = np.concatenate((all_masks, np.array(masks)), axis=1)
@@ -411,7 +418,7 @@ class ModelManager(object):
         if create_weighted_output:
             expert_names.append(self.gating_network.get_name())
         # Return all the stuff
-        return expert_names, all_targets, all_predictions, all_masks, all_mlp_maks
+        return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks
 
     def predict_all(self):
         """Predict the next position with all experts.

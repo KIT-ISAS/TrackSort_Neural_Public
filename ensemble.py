@@ -1,8 +1,4 @@
-"""The ensemble classes of gating networks.
-
-Todo:
-    * Implement weighted ensembles
-"""
+"""The ensemble classes of gating networks."""
 import numpy as np
 import logging
 
