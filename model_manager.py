@@ -92,6 +92,8 @@ class ModelManager(object):
             self.gating_network = Simple_Ensemble(self.expert_manager.n_experts)
         elif gating_type == "Covariance_Weighting":
             self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts)
+        elif gating_type == "SMAPE_Weighting":
+            self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.n_experts)
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
@@ -264,7 +266,8 @@ class ModelManager(object):
         # Call training of gating network
         self.gating_network.train_network(target = all_targets, 
                                           predictions = all_predictions, 
-                                          masks = all_masks)
+                                          masks = all_masks,
+                                          expert_types = self.expert_manager.get_expert_types())
         # Save gating network
         filehandler = open(self.gating_network_model_path, 'wb') 
         pickle.dump(self.gating_network, filehandler)

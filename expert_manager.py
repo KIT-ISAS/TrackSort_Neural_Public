@@ -342,6 +342,10 @@ class Expert_Manager(object):
         """Return list of names."""
         return [expert.name for expert in self.experts]
 
+    def get_expert_types(self):
+        """Return a list of expert types."""
+        return [expert.type for expert in self.experts]
+
     def is_type_in_experts(self, expert_type):
         """Check if at least one expert is of given type.
 
