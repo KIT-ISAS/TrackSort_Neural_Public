@@ -152,7 +152,7 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
         --> Expert 6 is only active at position 0.
         
         Args:
-            mask (np.array): Mask array with shape [n_experts, batch_size]
+            mask (tf.Tensor): Mask array with shape [n_experts, n_tracks, track_length]
 
         Returns:
             np.array with weights of shape mask.shape
@@ -282,7 +282,7 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
         --> Expert 6 is only active at position 0.
         
         Args:
-            mask (np.array): Mask array with shape [n_experts, batch_size]
+            mask (tf.Tensor): Mask array with shape [n_experts, n_tracks, track_length]
 
         Returns:
             np.array with weights of shape mask.shape

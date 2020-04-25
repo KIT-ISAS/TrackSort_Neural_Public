@@ -382,13 +382,13 @@ class ModelManager(object):
             masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
             # Get weighting of experts
             if create_weighted_output:
-                weights = self.gating_network.get_masked_weights(np.array(masks))
+                weights = self.gating_network.get_masked_weights(np.array(masks), seq2seq_inp)
                 total_prediction = weighting_function(np.array(predictions), weights)
                 predictions.append(total_prediction)
-            # Create a total mask to addd to list
-            total_mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
-            total_mask = 1 - K.cast(total_mask, tf.float64)
-            masks.append(total_mask)
+                # Create a total mask to addd to list
+                total_mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
+                total_mask = 1 - K.cast(total_mask, tf.float64)
+                masks.append(total_mask)
             # MLP mask to compare MLP with KF/RNN
             mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
             mlp_mask = 1 - K.cast(mlp_mask, tf.float64)

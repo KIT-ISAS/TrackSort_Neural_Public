@@ -93,22 +93,16 @@ class MixtureOfExperts(GatingNetwork):
         train_step_fn = train_step_generator(self.mlp_model, optimizer)
 
         ## Create Dataset
-        # Find a non MLP mask
-        normal_mask_pos = 0
-        for i in range(len(expert_types)):
-            if not expert_types[i] == Expert_Type.MLP:
-                normal_mask_pos = i 
-                break
-        mask = masks[normal_mask_pos]
         # Transform the data to the desired data format
-        inputs_out, targets_out, predictions_out, mask_out = self.transform_data(input_data, target, predictions, mask)
+        inputs_model, targets_model, predictions_model, mask_model = self.transform_data(input_data, target, predictions, masks)
         # Remove masked values from dataset
-        inputs_model = inputs_out[mask_out==1]
-        targets_model = targets_out[mask_out==1]
-        predictions_model = predictions_out[mask_out==1]
+        inputs_model = inputs_model[np.sum(mask_model, axis=1)!=0]
+        targets_model = targets_model[np.sum(mask_model, axis=1)!=0]
+        predictions_model = predictions_model[np.sum(mask_model, axis=1)!=0]
+        mask_model = mask_model[np.sum(mask_model, axis=1)!=0]
         # Create dataset
-        dataset_input = tf.data.Dataset.from_tensor_slices((inputs_model, predictions_model))
-        dataset_target = tf.data.Dataset.from_tensor_slices(targets_model)
+        dataset_input = tf.data.Dataset.from_tensor_slices((inputs_model, predictions_model, mask_model))
+        dataset_target = tf.data.Dataset.from_tensor_slices((targets_model))
         dataset = tf.data.Dataset.zip((dataset_input, dataset_target))
         # Seperate dataset in train and test
         train_size = int(0.9 * inputs_model.shape[0])
@@ -139,11 +133,12 @@ class MixtureOfExperts(GatingNetwork):
                 K.set_value(optimizer.lr, new_lr)
             # Iterate over the batches of the train dataset.
             train_iter = iter(train_dataset)
-            for ((train_inputs, train_expert_predictions), train_targets) in train_iter:
+            for ((train_inputs, train_expert_predictions, train_mask), train_targets) in train_iter:
                 # Predict weights for experts
-                weights, loss = train_step_fn(train_inputs, train_targets, train_expert_predictions)
+                weights, loss = train_step_fn(train_inputs, train_targets, train_expert_predictions, train_mask)
+                masked_weights = mask_weights(weights, train_mask)
                 # Evaluate mae
-                mae = weighted_sum_mae_loss(weights, train_expert_predictions, train_targets)
+                mae = weighted_sum_mae_loss(masked_weights, train_expert_predictions, train_targets)
                 train_loss(loss); train_mae(mae)
             # Write training results
             with train_summary_writer.as_default():
@@ -162,12 +157,13 @@ class MixtureOfExperts(GatingNetwork):
                     or (epoch + 1) == self.n_epochs:
                 # Iterate over the batches of the test dataset.
                 test_iter = iter(test_dataset)
-                for ((test_inputs, test_expert_predictions), test_targets) in test_iter:
+                for ((test_inputs, test_expert_predictions, test_mask), test_targets) in test_iter:
                     # Predict weights for experts
                     weights = self.mlp_model(test_inputs)
-                    loss = weighted_sum_mse_loss(weights, test_expert_predictions, test_targets)
+                    masked_weights = mask_weights(weights, test_mask)
+                    loss = weighted_sum_mse_loss(masked_weights, test_expert_predictions, test_targets)
                     # Evaluate mae
-                    mae = weighted_sum_mae_loss(weights, test_expert_predictions, test_targets)
+                    mae = weighted_sum_mae_loss(masked_weights, test_expert_predictions, test_targets)
                     test_loss(loss); test_mae(mae)
                 # Write testing results
                 with test_summary_writer.as_default():
@@ -182,14 +178,14 @@ class MixtureOfExperts(GatingNetwork):
                 test_loss.reset_states(); test_mae.reset_states()
 
         
-    def transform_data(self, input_data, target_data, predictions_data, mask):
+    def transform_data(self, input_data, target_data, predictions_data, masks):
         """Transform the given data to match the input and output data of the MLP.
 
         Args:
             input_data (np.array):      The current input to the experts, shape: [n_tracks, track_length, 2]
             target_data (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
             predictions_data (np.array):All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
-            mask (np.array):            Mask to mask total prediction, shape: [n_tracks, track_length]
+            masks (np.array):            Mask to mask total prediction, shape: [n_experts, n_tracks, track_length]
 
         Returns: 
             inputs (np.array):      Inputs to the MLP, shape: [n_tracks * track_length, 3]
@@ -205,14 +201,66 @@ class MixtureOfExperts(GatingNetwork):
         inputs_out = np.zeros([output_size, 3])
         targets_out = np.zeros([output_size, 2])
         predictions_out = np.zeros([output_size, n_experts, 2])
-        mask_out = np.zeros([output_size])
+        mask_out = np.zeros([output_size, n_experts])
         for i in range(n_tracks):
             inputs_out[i*track_length:(i+1)*track_length,0:2] = input_data[i]
             inputs_out[i*track_length:(i+1)*track_length,2] = np.arange(0, track_length)
             targets_out[i*track_length:(i+1)*track_length] = target_data[i]
             predictions_out[i*track_length:(i+1)*track_length] = np.swapaxes(predictions_data[:,i,:,:],0, 1)
-            mask_out[i*track_length:(i+1)*track_length] = mask[i]
+            mask_out[i*track_length:(i+1)*track_length] = np.swapaxes(masks[:,i,:],0, 1)
         return inputs_out, targets_out, predictions_out, mask_out
+
+    def create_input_data(self, input_data):
+        """Create input data from track format.
+
+        Args:
+            input_data (np.array):      The current input to the experts, shape: [n_tracks, track_length, 2]
+
+        Returns: 
+            inputs (np.array):      Inputs to the MLP, shape: [n_tracks * track_length, 3]
+        """
+        n_tracks = input_data.shape[0]
+        track_length = input_data.shape[1]
+        output_size = n_tracks*track_length
+        inputs_out = np.zeros([output_size, 3])
+        for i in range(n_tracks):
+            inputs_out[i*track_length:(i+1)*track_length,0:2] = input_data[i]
+            inputs_out[i*track_length:(i+1)*track_length,2] = np.arange(0, track_length)
+        return inputs_out
+
+    def create_mask_data(self, mask):
+        """Create masks from track format.
+
+        Args:
+            masks (np.array): Mask to mask total prediction, shape: [n_experts, n_tracks, track_length]
+
+        Returns: 
+            mask (np.array): Mask to mask total prediction, shape: [n_tracks * track_length]
+        """
+        n_tracks = mask.shape[1]
+        track_length = mask.shape[2]
+        output_size = n_tracks*track_length
+        n_experts = mask.shape[0] 
+        mask_out = np.zeros([output_size, n_experts])
+        for i in range(n_tracks):
+            mask_out[i*track_length:(i+1)*track_length] = np.swapaxes(mask[:,i,:],0, 1)
+        return mask_out
+
+    def convert_weights_to_tracks(self, weights, track_length):
+        """Create input data from track format.
+
+        Asserts weights.shape[0] % track_length == 0
+
+        Args:
+            weights (np.array): The predicted weights, shape: [n_tracks * track_length, n_experts]
+
+        Returns: 
+            track_weights (np.array): The predicted weights in track format, shape: [n_experts, n_tracks, track_length]
+        """
+        assert(weights.shape[0] % track_length == 0)
+        track_weights = np.reshape(weights, [int(weights.shape[0] / track_length), track_length, self.n_experts])
+        track_weights = np.swapaxes(track_weights, 0, 2).swapaxes(1, 2)
+        return track_weights
 
     def get_weights(self, batch_size):
         """Return a weight vector.
@@ -223,10 +271,9 @@ class MixtureOfExperts(GatingNetwork):
         Returns:
             np.array with weights of shape [n_experts, batch_size]
         """
-        weights = np.repeat(np.expand_dims(self.weights, -1), batch_size, axis=-1)
-        return weights
+        pass
 
-    def get_masked_weights(self, mask):
+    def get_masked_weights(self, mask, track_input):
         """Return an equal weights vector for all non masked experts.
         
         The weights sum to 1.
@@ -244,17 +291,20 @@ class MixtureOfExperts(GatingNetwork):
         --> Expert 6 is only active at position 0.
         
         Args:
-            mask (np.array): Mask array with shape [n_experts, batch_size]
+            mask (np.array): Mask array with shape [n_experts, n_tracks, track_length]
+            track_input (np.array): Data input in track format, shape: [n_tracks, track_length, 2]
 
         Returns:
             np.array with weights of shape mask.shape
         """
-        assert(mask.shape[0] == self.n_experts)
-        batch_weight = self.get_weights(mask.shape[1])
-        batch_weight = np.repeat(np.expand_dims(batch_weight, -1), mask.shape[2], axis=-1)
-        epsilon = 1e-30
-        weights = np.multiply(mask, batch_weight) / (np.sum(np.multiply(mask, batch_weight), axis=0) + epsilon)
-        return weights
+        net_input = self.create_input_data(track_input)
+        weights = self.mlp_model(net_input)
+        masks = self.create_mask_data(mask)
+        masked_weights = mask_weights(weights, masks)
+        masked_weights = masked_weights.numpy()
+        track_length = track_input.shape[1]
+        track_weights = self.convert_weights_to_tracks(masked_weights, track_length)
+        return track_weights
 
 
 """Model creation and training functionality"""
@@ -312,11 +362,12 @@ def train_step_generator(model, optimizer):
         function which can be called to train the given model with the given optimizer
     """
     @tf.function
-    def train_step(inp, target, expert_predictions):
+    def train_step(inp, target, expert_predictions, mask):
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
             weights = model(inp, training=True) 
-            loss = weighted_sum_mse_loss(weights, expert_predictions, target)
+            masked_weights = mask_weights(weights, mask)
+            loss = weighted_sum_mse_loss(masked_weights, expert_predictions, target)
 
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -324,6 +375,35 @@ def train_step_generator(model, optimizer):
         return weights, loss
 
     return train_step
+
+def mask_weights(weights, mask):
+    """Mask the tf weights vector.
+
+    A weight vector of form:
+    0.4 0.2 0.4
+    0.4 0.3 0.3
+    ...
+
+    With mask of form:
+    True False True
+    True True True
+    ...
+
+    Results in:
+    0.5 0.0 0.5
+    0.4 0.3 0.3
+    ...
+
+    Args:
+        weights (tf.Tensor): The outputs of the MLP network, shape: [n_output, n_experts]
+        mask (tf.Tensor):    The mask for all experts, shape: [n_output, n_experts]
+
+    Returns:
+        masked_weights (tf.Tensor): Same shape as weights
+    """
+    masked_weights = tf.multiply(weights, mask)
+    masked_weights, _ = tf.linalg.normalize(masked_weights, ord=1, axis=1)
+    return masked_weights
 
 def weighted_sum_mse_loss(weights, expert_predictions, target):
     """Return MSE for weighted expert predictions."""
