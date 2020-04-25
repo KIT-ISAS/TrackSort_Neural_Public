@@ -1,6 +1,8 @@
 """The ensemble classes of gating networks."""
 import numpy as np
 import logging
+import pickle
+import os
 
 from gating_network import GatingNetwork
 from expert import Expert_Type
@@ -16,7 +18,7 @@ class Simple_Ensemble(GatingNetwork):
 
     def __init__(self, n_experts):
         """Initialize a simple ensemble gating network."""
-        super().__init__(n_experts, "Simple Ensemble")
+        super().__init__(n_experts, "Simple Ensemble", "")
 
     def train_network(self, **kwargs):
         """Simple ensemble needs no training."""
@@ -67,10 +69,24 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts):
+    def __init__(self, n_experts, model_path):
         """Initialize a covariance weighting ensemble gating network."""
         self.weights = np.zeros(n_experts)
-        super().__init__(n_experts, "Covariance Weighting Ensemble")
+        super().__init__(n_experts, "Covariance Weighting Ensemble", model_path)
+
+    def save_model(self):
+        folder_path = os.path.dirname(self.model_path)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        filehandler = open(self.model_path, 'wb') 
+        pickle.dump(self.weights, filehandler)
+
+    def load_model(self):
+        try:
+            filehandler = open(self.model_path, 'rb') 
+            self.weights = pickle.load(filehandler)
+        except:
+            logging.error("Could not load gating network from path {}".format(self.model_path))
 
     def train_network(self, target, predictions, masks, **kwargs):
         """Train the ensemble.
@@ -159,10 +175,24 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts):
+    def __init__(self, n_experts, model_path):
         """Initialize a SMAPE weighting ensemble gating network."""
         self.weights = np.zeros(n_experts)
-        super().__init__(n_experts, "SMAPE Weighting Ensemble")
+        super().__init__(n_experts, "SMAPE Weighting Ensemble", model_path)
+
+    def save_model(self):
+        folder_path = os.path.dirname(self.model_path)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        filehandler = open(self.model_path, 'wb') 
+        pickle.dump(self.weights, filehandler)
+
+    def load_model(self):
+        try:
+            filehandler = open(self.model_path, 'rb') 
+            self.weights = pickle.load(filehandler)
+        except:
+            logging.error("Could not load gating network from path {}".format(self.model_path))
 
     def train_network(self, target, predictions, masks, expert_types, **kwargs):
         """Train the ensemble.

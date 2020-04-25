@@ -1,11 +1,14 @@
 """Mixture of expert approach for gating structure.
 
 TODO:
-
+    * Right now the input training data is split into train and test data for the gating network.
+        You may want to change this into passing the test data directly to the training function.
 """
 import numpy as np
 import logging
 import tensorflow as tf
+import os
+import datetime
 
 from tensorflow.keras import backend as K
 
@@ -29,7 +32,7 @@ class MixtureOfExperts(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts, network_options = {}):
+    def __init__(self, n_experts, model_path, network_options = {}):
         """Initialize a covariance weighting ensemble gating network.
         
         Args:
@@ -37,22 +40,17 @@ class MixtureOfExperts(GatingNetwork):
             mlp_config (dict):  Arguments for the mlp_model_factory
         """
         # Initialize with zero weights
-        self.weights = np.zeros(n_experts)
         self.model_structure = network_options.get("model_structure")
-        if "base_learning_rate" in network_options:
-            self.base_learning_rate = network_options.get("base_learning_rate")
-        else:
-            self.base_learning_rate = 0.005
-        if "batch_size" in network_options:
-            self.batch_size = network_options.get("batch_size")
-        else:
-            self.batch_size = 1000
-        if "n_epochs" in network_options:
-            self.n_epochs = network_options.get("n_epochs")
-        else:
-            self.n_epochs = 100
+        # Training parameters
+        self.base_learning_rate = 0.005 if not "base_learning_rate" in network_options else network_options.get("base_learning_rate")
+        self.batch_size = 1000 if not "batch_size" in network_options else network_options.get("batch_size")
+        self.n_epochs = 1000 if not "n_epochs" in network_options else network_options.get("n_epochs")
+        self.lr_decay_after_epochs = 100 if not "lr_decay_after_epochs" in network_options else network_options.get("lr_decay_after_epochs")
+        self.lr_decay_factor = 0.5 if not "lr_decay_factor" in network_options else network_options.get("lr_decay_factor")
+        self.evaluate_every_n_epochs = 20 if not "evaluate_every_n_epochs" in network_options else network_options.get("evaluate_every_n_epochs")
+
         self._label_dim = n_experts
-        super().__init__(n_experts, "ME weighting")
+        super().__init__(n_experts, "ME weighting", model_path)
 
     def create_model(self, n_features):
         """Create a new MLP ME model.
@@ -63,7 +61,19 @@ class MixtureOfExperts(GatingNetwork):
         self.mlp_model = me_mlp_model_factory(input_dim=n_features, output_dim=self._label_dim, **self.model_structure)
         
         logging.info(self.mlp_model.summary())
-        #self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
+
+    def save_model(self):
+        """Save the model to its model path."""
+        folder_path = os.path.dirname(self.model_path)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        self.mlp_model.save(self.model_path)
+        
+    def load_model(self):
+        """Load a MLP model from its model path."""
+        self.mlp_model = tf.keras.models.load_model(self.model_path)
+        self.input_dim = self.mlp_model.input_shape[1]
+        logging.info(self.mlp_model.summary())
 
     def train_network(self, target, predictions, masks, input_data, expert_types, **kwargs):
         """Train the mixture of expert network.
@@ -77,10 +87,12 @@ class MixtureOfExperts(GatingNetwork):
             masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks, track_length]
             expert_types (list):    List of expert types
         """
-        # Create the model
+        ## Create Model
         self.create_model(3)
         optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
         train_step_fn = train_step_generator(self.mlp_model, optimizer)
+
+        ## Create Dataset
         # Find a non MLP mask
         normal_mask_pos = 0
         for i in range(len(expert_types)):
@@ -90,22 +102,85 @@ class MixtureOfExperts(GatingNetwork):
         mask = masks[normal_mask_pos]
         # Transform the data to the desired data format
         inputs_out, targets_out, predictions_out, mask_out = self.transform_data(input_data, target, predictions, mask)
+        # Remove masked values from dataset
         inputs_model = inputs_out[mask_out==1]
         targets_model = targets_out[mask_out==1]
         predictions_model = predictions_out[mask_out==1]
         # Create dataset
         dataset_input = tf.data.Dataset.from_tensor_slices((inputs_model, predictions_model))
         dataset_target = tf.data.Dataset.from_tensor_slices(targets_model)
-        dataset = tf.data.Dataset.zip((dataset_input, dataset_target)).batch(self.batch_size)
-        dataset_iter = iter(dataset)
-        for epoch in range(self.n_epochs):
-            print('Start of epoch %d' % (epoch,))
+        dataset = tf.data.Dataset.zip((dataset_input, dataset_target))
+        # Seperate dataset in train and test
+        train_size = int(0.9 * inputs_model.shape[0])
+        train_dataset = dataset.take(train_size)
+        test_dataset = dataset.skip(train_size)
+        # Batch both datasets
+        train_dataset = train_dataset.batch(self.batch_size)
+        test_dataset = test_dataset.batch(self.batch_size)
+        
+        ## Values for training logging in tensorboard
+        current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        train_log_dir = 'logs/gradient_tape/' + current_time + '_train_me_gating' + '/train'
+        test_log_dir = 'logs/gradient_tape/' + current_time + '_train_me_gating' + '/test'
+        train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+        test_summary_writer = tf.summary.create_file_writer(test_log_dir)
+        train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
+        train_mae = tf.keras.metrics.Mean('train_mae', dtype=tf.float32)
+        test_loss = tf.keras.metrics.Mean('test_loss', dtype=tf.float32)
+        test_mae = tf.keras.metrics.Mean('test_mae', dtype=tf.float32)
 
-            # Iterate over the batches of the dataset.
-            for ((train_inputs, train_expert_predictions), train_targets) in dataset_iter:
-                weights = train_step_fn(train_inputs, train_targets, train_expert_predictions)
+        ## Training
+        for epoch in range(self.n_epochs):
+            # Learning rate decay
+            if (epoch + 1) % self.lr_decay_after_epochs == 0:
+                old_lr = K.get_value(optimizer.lr)
+                new_lr = old_lr * self.lr_decay_factor
+                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
+                K.set_value(optimizer.lr, new_lr)
+            # Iterate over the batches of the train dataset.
+            train_iter = iter(train_dataset)
+            for ((train_inputs, train_expert_predictions), train_targets) in train_iter:
+                # Predict weights for experts
+                weights, loss = train_step_fn(train_inputs, train_targets, train_expert_predictions)
+                # Evaluate mae
                 mae = weighted_sum_mae_loss(weights, train_expert_predictions, train_targets)
-                stop = 0
+                train_loss(loss); train_mae(mae)
+            # Write training results
+            with train_summary_writer.as_default():
+                tf.summary.scalar('loss', train_loss.result(), step=epoch)
+                tf.summary.scalar('mae', train_mae.result(), step=epoch)
+            # Console output
+            template = 'Epoch {}, Train Loss: {}, Train MAE: {}'
+            logging.info(template.format(epoch+1,
+                            train_loss.result().numpy(),
+                            train_mae.result().numpy()))
+            # Reset metrics every epoch
+            train_loss.reset_states(); train_mae.reset_states()
+
+            # Run trained models on the test set every n epochs
+            if (epoch + 1) % self.evaluate_every_n_epochs == 0 \
+                    or (epoch + 1) == self.n_epochs:
+                # Iterate over the batches of the test dataset.
+                test_iter = iter(test_dataset)
+                for ((test_inputs, test_expert_predictions), test_targets) in test_iter:
+                    # Predict weights for experts
+                    weights = self.mlp_model(test_inputs)
+                    loss = weighted_sum_mse_loss(weights, test_expert_predictions, test_targets)
+                    # Evaluate mae
+                    mae = weighted_sum_mae_loss(weights, test_expert_predictions, test_targets)
+                    test_loss(loss); test_mae(mae)
+                # Write testing results
+                with test_summary_writer.as_default():
+                    tf.summary.scalar('loss', test_loss.result(), step=epoch)
+                    tf.summary.scalar('mae', test_mae.result(), step=epoch)
+                # Console output
+                template = 'Epoch {}, Test Loss: {}, Test MAE: {}'
+                logging.info(template.format(epoch+1,
+                                test_loss.result().numpy(),
+                                test_mae.result().numpy()))
+                # Reset metrics every epoch
+                test_loss.reset_states(); test_mae.reset_states()
+
         
     def transform_data(self, input_data, target_data, predictions_data, mask):
         """Transform the given data to match the input and output data of the MLP.
@@ -246,7 +321,7 @@ def train_step_generator(model, optimizer):
         grads = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        return weights
+        return weights, loss
 
     return train_step
 

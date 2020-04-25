@@ -64,7 +64,6 @@ class ModelManager(object):
                                              model_config.get('batch_size'), num_time_steps)
         # The gating network that calculates all weights
         self.create_gating_network(model_config.get('gating'))
-        self.gating_network_model_path = model_config.get('gating').get('model_path')
         self.overwriting_activated = overwriting_activated
         self.batch_size = model_config.get('batch_size')
         self.num_time_steps = num_time_steps
@@ -89,14 +88,15 @@ class ModelManager(object):
 
         """
         gating_type = gating_config.get("type")
+        model_path = gating_config.get('model_path')
         if gating_type == "Simple_Ensemble":
             self.gating_network = Simple_Ensemble(self.expert_manager.n_experts)
         elif gating_type == "Covariance_Weighting":
-            self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts)
+            self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
         elif gating_type == "SMAPE_Weighting":
-            self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.n_experts)
+            self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
         elif gating_type == "Mixture_of_Experts":
-            self.gating_network = MixtureOfExperts(self.expert_manager.n_experts, gating_config.get('options'))
+            self.gating_network = MixtureOfExperts(self.expert_manager.n_experts, model_path, gating_config.get('options'))
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
@@ -208,7 +208,6 @@ class ModelManager(object):
                     mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
                     mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
                     # Calculate loss for all models
-                    #TODO: Implement MLP loss as loss if all predictors would have MLP mask
                     for i in range(len(predictions)):
                         loss = loss_object(seq2seq_target, predictions[i], sample_weight = masks[i])
                         mlp_loss = loss_object(seq2seq_target, predictions[i], sample_weight = mlp_mask)
@@ -273,16 +272,11 @@ class ModelManager(object):
                                           input_data = all_inputs,
                                           expert_types = self.expert_manager.get_expert_types())
         # Save gating network
-        filehandler = open(self.gating_network_model_path, 'wb') 
-        pickle.dump(self.gating_network, filehandler)
+        self.gating_network.save_model()
 
     def load_gating_network(self):
         """Load the gating network from path defined in config file."""
-        try:
-            filehandler = open(self.gating_network_model_path, 'rb') 
-            self.gating_network = pickle.load(filehandler)
-        except:
-            logging.error("Could not load gating network from path {}".format(self.gating_network_model_path))
+        self.gating_network.load_model()
 
     def test_models(self, mlp_conversion_func, result_dir,
                     seq2seq_dataset_test = None, mlp_dataset_test = None,
