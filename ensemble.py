@@ -35,7 +35,7 @@ class Simple_Ensemble(GatingNetwork):
         """
         return (1/self.n_experts) * np.ones([self.n_experts, batch_size])
 
-    def get_masked_weights(self, mask):
+    def get_masked_weights(self, mask, *args):
         """Return an equal weights vector for all non masked experts.
         
         The weights sum to 1.
@@ -134,7 +134,7 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
         weights = np.repeat(np.expand_dims(self.weights, -1), batch_size, axis=-1)
         return weights
 
-    def get_masked_weights(self, mask):
+    def get_masked_weights(self, mask, *args):
         """Return an equal weights vector for all non masked experts.
         
         The weights sum to 1.
@@ -264,7 +264,7 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
         weights = np.repeat(np.expand_dims(self.weights, -1), batch_size, axis=-1)
         return weights
 
-    def get_masked_weights(self, mask):
+    def get_masked_weights(self, mask, *args):
         """Return an equal weights vector for all non masked experts.
         
         The weights sum to 1.

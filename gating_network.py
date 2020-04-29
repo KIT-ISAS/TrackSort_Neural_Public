@@ -47,7 +47,7 @@ class GatingNetwork(ABC):
         pass
 
     @abstractmethod
-    def get_masked_weights(self, mask, **kwargs):
+    def get_masked_weights(self, mask, *args):
         """Return a weight vector for all non masked experts."""
         pass
 
