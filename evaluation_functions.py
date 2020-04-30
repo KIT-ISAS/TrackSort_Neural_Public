@@ -195,6 +195,38 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
             plt.show()
         np.savetxt(result_dir + "median_mae_map_{}.csv".format(expert_names[i].replace(" ", "_")), median_error_map, delimiter=',')
 
+def create_weight_pos_evaluation(weights, expert_names, result_dir, no_show = False):
+    """Plot expert weight over track position.
+
+    Args:
+        weights (np.array):     Weights for experts, shape: [n_experts, n_tracks, track_length]
+        expert_names (list):    Names (String) of each expert
+        result_dir (String):    Directory to save the created plot data to
+        no_show (Boolean):      Do not show the figures. The figures will still be saved.
+    """
+    assert(weights.shape[0]==len(expert_names))
+    mask = np.bitwise_or(weights==0, np.isnan(weights))
+    weights = np.ma.masked_array(weights, mask)
+    mean_weights_per_ts = np.ma.mean(weights, axis=1)
+    x = np.arange(0, mean_weights_per_ts.shape[1])
+    weights_dict = dict()
+    weights_dict['TrackPos'] = x
+    # Show plot
+    plt.figure()
+    for i in range(mean_weights_per_ts.shape[0]):
+        plt.plot(x, mean_weights_per_ts[i], label=expert_names[i])
+        weights_dict[expert_names[i]]=mean_weights_per_ts[i]
+    plt.ylabel("Weights")
+    plt.xlabel("Track index")
+    plt.legend()
+    plt.savefig(result_dir + 'weight_plot.pdf')
+    if not no_show:
+        plt.show()
+
+    # Save data to csv via pandas
+    weights_df = pd.DataFrame(weights_dict)
+    weights_df.to_csv(result_dir + "mean_weights_track_pos.csv", index=False)
+    
 
 def get_box_values(data):
     """Obtain all box plot values from a set of numpy data.

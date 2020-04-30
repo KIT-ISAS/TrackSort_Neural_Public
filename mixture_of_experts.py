@@ -49,16 +49,27 @@ class MixtureOfExperts(GatingNetwork):
         self.lr_decay_factor = 0.5 if not "lr_decay_factor" in network_options else network_options.get("lr_decay_factor")
         self.evaluate_every_n_epochs = 20 if not "evaluate_every_n_epochs" in network_options else network_options.get("evaluate_every_n_epochs")
 
+        # Set the input dimension based on the features
+        input_dim = 0
+        for feature in self.model_structure.get("features"):
+            if feature=="pos":
+                input_dim = input_dim + 2
+            elif feature=="id":
+                input_dim = input_dim + 1
+            elif feature=="prev_pred_err":
+                input_dim = input_dim + n_experts
+            else:
+                logging.warning("Feature {} is unknown. Won't include it in ME gating.".format(feature))
+        # Check if there is at least one input to the network
+        assert(input_dim > 0)
+        self.input_dim = input_dim
+        # Output dimensions
         self._label_dim = n_experts
         super().__init__(n_experts, "ME weighting", model_path)
 
-    def create_model(self, n_features):
-        """Create a new MLP ME model.
-
-        Args:
-            n_features (int):  The number of features as input to the model   
-        """
-        self.mlp_model = me_mlp_model_factory(input_dim=n_features, output_dim=self._label_dim, **self.model_structure)
+    def create_model(self):
+        """Create a new MLP ME model based on the model structure defined in the config file."""
+        self.mlp_model = me_mlp_model_factory(input_dim=self.input_dim, output_dim=self._label_dim, **self.model_structure)
         
         logging.info(self.mlp_model.summary())
 
@@ -88,13 +99,13 @@ class MixtureOfExperts(GatingNetwork):
             expert_types (list):    List of expert types
         """
         ## Create Model
-        self.create_model(3)
+        self.create_model()
         optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
         train_step_fn = train_step_generator(self.mlp_model, optimizer)
 
         ## Create Dataset
         # Transform the data to the desired data format
-        inputs_model, targets_model, predictions_model, mask_model = self.transform_data(input_data, target, predictions, masks)
+        inputs_model, targets_model, predictions_model, mask_model = self.transform_data(input_data, target, predictions, masks, self.model_structure.get("features"), self.input_dim)
         # Remove masked values from dataset
         inputs_model = inputs_model[np.sum(mask_model, axis=1)!=0]
         targets_model = targets_model[np.sum(mask_model, axis=1)!=0]
@@ -178,17 +189,22 @@ class MixtureOfExperts(GatingNetwork):
                 test_loss.reset_states(); test_mae.reset_states()
 
         
-    def transform_data(self, input_data, target_data, predictions_data, masks):
+    def transform_data(self, input_data, target_data, predictions_data, masks, features, input_dim):
         """Transform the given data to match the input and output data of the MLP.
 
         Args:
             input_data (np.array):      The current input to the experts, shape: [n_tracks, track_length, 2]
             target_data (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
             predictions_data (np.array):All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
-            masks (np.array):            Mask to mask total prediction, shape: [n_experts, n_tracks, track_length]
+            masks (np.array):           Mask to mask total prediction, shape: [n_experts, n_tracks, track_length]
+            features (list[String]):    Features to create. Possibilities:
+                                            "pos":  x and y position of current measurement.
+                                            "id":   Current track id - Number of measurements in track
+                                            "prev_pred_err": Previous prediction error of all experts
+            input_dim (int):            Input dimension for MLP (could be calculated from features)
 
         Returns: 
-            inputs (np.array):      Inputs to the MLP, shape: [n_tracks * track_length, 3]
+            inputs (np.array):      Inputs to the MLP based on features, shape: [n_tracks * track_length, input_dim]
             targets (np.array):     Target values, shape: [n_tracks * track_length, 2]
             predictions (np.array): Predictions of the experts as input to the MLP, shape: [n_tracks * track_length, n_experts, 2]
             mask (np.array):        Mask to mask total prediction, shape: [n_tracks * track_length]
@@ -198,23 +214,48 @@ class MixtureOfExperts(GatingNetwork):
         output_size = n_tracks*track_length
         n_experts = predictions_data.shape[0]
         # Generate input
-        inputs_out = np.zeros([output_size, 3])
+        inputs_out = np.zeros([output_size, input_dim])
         targets_out = np.zeros([output_size, 2])
         predictions_out = np.zeros([output_size, n_experts, 2])
         mask_out = np.zeros([output_size, n_experts])
         for i in range(n_tracks):
-            inputs_out[i*track_length:(i+1)*track_length,0:2] = input_data[i]
-            inputs_out[i*track_length:(i+1)*track_length,2] = np.arange(0, track_length)
+            input_pos = 0
+            for feature in features:
+                if feature=="pos":
+                    inputs_out[i*track_length:(i+1)*track_length, input_pos:input_pos+2] = input_data[i]
+                    input_pos += 2
+                elif feature=="id":
+                    inputs_out[i*track_length:(i+1)*track_length, input_pos] = np.arange(0, track_length)
+                    input_pos += 1
+                elif feature=="prev_pred_err":
+                    for e in range(n_experts):
+                        err = np.sum(np.power(target_data[i]-predictions_data[e,i,:,:], 2), axis=-1)
+                        # Add a time lag to the error
+                        err[1:]=err[:-1]
+                        # Default value for first error position -> This is tricky.
+                        err[0]=1
+                        inputs_out[i*track_length:(i+1)*track_length, input_pos] = err
+                        input_pos += 1
+                else:
+                    logging.warning("Feature {} is unknown. Won't include it in ME gating.".format(feature))
+            
             targets_out[i*track_length:(i+1)*track_length] = target_data[i]
             predictions_out[i*track_length:(i+1)*track_length] = np.swapaxes(predictions_data[:,i,:,:],0, 1)
             mask_out[i*track_length:(i+1)*track_length] = np.swapaxes(masks[:,i,:],0, 1)
         return inputs_out, targets_out, predictions_out, mask_out
 
-    def create_input_data(self, input_data):
+    def create_input_data(self, input_data, features, input_dim, track_predictions=None, track_target=None):
         """Create input data from track format.
 
         Args:
-            input_data (np.array):      The current input to the experts, shape: [n_tracks, track_length, 2]
+            input_data (np.array):          The current input to the experts, shape: [n_tracks, track_length, 2]
+            features (list[String]):        Features to create. Possibilities:
+                                                "pos":  x and y position of current measurement.
+                                                "id":   Current track id - Number of measurements in track
+                                                "prev_pred_err": Previous prediction error of all experts
+            input_dim (int):                Input dimension
+            track_predictions (np.array):   Optional track predictions for experts if you chose to use the prev_pred_err feature, shape: [n_experts, n_tracks, track_length, 2]
+            track_target (np.array):        Optional track target if you chose to use the prev_pred_err feature, shape: [n_tracks, track_length, 2]
 
         Returns: 
             inputs (np.array):      Inputs to the MLP, shape: [n_tracks * track_length, 3]
@@ -222,10 +263,27 @@ class MixtureOfExperts(GatingNetwork):
         n_tracks = input_data.shape[0]
         track_length = input_data.shape[1]
         output_size = n_tracks*track_length
-        inputs_out = np.zeros([output_size, 3])
+        inputs_out = np.zeros([output_size, input_dim])
         for i in range(n_tracks):
-            inputs_out[i*track_length:(i+1)*track_length,0:2] = input_data[i]
-            inputs_out[i*track_length:(i+1)*track_length,2] = np.arange(0, track_length)
+            input_pos = 0
+            for feature in features:
+                if feature=="pos":
+                    inputs_out[i*track_length:(i+1)*track_length, input_pos:input_pos+2] = input_data[i]
+                    input_pos += 2
+                elif feature=="id":
+                    inputs_out[i*track_length:(i+1)*track_length, input_pos] = np.arange(0, track_length)
+                    input_pos += 1
+                elif feature=="prev_pred_err":
+                    for e in range(track_predictions.shape[0]):
+                        err = np.sum(np.power(track_target[i]-track_predictions[e,i,:,:], 2), axis=-1)
+                        # Add a time lag to the error
+                        err[1:]=err[:-1]
+                        # Default value for first error position -> This is tricky.
+                        err[0]=1
+                        inputs_out[i*track_length:(i+1)*track_length, input_pos] = err
+                        input_pos += 1
+                else:
+                    logging.warning("Feature {} is unknown. Won't include it in ME gating.".format(feature))
         return inputs_out
 
     def create_mask_data(self, mask):
@@ -273,7 +331,7 @@ class MixtureOfExperts(GatingNetwork):
         """
         pass
 
-    def get_masked_weights(self, mask, track_input):
+    def get_masked_weights(self, mask, track_input, track_predictions=None, track_target=None):
         """Return an equal weights vector for all non masked experts.
         
         The weights sum to 1.
@@ -293,11 +351,18 @@ class MixtureOfExperts(GatingNetwork):
         Args:
             mask (np.array): Mask array with shape [n_experts, n_tracks, track_length]
             track_input (np.array): Data input in track format, shape: [n_tracks, track_length, 2]
+            track_predictions (np.array): Optional track predictions for experts if you chose to use the prev_pred_err feature
+            track_target (np.array): Optional track target if you chose to use the prev_pred_err feature
 
         Returns:
             np.array with weights of shape mask.shape
         """
-        net_input = self.create_input_data(track_input)
+        net_input = self.create_input_data(input_data=track_input, 
+                                           features=self.model_structure.get("features"),
+                                           input_dim=self.input_dim, 
+                                           track_predictions=track_predictions, 
+                                           track_target=track_target)
+            
         weights = self.mlp_model(net_input)
         masks = self.create_mask_data(mask)
         masked_weights = mask_weights(weights, masks)
@@ -309,12 +374,19 @@ class MixtureOfExperts(GatingNetwork):
 
 """Model creation and training functionality"""
 
-def me_mlp_model_factory(input_dim=3, prediciton_input_dim=2, output_dim=3, layers=[16, 16, 16], activation='leakly_relu'):
+def me_mlp_model_factory(input_dim, output_dim, prediciton_input_dim=2, features=["pos"], layers=[16, 16, 16], activation='leakly_relu'):
     """Create a new keras MLP model
 
     Args:
-        input_dim (int):    The number of features as input to the model
-        output_dim (int):   The number of outputs of the model (usually 2 - [x, y])
+        input_dim (int):            The number of inputs to the model
+        output_dim (int):           The number of outputs of the model = number of experts --> number of weights
+        prediciton_input_dim (int): Should be 2 for x and y position.
+        features (list):            List of String. Features for MLP. Possibilities:
+                                        "pos":  x and y position of current measurement.
+                                        "id":   Current track id - Number of measurements in track
+                                        "prev_pred_err": TODO: Previous prediction error of all experts
+        layers (list):              List of int. Number of nodes and layers
+        activation (String):        Activation function for layers
     
     Returns: 
         the model
@@ -338,15 +410,10 @@ def me_mlp_model_factory(input_dim=3, prediciton_input_dim=2, output_dim=3, laye
         else:
             logging.warning("Activation function {} not implemented yet :(".format(activation))
         c+=1
-
+    # Output layer = Dense layer with softmax activation
     weights = tf.keras.layers.Dense(output_dim, name='weights')(x)
     weights = tf.keras.layers.Softmax()(weights)
     model = tf.keras.Model(inputs=inputs, outputs=weights)
-    """
-    model.compile(loss=weighted_sum_mse_loss(expert_predictions=expert_predictions), 
-                  optimizer='ADAM',
-                  experimental_run_tf_function=False) #metrics=[weighted_sum_mae_loss(expert_predictions=expert_predictions)],
-    """
     return model
 
 def train_step_generator(model, optimizer):

@@ -260,7 +260,7 @@ class ModelManager(object):
             **_dataset_train (dict):        All training samples in the correct format for various models
         """
         # Create predictions for all training batches and save prediction and target values to one list.
-        _, all_inputs, all_targets, all_predictions, all_masks, _ = self.get_full_input_target_prediction_mask_from_dataset(
+        _, all_inputs, all_targets, all_predictions, all_masks, _, _ = self.get_full_input_target_prediction_mask_from_dataset(
             mlp_conversion_func = mlp_conversion_func,
             seq2seq_dataset = seq2seq_dataset_train,
             mlp_dataset = mlp_dataset_train,
@@ -294,7 +294,7 @@ class ModelManager(object):
             no_show (Boolean):                  Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks = self.get_full_input_target_prediction_mask_from_dataset(
+        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks, all_weights = self.get_full_input_target_prediction_mask_from_dataset(
             mlp_conversion_func = mlp_conversion_func,
             seq2seq_dataset = seq2seq_dataset_test,
             mlp_dataset = mlp_dataset_test,
@@ -349,6 +349,8 @@ class ModelManager(object):
                                     result_dir=result_dir,
                                     is_mlp_mask=True,
                                     no_show = no_show)
+        # Weight plot
+        create_weight_pos_evaluation(weights=all_weights, expert_names = expert_names[:-1], result_dir=result_dir, no_show = no_show)
         """
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
         """
@@ -356,6 +358,8 @@ class ModelManager(object):
     def get_full_input_target_prediction_mask_from_dataset(self, mlp_conversion_func,
                     seq2seq_dataset, mlp_dataset, create_weighted_output = False):
         """Create predictions for all models on the given dataset.
+
+        Can create weight position evaluation.
 
         Args:
             mlp_conversion_func:    Function to convert MLP format to track format
@@ -370,11 +374,12 @@ class ModelManager(object):
             all_predictions (np.array): All predictions for all experts, shape: [n_experts (+1), n_tracks, track_length, 2]
             all_masks (np.array):       Masks for each expert, shape: [n_experts (+1), n_tracks, track_length]
             all_mlp_maks  (np.array):   MLP masks for each expert (first n instances are masked out), shape: [n_experts (+1), n_tracks, track_length]
+            all_weights (np.array):     [Optional -> create_weighted_output] weights for the expert predictions, shape: [n_experts, n_tracks, track_length]
         """
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
         seq2seq_iter = iter(seq2seq_dataset)
         mlp_iter = iter(mlp_dataset)
-        all_inputs = np.array([]); all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_mlp_maks = np.array([])
+        all_inputs = np.array([]); all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_mlp_maks = np.array([]); all_weights = np.array([])
         for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
             (mlp_inp, mlp_target) = next(mlp_iter)
             # Test experts on a batch
@@ -382,13 +387,19 @@ class ModelManager(object):
             masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
             # Get weighting of experts
             if create_weighted_output:
-                weights = self.gating_network.get_masked_weights(np.array(masks), seq2seq_inp)
+                weights = self.gating_network.get_masked_weights(mask=np.array(masks),
+                                                                 track_input=seq2seq_inp.numpy(),
+                                                                 track_predictions=np.array(predictions),
+                                                                 track_target=seq2seq_target.numpy())
+                # Evaluation purposes  
                 total_prediction = weighting_function(np.array(predictions), weights)
                 predictions.append(total_prediction)
                 # Create a total mask to addd to list
                 total_mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
                 total_mask = 1 - K.cast(total_mask, tf.float64)
                 masks.append(total_mask)
+            else:
+                weights = np.zeros(np.array(masks).shape)
             # MLP mask to compare MLP with KF/RNN
             mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
             mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
@@ -401,18 +412,20 @@ class ModelManager(object):
                 all_predictions = np.array(predictions)
                 all_masks = np.array(masks)
                 all_mlp_maks = mlp_masks
+                all_weights = weights
             else:
                 all_inputs = np.concatenate((all_inputs, seq2seq_inp.numpy()),axis=0)
                 all_targets = np.concatenate((all_targets, seq2seq_target.numpy()),axis=0)
                 all_predictions = np.concatenate((all_predictions, predictions), axis=1)
                 all_masks = np.concatenate((all_masks, np.array(masks)), axis=1)
                 all_mlp_maks = np.concatenate((all_mlp_maks, mlp_masks), axis=1)
+                all_weights = np.concatenate((all_weights, weights), axis=1)
         # Create expert name list
         expert_names = self.expert_manager.get_expert_names()
         if create_weighted_output:
             expert_names.append(self.gating_network.get_name())
         # Return all the stuff
-        return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks
+        return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks, all_weights
 
     def predict_all(self):
         """Predict the next position with all experts.
