@@ -1,0 +1,134 @@
+{
+  "batch_size": 64,
+  "experts": {
+    "KF_CV_sw18E2": {
+      "type": "KF",
+      "sub_type": "CV",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18E2,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_sw18": {
+      "type": "KF",
+      "sub_type": "CV",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_sw18E-2": {
+      "type": "KF",
+      "sub_type": "CV",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 0.18,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CA_sw18E5": {
+      "type": "KF",
+      "sub_type": "CA",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18E5,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 180,
+        "accel_var_y": 1800
+      }
+    },
+    "KF_CA_sw18E3": {
+      "type": "KF",
+      "sub_type": "CA",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18E3,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 180,
+        "accel_var_y": 1800
+      }
+    },
+    "KF_CA_sw18E1": {
+      "type": "KF",
+      "sub_type": "CA",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18E1,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 180,
+        "accel_var_y": 1800
+      }
+    }
+  },
+  "gating": {
+    "type": "Mixture_of_Experts",
+    "model_path": "models/pepper/me_pos_id_err_weighting_gating_2.h5",
+    "options": {
+      "base_learning_rate": 0.005,
+      "batch_size": 1000,
+      "n_epochs": 300,
+      "lr_decay_after_epochs": 100,
+      "lr_decay_factor": 0.5,
+      "evaluate_every_n_epochs": 20,
+      "model_structure": {
+        "features": ["pos", "id", "prev_pred_err"],
+        "layers": [32, 16, 16],
+        "activation": "leakly_relu"
+      }
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "distance_threshold": 0.02,
+      "positional_probabilities": 0.0,
+      "is_alive_probability_weighting": 0.0,
+      "matching_algorithm": "global"
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}
