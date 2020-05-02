@@ -244,24 +244,30 @@ class MixtureOfExperts(GatingNetwork):
             mask_out[i*track_length:(i+1)*track_length] = np.swapaxes(masks[:,i,:],0, 1)
         return inputs_out, targets_out, predictions_out, mask_out
 
-    def create_input_data(self, input_data, features, input_dim, track_predictions=None, track_target=None):
+    def create_input_data(self, input_data, features, input_dim, track_predictions=None, track_target=None, track_ids=None):
         """Create input data from track format.
 
         Args:
             input_data (np.array):          The current input to the experts, shape: [n_tracks, track_length, 2]
+                                             OR shape: [n_tracks, 2] if predicting a single time step
             features (list[String]):        Features to create. Possibilities:
                                                 "pos":  x and y position of current measurement.
                                                 "id":   Current track id - Number of measurements in track
                                                 "prev_pred_err": Previous prediction error of all experts
-            input_dim (int):                Input dimension
+            input_dim (int):                Input dimension to neural network
             track_predictions (np.array):   Optional track predictions for experts if you chose to use the prev_pred_err feature, shape: [n_experts, n_tracks, track_length, 2]
             track_target (np.array):        Optional track target if you chose to use the prev_pred_err feature, shape: [n_tracks, track_length, 2]
-
+            track_ids (np.array):           Switch to multi-target tracking mode if this value is not None.
+                                            In this mode, we only get one instance of a track. 
+                                            Therefore the track length is 1 and the track_length dimension in the track_input is omitted.
+                                            The track ids hold the position of the instance in its track.
+                                            Shape: [n_tracks]
         Returns: 
             inputs (np.array):      Inputs to the MLP, shape: [n_tracks * track_length, 3]
         """
         n_tracks = input_data.shape[0]
-        track_length = input_data.shape[1]
+        # In case of live multi-target tracking, the track length is always 1.
+        track_length = input_data.shape[1] if track_ids is None else 1
         output_size = n_tracks*track_length
         inputs_out = np.zeros([output_size, input_dim])
         for i in range(n_tracks):
@@ -271,7 +277,7 @@ class MixtureOfExperts(GatingNetwork):
                     inputs_out[i*track_length:(i+1)*track_length, input_pos:input_pos+2] = input_data[i]
                     input_pos += 2
                 elif feature=="id":
-                    inputs_out[i*track_length:(i+1)*track_length, input_pos] = np.arange(0, track_length)
+                    inputs_out[i*track_length:(i+1)*track_length, input_pos] = np.arange(0, track_length) if track_ids is None else track_ids[i]
                     input_pos += 1
                 elif feature=="prev_pred_err":
                     for e in range(track_predictions.shape[0]):
@@ -290,18 +296,23 @@ class MixtureOfExperts(GatingNetwork):
         """Create masks from track format.
 
         Args:
-            masks (np.array): Mask to mask total prediction, shape: [n_experts, n_tracks, track_length]
+            masks (np.array): Mask to mask total prediction, shape: [n_experts, n_tracks, track_length] 
+                                OR shape: [n_experts, n_tracks] if predicting a single time step
 
         Returns: 
-            mask (np.array): Mask to mask total prediction, shape: [n_tracks * track_length]
+            mask (np.array): Mask to mask total prediction, shape: [n_tracks * track_length, n_experts]
         """
         n_tracks = mask.shape[1]
-        track_length = mask.shape[2]
+        # In case of live multi-target tracking, the track length is always 1.
+        track_length = mask.shape[2] if mask.ndim==3 else 1
         output_size = n_tracks*track_length
         n_experts = mask.shape[0] 
         mask_out = np.zeros([output_size, n_experts])
-        for i in range(n_tracks):
-            mask_out[i*track_length:(i+1)*track_length] = np.swapaxes(mask[:,i,:],0, 1)
+        if mask.ndim==3:
+            for i in range(n_tracks):
+                mask_out[i*track_length:(i+1)*track_length] = np.swapaxes(mask[:,i,:],0, 1)
+        else:
+            mask_out = np.swapaxes(mask,0, 1)
         return mask_out
 
     def convert_weights_to_tracks(self, weights, track_length):
@@ -316,8 +327,11 @@ class MixtureOfExperts(GatingNetwork):
             track_weights (np.array): The predicted weights in track format, shape: [n_experts, n_tracks, track_length]
         """
         assert(weights.shape[0] % track_length == 0)
-        track_weights = np.reshape(weights, [int(weights.shape[0] / track_length), track_length, self.n_experts])
-        track_weights = np.swapaxes(track_weights, 0, 2).swapaxes(1, 2)
+        if track_length > 1:
+            track_weights = np.reshape(weights, [int(weights.shape[0] / track_length), track_length, self.n_experts])
+            track_weights = np.swapaxes(track_weights, 0, 2).swapaxes(1, 2)
+        else:
+            track_weights = np.swapaxes(weights, 0, 1)
         return track_weights
 
     def get_weights(self, batch_size):
@@ -331,7 +345,7 @@ class MixtureOfExperts(GatingNetwork):
         """
         pass
 
-    def get_masked_weights(self, mask, track_input, track_predictions=None, track_target=None):
+    def get_masked_weights(self, mask, track_input, track_predictions=None, track_target=None, track_ids=None):
         """Return an equal weights vector for all non masked experts.
         
         The weights sum to 1.
@@ -353,6 +367,11 @@ class MixtureOfExperts(GatingNetwork):
             track_input (np.array): Data input in track format, shape: [n_tracks, track_length, 2]
             track_predictions (np.array): Optional track predictions for experts if you chose to use the prev_pred_err feature
             track_target (np.array): Optional track target if you chose to use the prev_pred_err feature
+            track_ids (np.array):   Switch to multi-target tracking mode if this value is not None.
+                                    In this mode, we only get one instance of a track. 
+                                    Therefore the track length is 1 and the track_length dimension in the track_input is omitted.
+                                    The track ids hold the position of the instance in its track.
+                                    Shape: [n_tracks]
 
         Returns:
             np.array with weights of shape mask.shape
@@ -361,13 +380,14 @@ class MixtureOfExperts(GatingNetwork):
                                            features=self.model_structure.get("features"),
                                            input_dim=self.input_dim, 
                                            track_predictions=track_predictions, 
-                                           track_target=track_target)
+                                           track_target=track_target, 
+                                           track_ids=track_ids)
             
         weights = self.mlp_model(net_input)
         masks = self.create_mask_data(mask)
         masked_weights = mask_weights(weights, masks)
         masked_weights = masked_weights.numpy()
-        track_length = track_input.shape[1]
+        track_length = track_input.shape[1] if track_ids is None else 1
         track_weights = self.convert_weights_to_tracks(masked_weights, track_length)
         return track_weights
 

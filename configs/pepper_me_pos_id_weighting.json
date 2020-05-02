@@ -61,6 +61,7 @@
       "lr_decay_factor": 0.5,
       "evaluate_every_n_epochs": 20,
       "model_structure": {
+        "features": ["pos", "id"],
         "layers": [16, 16],
         "activation": "leakly_relu"
       }

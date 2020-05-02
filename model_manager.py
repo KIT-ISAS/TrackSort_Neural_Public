@@ -44,6 +44,9 @@ class ModelManager(object):
         current_is_alive (dict): Stores if a track is alive.
                                     Maps the alive status to a global track id.
                                     current_is_alive[global_track_id] = [True or False]
+        current_meas_counter (dict): Stores the counter of measurements in a track.
+                                        Maps the measurement counter to a global track id.
+                                        current_meas_counter[global_track_id] = int
         current_batches (dict): Maps a (batch_nr, idx) tuple to each global track id
         current_free_entries (set): Set of all dead free entries in batches
     """
@@ -73,6 +76,8 @@ class ModelManager(object):
         self.current_ids = []
         self.current_is_alive = dict()
         self.current_is_alive[-1] = False
+        self.current_meas_counter = dict()
+        self.current_meas_counter[-1] = -1
         self.current_batches = dict()
         self.current_free_entries = set()
 
@@ -387,10 +392,11 @@ class ModelManager(object):
             masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
             # Get weighting of experts
             if create_weighted_output:
-                weights = self.gating_network.get_masked_weights(mask=np.array(masks),
-                                                                 track_input=seq2seq_inp.numpy(),
-                                                                 track_predictions=np.array(predictions),
-                                                                 track_target=seq2seq_target.numpy())
+                weights = self.gating_network.get_masked_weights(np.array(masks),
+                                                                 seq2seq_inp.numpy(),
+                                                                 np.array(predictions),
+                                                                 seq2seq_target.numpy(),
+                                                                 None)
                 # Evaluation purposes  
                 total_prediction = weighting_function(np.array(predictions), weights)
                 predictions.append(total_prediction)
@@ -427,6 +433,9 @@ class ModelManager(object):
         # Return all the stuff
         return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks, all_weights
 
+    """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
+    """ METHODS FOR MULTI TARGET TRACKING """
+    """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     def predict_all(self):
         """Predict the next position with all experts.
         
@@ -443,7 +452,8 @@ class ModelManager(object):
             # get global ids in batch
             global_track_ids = self.current_ids[batch_nr]
             # Get current inputs
-            inputs = [self.current_inputs.get(id) for id in global_track_ids]
+            inputs = [self.current_inputs.get(idx) for idx in global_track_ids]
+            meas_counts = [self.current_meas_counter.get(idx) for idx in global_track_ids]
             # Delte input for dead tracks and save alive tracks of this batch
             alive_tracks = []
             for i in range(len(global_track_ids)):
@@ -456,9 +466,9 @@ class ModelManager(object):
             all_predictions = self.expert_manager.predict_all(inputs, batch_nr)
             prediction_mask = self.expert_manager.get_prediction_mask(batch_nr, batch_size=len(global_track_ids))
             # Gating
-            # TODO: Implement MLP masking in gating network!
-            #weights = np.array([[1], [0]])
-            weights = self.gating_network.get_masked_weights(prediction_mask)
+            # TODO: Mixture of Experts gating network with feature "prev_pred_err" is not implemented for multi target tracking.
+            #       The results of testing this feature were not promising, so the feature will not be implemented in the near future.
+            weights = self.gating_network.get_masked_weights(prediction_mask, np.array(inputs), None, None, np.array(meas_counts))
 
             # Weighting
             prediction = weighting_function(all_predictions, weights)
@@ -477,6 +487,7 @@ class ModelManager(object):
             measurement (list):   The new measurement [x_in, y_in]
         """
         self.current_inputs[global_track_id] = measurement
+        self.current_meas_counter[global_track_id] += 1
 
     def delete_by_id(self, global_track_id):
         """Delete a track.
@@ -523,4 +534,5 @@ class ModelManager(object):
         self.current_inputs[global_track_id] = measurement
         self.current_ids[batch_nr][idx] = global_track_id
         self.current_batches[global_track_id] = (batch_nr, idx)
+        self.current_meas_counter[global_track_id] = 0
         self.expert_manager.create_new_track(batch_nr, idx, measurement)

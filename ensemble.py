@@ -135,7 +135,7 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
         return weights
 
     def get_masked_weights(self, mask, *args):
-        """Return an equal weights vector for all non masked experts.
+        """Return a weights vector for all non masked experts.
         
         The weights sum to 1.
         All Weights are > 0 if the expert is non masked at an instance.
@@ -265,7 +265,7 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
         return weights
 
     def get_masked_weights(self, mask, *args):
-        """Return an equal weights vector for all non masked experts.
+        """Return a weights vector for all non masked experts.
         
         The weights sum to 1.
         All Weights are > 0 if the expert is non masked at an instance.

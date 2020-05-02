@@ -207,7 +207,7 @@ def run_global_config(global_config, experiment_series_names=''):
     # file paths
     global_config['visualization_video_path'] = os.path.join(global_config['visualization_path'],
                                                              'matching_visualization_vid.mp4')
-    global_config['json_file'] = os.path.join(global_config['experiment_path'], 'config.json')
+    global_config['json_file'] = os.path.join(global_config['result_path'], 'config.json')
 
     ## Import data
     if global_config['dataset_type'] == 'FakeDataset':
