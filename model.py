@@ -1519,6 +1519,9 @@ class Model(object):
         self.global_config['sum_log_likelihood'] = np.sum(data['log_likelihood'])
         logging.info('Sum of Log Likelihoods: {}'.format(self.global_config['sum_log_likelihood']))
 
+        self.global_config['mean_variance_area'] = np.mean(data['variance_area'])
+        logging.info('Mean variance area: {}'.format(self.global_config['mean_variance_area']))
+
         return data
 
     def plot_calibration(self, dataset, epoch=0):
