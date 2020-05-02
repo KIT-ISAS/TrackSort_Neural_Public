@@ -5,6 +5,26 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Training cuboids MLP",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": ["--is_loaded", "False",
+                    "--config_path", "configs/train_cuboids_mlp.json",
+                    "--dataset_dir", "data/DEM_cuboids.csv",
+                    "--dataset_type", "CsvDataset",
+                    "--data_is_aligned", "False",
+                    "--rotate_columns", "True",
+                    "--num_train_epochs", "3000",
+                    "--batch_size", "64",
+                    "--evaluate_every_n_epochs", "20",
+                    "--lr_decay_after_epochs", "150",
+                    "--lr_decay_factor", "0.5",
+                    "--execute_evaluation", "False",
+                    "--execute_multi_target_tracking", "False"]
+        },
+        {
             "name": "Training pepper RNN",
             "type": "python",
             "request": "launch",
@@ -12,7 +32,7 @@
             "console": "integratedTerminal",
             "args": ["--is_loaded", "False",
                     "--config_path", "configs/train_pepper_rnn.json",
-                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
                     "--num_train_epochs", "400",
                     "--evaluate_every_n_epochs", "5",
                     "--improvement_break_condition", "0.001",
@@ -107,10 +127,10 @@
             "args": ["--is_loaded", "True",
                     "--is_loaded_gating_network", "True",
                     "--config_path", "configs/kf_only.json",
-                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv",
                     "--result_path", "results/pepper_all/pepper_kf_only/",
                     "--evaluate_mlp_mask", "False",
-                    "--execute_evaluation", "True",
+                    "--execute_evaluation", "False",
                     "--execute_multi_target_tracking", "True"]
         },
         {

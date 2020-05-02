@@ -1017,62 +1017,65 @@ class CsvDataSet(AbstractDataSet):
         self.belt_height = self.belt_width
 
     def _load_tracks(self, data_is_aligned=True, rotate_columns=False):
-        tracks = []
+        """Load tracks from csv files.
 
-        # total rows of all files -> number of timesteps
-        longest_track = 0
-        timesteps = 0
-        # calculate length of longest track
+        Sets variables:
+            self.timesteps:     sum of track_length over all files
+            self.longest_track: Longest overall track in all files
+
+        Args:
+            data_is_aligned (Boolean):  Every track starts at t=0. There is no information about track start times provided.
+            rotate_columns (Boolean):   File structure if False: [x, y] | if True: [y, x]
+        
+        Returns:
+            track_data (np.array): All tracks. Shape: [n_tracks, timesteps, 2]
+        """
+        tracks = np.array([])
+        n_prev = 0
+        # Itearate over all files
         for file_ in self.file_list:
             # read the tracks from one session
             df = pd.read_csv(file_, engine='python')
-            # concatenate the timesteps
-            timesteps += df.shape[0]
-            # iterate over all tracks: track_count=int((df.shape[1]) / 2)
-            for track_number in range(int((df.shape[1]) / 2)):
-                track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
-                track_beginning = self.get_first_timestep_of_track(track, use_nan=True)
-                track_end = self.get_last_timestep_of_track(track, use_nan=True, beginning=track_beginning)
-                track_len = track_end + 1 - track_beginning
-                if track_len > longest_track:
-                    longest_track = track_len
-
-        logging.info('timesteps={}'.format(timesteps))
-        logging.info('longest_track={}'.format(longest_track))
-        self.timesteps = timesteps
-        self.longest_track = longest_track
-
-        t_step = 0
-
-        for file_ in self.file_list:
-            # read the tracks from one measurement
-            df = pd.read_csv(file_)
-
-            # remove columns with less then 6 detections (same as Tobias did)
-            df = df.dropna(axis=1, thresh=self.min_number_detections, inplace=False)
-
-            # there are two columns per track, for example "TrackID_4_X" and "TrackID_4_Y"
-            number_of_tracks = int((df.shape[1]) / 2)
-
             # We want to use 0.0 as NaN value. Therefore we have to check that it does not
             #   exist in the data.   Note: the double .min().min() is necessary because we
             #   first get the column minima and then we get the table minimum from that
             assert df.min().min() > 0.0, "Error: The dataframe {} contains a minimum <= 0.0".format(file_)
+            # Convert 2D df array to 3D numpy
+            n_row = df.shape[0]
+            n_col = df.shape[1]
+            aranged_ids = np.arange(0, n_col)
+            if rotate_columns:
+                x_ids = aranged_ids%2==1
+                y_ids = aranged_ids%2==0
+            else:
+                x_ids = aranged_ids%2==0
+                y_ids = aranged_ids%2==1
+            
+            np_tracks = np.zeros([int(n_col/2), n_prev + n_row, 2])
+            if data_is_aligned:
+                # Add the tracks to the beginning
+                np_tracks[:,:n_row,0] = df.iloc[:, x_ids].to_numpy(copy=True).swapaxes(0,1)
+                np_tracks[:,:n_row,1] = df.iloc[:, y_ids].to_numpy(copy=True).swapaxes(0,1)
+            else:
+                # Add the tracks to the end
+                np_tracks[:,n_prev:,0] = df.iloc[:, x_ids].to_numpy(copy=True).swapaxes(0,1)
+                np_tracks[:,n_prev:,1] = df.iloc[:, y_ids].to_numpy(copy=True).swapaxes(0,1)
+            # append new tracks to total tracks
+            if tracks.shape[0]==0:
+                # First file
+                tracks = np.nan_to_num(np_tracks)
+            else:
+                # Add nan values (0.0) to end of existing tracks
+                #tracks = np.concatenate((tracks, np.zeros([tracks.shape[0], n_row, 2]), axis=1)
+                tracks = np.append(tracks, np.zeros([tracks.shape[0], n_row, 2]), axis=1)
+                # Add the new tracks (and replace nan values with 0.0)
+                tracks = np.append(tracks, np.nan_to_num(np_tracks), axis=0)
 
-            for track_number in range(number_of_tracks):
-                # create the simple tracks
-                # **Attention:** the columns are ordered as (Y,X) and we turn it around to (X,Y)
-                track = df.iloc[:, [(2 * track_number + 1), (2 * track_number)]].to_numpy(copy=True)
-                background = np.zeros([timesteps, self.input_dim])
-                background[t_step:t_step + track.shape[0], :track.shape[1]] = track
-                if rotate_columns:
-                    background = np.roll(background, shift=1, axis=-1)
-                tracks.append(np.nan_to_num(background))
+            n_prev += n_row
 
-            if not data_is_aligned:
-                t_step += df.shape[0]
-
-        tracks = np.array(tracks)
+        self.timesteps = tracks.shape[1]
+        # Get longest track and add 1 (?For some reasons?)
+        self.longest_track = np.max(np.sum(tracks > 0, axis=1)) + 1
         return tracks
 
     def get_measurement_at_timestep(self, timestep, normalized=True):
