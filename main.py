@@ -139,6 +139,7 @@ global_config = {
     #
     'num_timesteps': args.num_timesteps,
     'dataset_type': args.dataset_type,
+    'mlp_input_dim': args.mlp_input_dim,
     #
     'CsvDataSet': {
         'glob_file_pattern': args.dataset_dir,
@@ -212,7 +213,7 @@ def run_global_config(global_config, experiment_series_names=''):
     ## Import data
     if global_config['dataset_type'] == 'FakeDataset':
         # TODO: Implement MLP dataset on fake data!
-        data_source = FakeDataSet(timesteps=global_config['num_timesteps'], batch_size=global_config['batch_size'])
+        data_source = FakeDataSet(mlp_input_dim=global_config['mlp_input_dim'], timesteps=global_config['num_timesteps'], batch_size=global_config['batch_size'])
     elif global_config['dataset_type'] == 'CsvDataset':
         data_source = CsvDataSet(**global_config['CsvDataSet'])
         global_config['num_timesteps'] = data_source.get_num_timesteps()

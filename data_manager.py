@@ -840,7 +840,7 @@ class AbstractDataSet(ABC):
 
 
 class FakeDataSet(AbstractDataSet):
-    def __init__(self, timesteps=350, number_trajectories=512,
+    def __init__(self, mlp_input_dim=5, timesteps=350, number_trajectories=512,
                  additive_noise_stddev=0, splits=0, additive_target_stddev=0,
                  min_number_points_per_trajectory=20, batch_size=64,
                  belt_width=2000, belt_height=2000, nan_value=0, step_length=70):
@@ -875,7 +875,7 @@ class FakeDataSet(AbstractDataSet):
         self.track_data = self._generate_tracks()
         self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_track_data)
-
+        self._create_mlp_data(self.aligned_track_data, n_inp_points = mlp_input_dim)
         # if we don't have enough tracks, then the smaller split (usually test) is so small that is smaller
         # than a batch. Because we use drop_remainder=True we cannot allow this, or else the only batch
         # would be empty -> as a result we would not have test data
