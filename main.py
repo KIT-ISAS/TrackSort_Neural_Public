@@ -61,7 +61,7 @@ parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, t
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
-parser.add_argument('--improvement_break_condition', type=float, default=-1, 
+parser.add_argument('--improvement_break_condition', type=float, default=-100, 
                     help='Break training if test loss on every expert does not improve by more than this value.')
 parser.add_argument('--lr_decay_after_epochs', type=int, default=150, help='When to decrease the lr by lr_decay_factor')
 parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='When learning rate should be decreased, '

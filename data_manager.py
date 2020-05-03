@@ -811,32 +811,20 @@ class AbstractDataSet(ABC):
         """
         Align the tracks, in order that they all start with time step = 0
 
-        :param track_data:
-        :return:
+        Args:
+            track_data (np.array): Tracks that start at any time step. Nan value is 0.0, Shape: [n_tracks, n_timesteps, 2]
+        
+        Returns:
+            aligned_tracks (np.array): All tracks start at t=0. Shape: [n_tracks, longest_track, 2]
         """
-        aligned_tracks = []
-
-        # the nan value used for every dimension of a skipped timestep
-        nan_value_ary = self.get_nan_value_ary()
-
+        n_tracks = track_data.shape[0]
+        aligned_tracks = np.zeros([n_tracks, self.longest_track, 2])
         # for every track
-        for track_idx in range(track_data.shape[0]):
-            # for every time step
-            skip_counter = 0
-            track = []
-            for t in range(track_data.shape[1]):
-                # skip if NaN
-                if np.all(track_data[track_idx, t] == self.nan_value):
-                    skip_counter += 1
-                else:
-                    track.append(track_data[track_idx, t])
+        for i in range(n_tracks):
+            short_track = track_data[i, (track_data[i] != (0,0)).all(axis=1)]
+            aligned_tracks[i, 0:short_track.shape[0]] = short_track 
 
-            for t in range(skip_counter):
-                track.append(nan_value_ary)
-
-            aligned_tracks.append(track)
-
-        return np.array(aligned_tracks)[:, :self.longest_track, :]
+        return aligned_tracks
 
 
 class FakeDataSet(AbstractDataSet):
@@ -1040,16 +1028,18 @@ class CsvDataSet(AbstractDataSet):
             #   exist in the data.   Note: the double .min().min() is necessary because we
             #   first get the column minima and then we get the table minimum from that
             assert df.min().min() > 0.0, "Error: The dataframe {} contains a minimum <= 0.0".format(file_)
+             # remove columns with less then 6 detections (same as Tobias did)
+            #df = df.dropna(axis=1, thresh=self.min_number_detections, inplace=False)
             # Convert 2D df array to 3D numpy
             n_row = df.shape[0]
             n_col = df.shape[1]
             aranged_ids = np.arange(0, n_col)
             if rotate_columns:
-                x_ids = aranged_ids%2==1
-                y_ids = aranged_ids%2==0
-            else:
                 x_ids = aranged_ids%2==0
                 y_ids = aranged_ids%2==1
+            else:
+                x_ids = aranged_ids%2==1
+                y_ids = aranged_ids%2==0
             
             np_tracks = np.zeros([int(n_col/2), n_prev + n_row, 2])
             if data_is_aligned:

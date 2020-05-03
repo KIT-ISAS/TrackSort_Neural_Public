@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Training cuboids MLP",
+            "name": "Train cuboids MLP",
             "type": "python",
             "request": "launch",
             "program": "main.py",
@@ -19,10 +19,13 @@
                     "--num_train_epochs", "3000",
                     "--batch_size", "64",
                     "--evaluate_every_n_epochs", "20",
-                    "--lr_decay_after_epochs", "150",
+                    "--lr_decay_after_epochs", "300",
                     "--lr_decay_factor", "0.5",
                     "--execute_evaluation", "False",
-                    "--execute_multi_target_tracking", "False"]
+                    "--execute_multi_target_tracking", "False",
+                    "--result_path", "results/DEM_cuboids/MLP/",
+                    "--normalization_constant", "1.0",
+                    "--additive_noise_stddev", "1.12e-4"]
         },
         {
             "name": "Training pepper RNN",
