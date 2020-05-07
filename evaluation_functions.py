@@ -18,6 +18,9 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     
     Create box plots and data of plots.
     Save plots and data to result directory.
+    The normalization_constant changes the plot in y axis.
+        If the n_c is >= 100 we assume that you work with pixel data
+        If the n_c is < 100 we assume that you work with data in metric units where 1=1m
 
     Args:
         target (np.array):      Target values
@@ -47,15 +50,24 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     # Show plot
     plt.figure()
     plt.boxplot(mse_boxplot_inputs, sym='', labels=expert_names)
-    plt.ylabel("MSE")
+    if normalization_constant >= 100:
+        plt.ylabel("MSE [px^2]")
+    else:
+        plt.ylabel("MSE [m^2]")
     plt.grid(b=True, which='major', axis='y', linestyle='--')
     plt.savefig(result_dir + ('mse_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mse_box_plot.pdf')) 
     if not no_show:
         plt.show()
     plt.figure()
-    plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
-    plt.ylabel("MAE")
-    plt.ylim([0, 5])
+    if normalization_constant >= 100:
+        plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
+        plt.ylabel("MAE [px]")
+        plt.ylim([0, 5])
+    else:
+        mm_mae_boxplot_inputs = np.array(mae_boxplot_inputs)*1000
+        plt.boxplot(mm_mae_boxplot_inputs, sym='', labels=expert_names)
+        plt.ylabel("MAE [mm]")
+        plt.ylim([0, 1])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
     plt.savefig(result_dir + ('mae_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mae_box_plot.pdf'))  
     if not no_show:
@@ -136,6 +148,9 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
     Calculate the median MAE error in each raster field.
     Denormalizes the data.
     Display the median MAE errors on a 2D color plot.
+    The normalization_constant changes the plot in y axis.
+        If the n_c is >= 100 we assume that you work with pixel data
+        If the n_c is < 100 we assume that you work with data in metric units where 1=1m
 
     Args:
         target (np.array):      Target values
@@ -179,14 +194,21 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
                     median_error_map[y, x] = np.nan
         # Plot error map
         plt.figure()
-        plt.pcolor(median_error_map, cmap="Reds", vmin=0, vmax=3)
+        if normalization_constant >= 100:
+            plt.pcolor(median_error_map, cmap="Reds", vmin=0, vmax=3)
+        else:
+            plt.pcolor(median_error_map*1000, cmap="Reds", vmin=0, vmax=0.5)
         plt.colorbar()
         x_ticks = np.linspace(0, rastering[0], num=5, endpoint=True)
-        x_labels = np.floor(x_ticks/rastering[0] * normalization_constant)
+        x_labels = np.round(x_ticks/rastering[0] * normalization_constant, 2)
+        if normalization_constant >= 100:
+            x_labels = np.floor(x_labels)
         plt.xticks(ticks=x_ticks, labels=x_labels)
         y_ticks = np.linspace(1, rastering[1], num=5, endpoint=True)
         y_ticks = y_ticks[::-1]
-        y_labels = np.floor(y_ticks/rastering[1] * normalization_constant)
+        y_labels = np.round(y_ticks/rastering[1] * normalization_constant, 2)
+        if normalization_constant >= 100:
+            y_labels = np.floor(y_labels) 
         plt.yticks(ticks=y_ticks, labels=y_labels)
         title = "Median MAE mapped over belt for expert " + expert_names[i]
         plt.title(title)

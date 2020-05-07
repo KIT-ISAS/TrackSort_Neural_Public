@@ -315,7 +315,7 @@ class ModelManager(object):
                                     masks=all_masks, 
                                     expert_names = expert_names,
                                     result_dir=result_dir,
-                                    is_normalized=normalization_constant>1,
+                                    is_normalized=normalization_constant!=1,
                                     normalization_constant = normalization_constant,
                                     rastering = [15, 10],
                                     no_show = no_show)

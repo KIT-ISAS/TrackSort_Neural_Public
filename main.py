@@ -221,7 +221,7 @@ def run_global_config(global_config, experiment_series_names=''):
     
     # PLAY AROUND WITH VARIOUS KALMAN FILTERS
     # should be commented out...
-    kalman_playground(data_source.aligned_track_data)
+    #kalman_playground(data_source.aligned_track_data)
 
     ## Import model config to json tree
     # TODO: Create json schema to check config validity
