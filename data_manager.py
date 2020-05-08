@@ -965,7 +965,7 @@ class CsvDataSet(AbstractDataSet):
         # Set timesteps if wanted. Else: _load_tracks calculates the longest track length
         if timesteps is not None:
             self.timesteps = timesteps
-        self.track_data = self._load_tracks(rotate_columns=self.rotate_columns)
+        self.track_data = self._load_tracks(data_is_aligned=data_is_aligned, rotate_columns=self.rotate_columns)
 
         # Add normally distributed noise to the tracks
         self.additive_noise_stddev = additive_noise_stddev
