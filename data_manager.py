@@ -464,17 +464,20 @@ class AbstractDataSet(ABC):
         return track_target
 
 
-    def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, test_ratio=0.1, time_normalization=22.,
-                                                      virtual_belt_edge_x_position=1200,
-                                                      virtual_nozzle_array_x_position=1400, batch_size=64):
-        track_data, spatial_labels, temporal_labels = self.get_separation_prediction_data(
-            virtual_belt_edge_x_position=virtual_belt_edge_x_position,
-            virtual_nozzle_array_x_position=virtual_nozzle_array_x_position)
-
+    def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, 
+                                                      test_ratio=0.1,
+                                                      batch_size=64, 
+                                                      random_seed=None,
+                                                      time_normalization=22.):
+        
+        track_data = self.separation_track_data
+        spatial_labels = self.separation_spatial_labels
+        temporal_labels = self.separation_temporal_labels
         tracks = self._convert_aligned_tracks_to_seq2seq_data(track_data)
         num_time_steps = tracks.shape[1]
 
         # add additional labels
+        # track[0,0,:] = [x_1, y_1, x_2, y_2, y_nozzle, t_nozzle]
         tracks = np.concatenate(
             (tracks,
              np.repeat(spatial_labels[:, 1][None], num_time_steps, axis=0).T.reshape(-1, tracks.shape[1], 1),
@@ -490,14 +493,18 @@ class AbstractDataSet(ABC):
             # normalize temporal prediction
             tracks[:, :, [5]] /= time_normalization
 
-        train_tracks, test_tracks = self.split_train_test(tracks, test_ratio=test_ratio)
+        train_tracks, test_tracks = train_test_split(tracks, test_size=test_ratio, random_state=random_seed)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
-        minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(drop_remainder=True)
-        minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(drop_remainder=True)
+        if random_seed is None:
+            minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(batch_size=batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(batch_size=batch_size, drop_remainder=True)
+        else:
+            minibatches_train = raw_train_dataset.batch(batch_size=batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.batch(batch_size=batch_size, drop_remainder=True)
 
         def split_input_target_separation(chunk):
             # split the tensor (x, y, y_pred, t_pred, x_target, y_target, y_pred_target, t_pred_target)
@@ -510,6 +517,86 @@ class AbstractDataSet(ABC):
         dataset_test = minibatches_test.map(split_input_target_separation)
 
         return dataset_train, dataset_test, num_time_steps
+
+    def get_tf_data_sets_mlp_with_separation_data(self, 
+                                                  normalized=True, 
+                                                  test_ratio=0.1,
+                                                  batch_size=64, 
+                                                  random_seed=None,
+                                                  time_normalization=22.,
+                                                  n_inp_points = 5):
+        """Get the training and test datasets for MLP separation prediction.
+
+        input format: [x_1, x_2, ..., x_n_inp, y_1, y_2, ..., y_n_inp]
+        target format: [y_nozzle, dt_nozzle]
+            dt_nozzle describes the difference in time from the last measurement to the nozzle array.
+            We don't take absolute time values because this minimizes the input to the network.
+
+        If there are not enough measurements in the track, the default input/target is: [0, 0, ..., 0], [0, 0]
+
+        Args:
+            normalized (Boolean):   Normalize the data
+            test_ration (double):   Ratio of test data to all data. Value between 0 and 1.
+            batch_size (int):       Batch size for training. This value gets multiplied with the total track length to generate more reasonable batch sizes that match the RNN data.
+            random_seed (int):      Random seed for train/test split. Set this to None to be random every time.
+            time_normalization (double):  Normalize the time step target with this parameter
+            n_inp_points (int):     Number of measurements for the input of the MLP
+
+        Returns:
+            training_dataset (tf.Dataset): Batches of (input, target) pairs for training
+            testing_dataset (tf.Dataset)
+        """
+        track_data = self.separation_track_data
+        spatial_labels = self.separation_spatial_labels
+        temporal_labels = self.separation_temporal_labels
+        
+        n_tracks = track_data.shape[0]
+        mlp_data = np.zeros([n_tracks, 2*n_inp_points + 2])
+        # Build MLP input and target for all tracks
+        for i in range(n_tracks):
+            n_measurements = self.get_last_timestep_of_track(track_data[i])
+            if n_measurements >= n_inp_points:
+                # Set input = [x1, x2, ..., y_1, y2, ...]
+                c=0
+                for index in np.arange(n_measurements-n_inp_points, n_measurements):
+                    mlp_data[i,c] = track_data[i, index, 0]
+                    mlp_data[i,c+n_inp_points] = track_data[i, index, 1]
+                    c += 1
+                # Set target [y_nozzle, dt_nozzle]
+                mlp_data[i, -2] = spatial_labels[i, 1]
+                mlp_data[i, -1] = temporal_labels[i]  - (n_measurements-1)
+            stop=0
+
+        if normalized:
+            # normalize spatial data
+            mlp_data[:, :-1] /= self.normalization_constant
+            # normalize temporal prediction
+            mlp_data[:, -1] /= time_normalization
+
+        train_data, test_data = train_test_split(mlp_data, test_size=test_ratio, random_state=random_seed)
+
+        raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
+        raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_data)
+
+        # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
+        if random_seed is None:
+            minibatches_train = raw_train_dataset.shuffle(n_tracks).batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_test = raw_test_dataset.shuffle(n_tracks).batch(batch_size * self.longest_track, drop_remainder=True)
+        else:
+            minibatches_train = raw_train_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_test = raw_test_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
+
+        def split_input_target_separation(chunk):
+            # split the tensor (x1, x2, ..., y1, y2, ..., y_pred_target, t_pred_target)
+            #  -> into two tensors (x..., y...) and (y_pred_target, t_pred_target)
+            input_seq = chunk[:, :-2]
+            target_seq = chunk[:, -2:]
+            return input_seq, target_seq
+
+        dataset_train = minibatches_train.map(split_input_target_separation)
+        dataset_test = minibatches_test.map(split_input_target_separation)
+
+        return dataset_train, dataset_test
 
     def get_last_timestep_of_track(self, track, use_nan=False, beginning=None):
         if beginning is None:
@@ -583,7 +670,7 @@ class AbstractDataSet(ABC):
 
         return np.array(seq2seq_data)
 
-    def _create_mlp_data(self, aligned_track_data, n_inp_points = 5):
+    def _convert_aligned_tracks_to_mlp_data(self, aligned_track_data, n_inp_points = 5):
         """Create input to target data for MLP from aligned tracks.
 
         The MLP data format is:
@@ -595,18 +682,23 @@ class AbstractDataSet(ABC):
         Args:
             aligned_track_data (np.array): The tracks in format: [n_tracks, length_tracks, 2]
             n_inp_points (int): Number of track points as input
+
+        Returns:
+            mlp_data (np.array):        The tracks in MLP data format
+            mlp_id_track_num (np.array): Matches each data instance to a track number
+            track_num_mlp_id (dict):    Matches each track to all its data instances
         """
         assert self.longest_track is not None, "self.longest_track not set"
 
         n_tracks = aligned_track_data.shape[0]
         
-        self.mlp_data = np.full([n_tracks*self.longest_track, 2 * (n_inp_points + 1)], self.nan_value)
-        self.mlp_id_track_num = np.zeros([n_tracks*self.longest_track])
-        self.track_num_mlp_id = dict()
+        mlp_data = np.full([n_tracks*self.longest_track, 2 * (n_inp_points + 1)], self.nan_value)
+        mlp_id_track_num = np.zeros([n_tracks*self.longest_track])
+        track_num_mlp_id = dict()
         counter = 0
         # For each track
         for track_number in range(n_tracks):
-            self.track_num_mlp_id[track_number] = []
+            track_num_mlp_id[track_number] = []
             track = aligned_track_data[track_number]
             # Last index with measurement
             last_index = self.get_last_timestep_of_track(track) - 1
@@ -618,12 +710,14 @@ class AbstractDataSet(ABC):
                     # x_output, y_output
                     output_array = np.append(aligned_track_data[track_number, i+1, 0], aligned_track_data[track_number, i+1, 1])
                     full_array = np.append(input_array, output_array)
-                    self.mlp_data[counter] = full_array
+                    mlp_data[counter] = full_array
 
                 # Add track id and MLP dataset id to list and dict
-                self.mlp_id_track_num[counter]=track_number
-                self.track_num_mlp_id[track_number].append(counter)
+                mlp_id_track_num[counter]=track_number
+                track_num_mlp_id[track_number].append(counter)
                 counter += 1
+
+        return mlp_data, mlp_id_track_num, track_num_mlp_id
 
     def get_box_plot(self, model, dataset):
         maes = []
@@ -648,7 +742,7 @@ class AbstractDataSet(ABC):
         ax1.boxplot(maes, showfliers=False)
 
     def get_separation_prediction_data(self, virtual_belt_edge_x_position=1200, virtual_nozzle_array_x_position=1400,
-                                       min_measurements_count=7):
+                                       min_measurements_count=3):
         """
         Get training data for the separation task.
         For every track, which has measurements left of the virtual_belt_edge_x_position (visible measurements) and
@@ -756,9 +850,9 @@ class AbstractDataSet(ABC):
         aligned_track_data = self.get_aligned_track_data()
 
         # 1. only work with tracks which have visible measurements left of the virtual_belt_edge_x_position
-        # ToDO:   -> minimum of min_measurements_count necessary
+        # TODO:   -> minimum of min_measurements_count necessary
 
-        left_of_edge_mask = aligned_track_data[:, 0, 0] < virtual_belt_edge_x_position
+        left_of_edge_mask = np.bitwise_and(aligned_track_data[:, min_measurements_count-1, 0] < virtual_belt_edge_x_position, aligned_track_data[:, min_measurements_count-1, 0] != self.nan_value)
         # apply mask as filter
         aligned_track_data = aligned_track_data[left_of_edge_mask]
 
@@ -971,16 +1065,18 @@ class FakeDataSet(AbstractDataSet):
 
 
 class CsvDataSet(AbstractDataSet):
-    def __init__(self, glob_file_pattern=None, min_number_detections=6, nan_value=0, input_dim=2, mlp_input_dim=5,
+    def __init__(self, glob_file_pattern=None, nan_value=0, input_dim=2, mlp_input_dim=5,
                  timesteps=35, data_is_aligned=True,
                  rotate_columns=False, normalization_constant=None,
+                 virtual_belt_edge_x_position=1200,
+                 virtual_nozzle_array_x_position=1400, 
+                 min_measurements_count=3,
                  birth_rate_mean=6, birth_rate_std=2,
-                 additive_noise_stddev=0):
+                 additive_noise_stddev=0,
+                 is_separation_prediction=False):
         self.glob_file_pattern = glob_file_pattern
         self.file_list = sorted(glob.glob(glob_file_pattern))
         assert len(self.file_list) > 0, "No files found"
-
-        self.min_number_detections = min_number_detections
         self.rotate_columns = rotate_columns
 
         self.nan_value = nan_value
@@ -989,7 +1085,7 @@ class CsvDataSet(AbstractDataSet):
         # Set timesteps if wanted. Else: _load_tracks calculates the longest track length
         if timesteps is not None:
             self.timesteps = timesteps
-        self.track_data = self._load_tracks(data_is_aligned=data_is_aligned, rotate_columns=self.rotate_columns)
+        self.track_data = self._load_tracks(data_is_aligned=data_is_aligned, rotate_columns=rotate_columns, min_measurements_count=min_measurements_count)
 
         # Add normally distributed noise to the tracks
         self.additive_noise_stddev = additive_noise_stddev
@@ -1007,11 +1103,10 @@ class CsvDataSet(AbstractDataSet):
             logging.info("align data")
             self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
             logging.info("data is aligned")
-
-        self._create_mlp_data(self.aligned_track_data, n_inp_points = mlp_input_dim)
-
+        # Create MLP data for tracking
+        self.mlp_data, self.mlp_id_track_num, self.track_num_mlp_id = self._convert_aligned_tracks_to_mlp_data(self.aligned_track_data, n_inp_points = mlp_input_dim)
+        # Create seq2seq data for tracking
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_track_data)
-
         # if data is aligned -> we create an artificial ordering of the tracks according to the given
         #  number of timesteps
         if data_is_aligned:
@@ -1027,8 +1122,14 @@ class CsvDataSet(AbstractDataSet):
             self.normalization_constant = normalization_constant
         self.belt_width = self.normalization_constant
         self.belt_height = self.belt_width
+        # Create data for separation prediction
+        if is_separation_prediction:
+            self.separation_track_data, self.separation_spatial_labels, self.separation_temporal_labels = self.get_separation_prediction_data(
+                virtual_belt_edge_x_position=virtual_belt_edge_x_position,
+                virtual_nozzle_array_x_position=virtual_nozzle_array_x_position,
+                min_measurements_count = min_measurements_count)
 
-    def _load_tracks(self, data_is_aligned=True, rotate_columns=False):
+    def _load_tracks(self, data_is_aligned=True, rotate_columns=False, min_measurements_count=3):
         """Load tracks from csv files.
 
         Sets variables:
@@ -1052,8 +1153,8 @@ class CsvDataSet(AbstractDataSet):
             #   exist in the data.   Note: the double .min().min() is necessary because we
             #   first get the column minima and then we get the table minimum from that
             assert df.min().min() > 0.0, "Error: The dataframe {} contains a minimum <= 0.0".format(file_)
-             # remove columns with less then 6 detections (same as Tobias did)
-            #df = df.dropna(axis=1, thresh=self.min_number_detections, inplace=False)
+             # remove columns with less then n detections to filter out hard outliers
+            df = df.dropna(axis=1, thresh=min_measurements_count, inplace=False)
             # Convert 2D df array to 3D numpy
             n_row = df.shape[0]
             n_col = df.shape[1]

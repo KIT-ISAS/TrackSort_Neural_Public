@@ -75,10 +75,9 @@ parser.add_argument('--birth_rate_std', type=float, default=2.0,
 parser.add_argument('--normalization_constant', type=float, default=None, help='Normalization value')
 parser.add_argument('--evaluate_every_n_epochs', type=int, default=50)
 parser.add_argument('--time_normalization_constant', type=float, default=22.0, help='Normalization for time prediction')
-parser.add_argument('--min_number_detections', type=int, default=6,
-                    help='The min_number_detections value, that is used by the DataManager')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
 parser.add_argument('--mlp_input_dim', type=int, default=5, help='The dimension of input points for the MLP')
+parser.add_argument('--separation_mlp_input_dim', type=int, default=7, help='The dimension of input points for the separation MLP')
 parser.add_argument('--data_is_aligned', type=str2bool, default=True,
                     help='Whether the data used by the DataManger is aligned or not.')
 parser.add_argument('--rotate_columns', type=str2bool, default=False,
@@ -97,10 +96,9 @@ parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
 parser.add_argument('--virtual_nozzle_array_x_position', type=float, default=1550,
                     help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_first_rnn', type=int, default=1024,
-                    help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_second_rnn', type=int, default=16,
-                    help='Where should the virtual nozzle array be?')
+parser.add_argument('--min_measurements_count', type=int, default=3,
+                    help='Ignore tracks with less measurements.')                    
+
 parser.add_argument('--clear_state', type=str2bool, default=True,
                     help='Whether a new track should be initialized with empty state?')
 parser.add_argument('--overwriting_activated', type=str2bool, default=True,
@@ -146,7 +144,6 @@ global_config = {
     #
     'CsvDataSet': {
         'glob_file_pattern': args.dataset_dir,
-        'min_number_detections': args.min_number_detections,
         'nan_value': args.nan_value,
         'input_dim': args.input_dim,
         'mlp_input_dim': args.mlp_input_dim,
@@ -155,8 +152,14 @@ global_config = {
         'birth_rate_std': args.birth_rate_std,
         'rotate_columns': args.rotate_columns,
         'normalization_constant': args.normalization_constant,
-        'additive_noise_stddev': args.additive_noise_stddev
+        'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
+        'virtual_nozzle_array_x_position': args.virtual_nozzle_array_x_position, 
+        'min_measurements_count': args.min_measurements_count,
+        'additive_noise_stddev': args.additive_noise_stddev,
+        'is_separation_prediction': args.separation_prediction
     },
+    'separation_mlp_input_dim': args.separation_mlp_input_dim,
+
     'num_train_epochs': args.num_train_epochs,
     'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
     'improvement_break_condition': args.improvement_break_condition,
@@ -246,6 +249,16 @@ def run_global_config(global_config, experiment_series_names=''):
                                     normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
                                     random_seed = random_seed)
     
+    #TODO: 
+    #   eval dataset
+    dataset_train, dataset_test = data_source.get_tf_data_sets_mlp_with_separation_data( 
+                                                      normalized=True, 
+                                                      test_ratio=test_ratio,
+                                                      batch_size=global_config['batch_size'], 
+                                                      random_seed=random_seed,
+                                                      time_normalization=global_config['time_normalization_constant'],
+                                                      n_inp_points = global_config['separation_mlp_input_dim'])
+
     ## Train models
     if not global_config["is_loaded"]:
         model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,

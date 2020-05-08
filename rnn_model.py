@@ -168,13 +168,10 @@ def train_step_separation_prediction_generator(model,
                                             off_value=False)
                 mask_last_step = K.cast(mask_last_step, tf.float64)
 
-            start = None
-            end = None
-
-            spatial_mse = tf.keras.losses.mean_squared_error(target[:, start:end, 2:3],
-                                                             predictions[:, start:end, 2:3]) * mask
-            spatial_mae = tf.keras.losses.mean_absolute_error(target[:, start:end, 2:3],
-                                                              predictions[:, start:end, 2:3]) * mask
+            spatial_mse = tf.keras.losses.mean_squared_error(target[:, :, 2],
+                                                             predictions[:, :, 2]) * mask
+            spatial_mae = tf.keras.losses.mean_absolute_error(target[:, :, 2],
+                                                              predictions[:, :, 2]) * mask
 
             if only_last_timestep_additional_loss:
                 spatial_mse = K.sum(spatial_mse * mask_last_step) / batch_size
@@ -186,10 +183,10 @@ def train_step_separation_prediction_generator(model,
             # new_time_target is like a countdown
             new_time_target = (target[:, :, 3:4] - range_)
 
-            temporal_mse = tf.keras.losses.mean_squared_error(new_time_target[:, start:end],
-                                                              predictions[:, start:end, 3:4]) * mask
-            temporal_mae = tf.keras.losses.mean_squared_error(new_time_target[:, start:end],
-                                                              predictions[:, start:end, 3:4]) * mask
+            temporal_mse = tf.keras.losses.mean_squared_error(new_time_target[:, :],
+                                                              predictions[:, :, 3]) * mask
+            temporal_mae = tf.keras.losses.mean_squared_error(new_time_target[:, :],
+                                                              predictions[:, :, 3]) * mask
 
             if only_last_timestep_additional_loss:
                 temporal_mse = K.sum(temporal_mse * mask_last_step) / batch_size
