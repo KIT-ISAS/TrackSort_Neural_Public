@@ -1,0 +1,43 @@
+{
+  "batch_size": 64,
+  "experts": {
+    "KF_CA_sw18E3": {
+      "type": "KF",
+      "sub_type": "CA",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/DEM_spheres/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "distance_threshold": 0.02,
+      "positional_probabilities": 0.0,
+      "is_alive_probability_weighting": 0.0,
+      "matching_algorithm": "global"
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}
