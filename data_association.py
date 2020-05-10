@@ -67,8 +67,9 @@ class DataAssociation(object):
         """
         old_measurements = None
         # Make directory for visualization
-        shutil.rmtree(self.visualization_path, ignore_errors=True)
-        os.makedirs(self.visualization_path)
+        if self.visualize:
+            shutil.rmtree(self.visualization_path, ignore_errors=True)
+            os.makedirs(self.visualization_path)
         # Set start and end phase for data association weighting
         start_phase = belt_limits[0,0] + self.delta_start_end_phase
         end_phase = belt_limits[0,1] - self.delta_start_end_phase
@@ -160,9 +161,10 @@ class DataAssociation(object):
                     # The measurement was associated to an existing track
                     counts[0] += 1
                     prediction_id = prediction_ids[prediction_idxs[idx]]
+                    particle_id = particle_ids[measurement_idxs[idx]]
                     #
                     measurement = measurements[measurement_idxs[idx]]
-                    track_manager.real_track_real_measurement(prediction_id, measurement, model_manager)
+                    track_manager.real_track_real_measurement(prediction_id, particle_id, measurement, model_manager)
                     old_measurements[prediction_id] = (measurement, True)
                     #
                     if self.visualize: 
@@ -197,7 +199,8 @@ class DataAssociation(object):
                     counts[2] += 1
                     #
                     measurement = measurements[measurement_idxs[idx]]
-                    prediction_id = track_manager.pseudo_track_real_measurement(measurement, time_step, model_manager)
+                    particle_id = particle_ids[measurement_idxs[idx]]
+                    prediction_id = track_manager.pseudo_track_real_measurement(measurement, particle_id, time_step, model_manager)
                     old_measurements[prediction_id] = (measurement, True)
                     #
                     if self.visualize:
@@ -222,4 +225,4 @@ class DataAssociation(object):
                 plt.savefig(os.path.join(self.visualization_path, '{:05d}'.format(time_step)))
                 plt.clf()
         #
-        return track_manager.tracks
+        return track_manager.get_tracks()

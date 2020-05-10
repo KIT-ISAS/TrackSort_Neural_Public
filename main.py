@@ -17,7 +17,7 @@ from track_manager import TrackManager
 from model_manager import ModelManager
 from data_association import DataAssociation
 from data_manager import FakeDataSet, CsvDataSet
-from evaluator import Evaluator
+from evaluation_functions import calculate_error_first_and_second_kind
 from kalman_playground import kalman_playground
 # Test
 from cv_model import *
@@ -286,7 +286,7 @@ def run_global_config(global_config, experiment_series_names=''):
         data_association = DataAssociation(global_config.get('num_timesteps'), global_config.get('CsvDataSet').get('rotate_columns'),
                                         global_config.get("visualization_path"), global_config.get("visualize"),
                                         **model_config.get('data_association').get('association_config'))
-        #particles = data_source.get_particles()
+
         tracks = data_association.associate_data(particle_time_list, track_manager, model_manager, data_source.get_belt_limits())
 
         if global_config['visualize']:
@@ -294,9 +294,11 @@ def run_global_config(global_config, experiment_series_names=''):
             clip = ImageSequenceClip(global_config['visualization_path'], fps=4)
             clip.write_videofile(global_config['visualization_video_path'], fps=4)
 
-        evaluator = Evaluator(global_config, particles, tracks)
-        accuracy_of_the_first_kind = 1.0 - evaluator.error_of_first_kind()
-        accuracy_of_the_second_kind = 1.0 - evaluator.error_of_second_kind()
+        # No ids are skipped, so this is can be used.
+        particle_ids = np.arange(0, len(particle_time_list), 1)
+        error_of_first_kind, error_of_second_kind = calculate_error_first_and_second_kind(tracks, particle_ids)
+        accuracy_of_the_first_kind = 1.0 - error_of_first_kind
+        accuracy_of_the_second_kind = 1.0 - error_of_second_kind
         score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (
                 accuracy_of_the_first_kind + accuracy_of_the_second_kind)
 
@@ -309,7 +311,7 @@ def run_global_config(global_config, experiment_series_names=''):
             json.dump(global_config, file_, sort_keys=True, indent=4)
 
         del data_association
-        del particles
+        del particle_time_list
         del tracks
         del global_config
 

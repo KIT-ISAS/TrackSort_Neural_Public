@@ -12,6 +12,44 @@ import matplotlib
 import pandas as pd
 plt = matplotlib.pyplot
 
+def calculate_error_first_and_second_kind(tracks, particle_ids):
+    """Calculate the error of first and second kind of the MTT.
+
+    Error of first kind:
+        How many tracks have more than one unique particle associated
+    Error of second kind:
+        How many particles have more than one track associated
+    
+    Args:
+        tracks (list):           List of Track objects
+        particle_ids (np.array): Array of particle ids
+
+    Returns:
+        Error of first kind:  Value between 1 (100%) and 0
+        Error of second kind: Value between 1 (100%) and 0
+    """
+    sum_first = 0
+    sum_second = 0 
+    particle_id_dict = dict()
+    for _, track in tracks.items():
+        unique_particles = track.get_unique_particle_ids()
+        if unique_particles.shape[0] > 1:
+            sum_first += 1
+        for p_id in unique_particles:
+            if p_id in particle_id_dict:
+                sum_second += 1
+            else:
+                particle_id_dict[p_id] = True
+    # Check if a particle got no track
+    for p_id in particle_ids:
+        if p_id not in particle_id_dict:
+            logging.warning("Particle with id {} was not associated to any track.".format(p_id))
+            # Is this correct???
+            sum_second += 1
+    error_of_first_kind = sum_first/len(tracks)
+    error_of_second_kind = sum_second/len(particle_ids)
+    return error_of_first_kind, error_of_second_kind
+
 def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, 
                               normalization_constant = 1, is_mlp_mask=False, no_show = False):
     """Create the data for MSE and MAE boxplots.
