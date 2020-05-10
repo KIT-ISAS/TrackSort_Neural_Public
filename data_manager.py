@@ -153,6 +153,30 @@ class AbstractDataSet(ABC):
         """
         raise NotImplementedError
 
+    def get_particle_timestep_data(self):
+        """Create data for multitarget tracking.
+
+        Returns a list of particles in each timestep.
+            particle_time_list: list of np arrays. 
+            particle_time_list[0] = np array with a entry per particle in this timestep:
+                                    particle_id, x, y
+        """
+        raise NotImplementedError
+
+    def get_belt_limits(self):
+        """Get the belt limits based on min and max values of measurement.
+
+        Returns: 
+            belt_limits (np.array):  Limits of the belt [[x_min, x_max],[y_min, y_max]]
+        """
+        belt_limits = np.zeros([2,2])
+        masked_tracks = np.ma.array(self.aligned_track_data, mask=self.aligned_track_data==0)
+        belt_limits[0,0] = np.min(masked_tracks[:,:,0])
+        belt_limits[0,1] = np.max(masked_tracks[:,:,0])
+        belt_limits[1,0] = np.min(masked_tracks[:,:,1])
+        belt_limits[1,1] = np.max(masked_tracks[:,:,1])
+        return belt_limits/self.normalization_constant
+
     def get_measurement_at_timestep_list(self, timestep, normalized=True):
         data = self.get_measurement_at_timestep(timestep)
         data = list(map(lambda x: np.squeeze(data[x]), filter(lambda x: data[x][0][0] > 0, range(data.shape[0]))))
@@ -1068,6 +1092,20 @@ class CsvDataSet(AbstractDataSet):
         self.longest_track = np.max(np.sum(tracks > 0, axis=1)) + 1
         return tracks
 
+    def get_particle_timestep_data(self):
+        if self.data_is_aligned:
+            source = self.artificial_tracks
+        else:
+            source = self.get_track_data()
+        particle_time_list = []
+        # Iterate over all (artificial) timesteps in the data
+        for t in range(source.shape[1]):
+            all_particles = source[:, t]
+            existing_particles = np.all(all_particles[:] != 0.0, axis=1)
+            particle_time_list.append(np.append(np.where(existing_particles)[0][:,None], all_particles[existing_particles]/self.normalization_constant, axis=1))
+        return particle_time_list
+
+
     def get_measurement_at_timestep(self, timestep, normalized=True):
         if self.data_is_aligned:
             source = self.artificial_tracks
@@ -1119,7 +1157,7 @@ class CsvDataSet(AbstractDataSet):
             expanded_tracks.append(background.copy())
 
         expanded_tracks = np.array(expanded_tracks)
-
+        self.timesteps = expanded_tracks.shape[1]
         return expanded_tracks
 
 

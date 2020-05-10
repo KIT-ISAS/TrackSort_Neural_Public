@@ -31,136 +31,146 @@ def nearest_neighbour(weight_matrix):
 
 
 class DataAssociation(object):
-    def __init__(self, num_timesteps, rotate_columns, visualization_path, visualize,
-                distance_threshold, positional_probabilities, is_alive_probability_weighting, matching_algorithm):
+    def __init__(self, num_timesteps, rotate_columns, visualization_path, visualize, matching_algorithm,
+                delta_start_end_phase=0.025, no_change_dist=0.02, new_track_at_beginning_dist=0.005, 
+                new_track_middle_dist=0.02, track_disappear_at_end_dist=0.005, track_disappear_at_middle_dist=0.02):
         self.num_timesteps = num_timesteps
         self.rotate_columns = rotate_columns
-        self.distance_threshold = distance_threshold
-        self.positional_probabilities = positional_probabilities
-        self.is_alive_probability_weighting = is_alive_probability_weighting
+
+        self.delta_start_end_phase = delta_start_end_phase
+        self.no_change_dist = no_change_dist
+        self.new_track_at_beginning_dist = new_track_at_beginning_dist
+        self.new_track_middle_dist = new_track_middle_dist
+        self.track_disappear_at_end_dist = track_disappear_at_end_dist
+        self.track_disappear_at_middle_dist = track_disappear_at_middle_dist
+
         self.matching_algorithm = matching_algorithm
         self.visualization_path = visualization_path
         self.visualize = visualize
         self.current_time_step = 0
+        self.max_new_meas = 100
 
-    def associate_data(self, data_source, track_manager, model_manager):
+    def associate_data(self, particle_time_list, track_manager, model_manager, belt_limits):
+        """Perform the data association algorithm.
+
+        See Florian Pfaff. Multitarget Tracking Using Orientation Estimation for Optical Belt Sorting. Chapter 3.
+
+        Args:
+            particle_time_list (list): List of np arrays. One entry for every timestep. Has multiple particles in each timestep.
+                                        Each particle has [id, x, y].
+            track_manager:  TrackManager object
+            model_manager:  ModelManager object
+            belt_limits (np.array):     Limits of the belt [[x_min, x_max],[y_min, y_max]]
+
+        Returns:
+            All tracks with associated particles
+        """
         old_measurements = None
+        # Make directory for visualization
         shutil.rmtree(self.visualization_path, ignore_errors=True)
         os.makedirs(self.visualization_path)
+        # Set start and end phase for data association weighting
+        start_phase = belt_limits[0,0] + self.delta_start_end_phase
+        end_phase = belt_limits[0,1] - self.delta_start_end_phase
+        # Iterate over timesteps
         for time_step in range(self.num_timesteps):
             logging.info('step {} / {}'.format(time_step, self.num_timesteps))
 
             if self.visualize:
                 plt.title('Time step: {}'.format(time_step))
-                if not self.rotate_columns:
-                    plt.xlim((-0.1, 1.3))  # TODO more sophisticated solution to this problem???
-                    plt.ylim((-0.1, 1.5))
-
-                if self.rotate_columns:
-                    plt.xlim((0.3, 0.8))
-                    plt.ylim((0.0, 0.2))
+                plt.xlim((belt_limits[0,0], belt_limits[0,1]))
+                plt.ylim((belt_limits[1,0], belt_limits[1,1]))
 
             self.current_time_step = time_step
             
-            ## Get the measurements at the current time step
-            measurements = data_source.get_measurement_at_timestep_list(time_step)
+            ## Get the measurements and particle ids at the current time step
+            particles = particle_time_list[time_step]
+            measurements = particles[:,1:]
+            particle_ids = particles[:,0]
             
             ## Predict new belt position for each track
             predictions = track_manager.get_predictions(model_manager)
             prediction_ids = list(predictions.keys())
-            prediction_values = list(predictions.values())
+            prediction_values = np.array(list(predictions.values()))
             prediction_is_alive_probabilities = list(map(lambda x: track_manager.get_alive_probability(x), prediction_ids))
             
-            #
+            n_meas = measurements.shape[0]
+            n_pred = prediction_values.shape[0]
+
             if old_measurements is not None:
-                if len(old_measurements) != len(prediction_values):
+                if len(old_measurements) != n_pred:
                     logging.error('number old_measurements different from number predictions!')
                     code.interact(local=dict(globals(), **locals()))
-                for idx, prediction_id in enumerate(prediction_ids):
-                    if old_measurements[prediction_id][1]:
-                        if self.visualize: plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
-                                    c='cyan', label='old measurement')
-                    else:
-                        if self.visualize: plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
-                                    c='yellow', label='old measurement artificial')
-                    start = old_measurements[prediction_id][0]
-                    end = predictions[prediction_id]
-                    line = np.stack((start, end), axis=0)
-                    if self.visualize: plt.plot(line[:, 0], line[:, 1], c='purple', label='prediction step')
+                if self.visualize:
+                    for idx, prediction_id in enumerate(prediction_ids):
+                        if old_measurements[prediction_id][1]:
+                            plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
+                                        c='cyan', label='old measurement')
+                        else:
+                            plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
+                                        c='yellow', label='old measurement artificial')
+                        start = old_measurements[prediction_id][0]
+                        end = predictions[prediction_id]
+                        line = np.stack((start, end), axis=0)
+                        plt.plot(line[:, 0], line[:, 1], c='purple', label='prediction step')
 
-            if len(measurements) != 0:
-                if self.visualize: plt.scatter(np.array(measurements)[:, 0], np.array(measurements)[:, 1], c='blue', label='measurement')
-            if prediction_values != []:
-                if self.visualize: plt.scatter(np.array(prediction_values)[:, 0], np.array(prediction_values)[:, 1], c='red',
-                            label='prediction')
+            if self.visualize:
+                if n_meas != 0:
+                    plt.scatter(measurements[:, 0], measurements[:, 1], c='blue', label='measurement')
+                if n_pred != 0:
+                    plt.scatter(prediction_values[:, 0], prediction_values[:, 1], c='red',
+                                label='prediction')
 
             ## Build distance matrix for association
-            # why isn't infinity working anymore???
-            distance_matrix = 10000 * np.ones([2 * len(measurements) + len(prediction_values), 2 * len(prediction_values) + len(measurements)])
+            n_new_rows = n_meas
+            n_new_cols = n_pred
+            distance_matrix = np.full([n_pred + n_new_rows, n_meas + n_new_cols], np.inf)
             if distance_matrix.size == 0:
                 continue
-            #
-            for measurement_nr in range(len(measurements)):
-                for prediction_nr in range(len(prediction_values)):
-                    distance_matrix[measurement_nr][prediction_nr] = np.linalg.norm(
-                        measurements[measurement_nr] - prediction_values[prediction_nr])
-            #
-            for measurement_nr in range(len(measurements)):
-                distance_matrix[measurement_nr][len(prediction_values) + measurement_nr] = self.distance_threshold \
-                    * math.pow(1.0 + (1.0 - measurements[measurement_nr][0]), self.positional_probabilities)
-                distance_matrix[len(measurements) + len(prediction_values) + measurement_nr][
-                    len(prediction_values) + measurement_nr] = 1.1 * self.distance_threshold\
-                    * math.pow(1.0 + (1.0 - measurements[measurement_nr][0]), self.positional_probabilities)
-            #
-            for prediction_nr, _ in enumerate(prediction_values):
-                # code.interact(local=dict(globals(), **locals()))
-                distance_matrix[len(measurements) + prediction_nr][prediction_nr] = self.distance_threshold \
-                    * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.is_alive_probability_weighting) \
-                    * math.pow(1.0 + prediction_values[prediction_nr][0], self.positional_probabilities)
-                distance_matrix[len(measurements) + prediction_nr][
-                    len(measurements) + len(prediction_values) + prediction_nr] = 1.1 * self.distance_threshold \
-                    * math.pow(1.0 + prediction_is_alive_probabilities[prediction_nr], self.is_alive_probability_weighting) \
-                    * math.pow(1.0 + prediction_values[prediction_nr][0], self.positional_probabilities)
-            #
-            if self.matching_algorithm == 'global': 
-                distance_matrix[-len(measurements):,-len(prediction_values)] = 1.2 * self.distance_threshold \
-                        * math.pow(2.0, self.is_alive_probability_weighting)
-                if len(measurements) >= len(prediction_values):
-                    distance_matrix_a = 10000 * np.ones([len(measurements), len(prediction_values) + len(measurements)])
-                    distance_matrix_b = 1.2 * self.distance_threshold * np.ones([len(measurements), len(prediction_values)]) \
-                        * math.pow(2.0, self.is_alive_probability_weighting)
-                    distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=1)
-                    distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=0)
-                else:
-                    distance_matrix_a = 10000 * np.ones([len(prediction_values) + len(measurements), len(prediction_values)])
-                    distance_matrix_b = 1.2 * self.distance_threshold * np.ones([len(measurements), len(prediction_values)]) \
-                        * math.pow(2.0, self.is_alive_probability_weighting)
-                    distance_matrix_c = np.concatenate([distance_matrix_a, distance_matrix_b], axis=0)
-                    distance_matrix = np.concatenate([distance_matrix, distance_matrix_c], axis=1)
-            
+            # Calculate distance matrix
+            if n_meas>0 and n_pred>0:
+                M = np.swapaxes(np.repeat(np.expand_dims(measurements,1), n_pred, axis=1), 0, 1)
+                P = np.repeat(np.expand_dims(prediction_values, 1), n_meas, axis=1)
+                distance_matrix[:n_pred, :n_meas] = np.linalg.norm(M-P, axis=2)
+            # Add additional rows for measurements without tracks 
+            if n_new_rows>0:
+                dist = self.new_track_middle_dist + (self.new_track_at_beginning_dist - self.new_track_middle_dist) * (measurements[:,0] < start_phase)
+                new_rows = np.transpose(np.repeat(np.expand_dims(dist, 1), n_new_rows, 1))
+                distance_matrix[n_pred:, 0:n_meas] = new_rows
+            # and additional columns for tracks without measurement
+            if n_new_cols>0:
+                dist = self.track_disappear_at_middle_dist + (self.track_disappear_at_end_dist - self.track_disappear_at_middle_dist) * (prediction_values[:,0] > end_phase)
+                new_cols = np.repeat(np.expand_dims(dist, 1), n_new_cols, 1)
+                distance_matrix[0:n_pred, n_meas:] = new_cols
+            # Add additional matrix for no change
+            if n_new_rows>0 and n_new_cols>0:
+                no_change_mat = 2*self.no_change_dist * np.ones([n_new_rows, n_new_cols])
+                distance_matrix[n_pred:, n_meas:] = no_change_mat
             ## Associate predictions and measurements based on the distance matrix
             if self.matching_algorithm == 'local':
-                measurement_idxs, prediction_idxs = nearest_neighbour(distance_matrix)
+               prediction_idxs, measurement_idxs = nearest_neighbour(distance_matrix)
             elif self.matching_algorithm == 'global':
-                measurement_idxs, prediction_idxs = linear_sum_assignment(distance_matrix)
-            
+               prediction_idxs, measurement_idxs = linear_sum_assignment(distance_matrix)
+        
             ## Create new, update existing and delete expired tracks
             counts = np.zeros([4], dtype=np.int32)
             old_measurements = {}
             for idx in range(len(measurement_idxs)):
-                if measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] < len(prediction_values):
+                if measurement_idxs[idx] < n_meas and prediction_idxs[idx] < n_pred:
                     # The measurement was associated to an existing track
                     counts[0] += 1
                     prediction_id = prediction_ids[prediction_idxs[idx]]
                     #
-                    track_manager.real_track_real_measurement(prediction_id, measurements[measurement_idxs[idx]], model_manager)
-                    old_measurements[prediction_id] = (measurements[measurement_idxs[idx]], True)
+                    measurement = measurements[measurement_idxs[idx]]
+                    track_manager.real_track_real_measurement(prediction_id, measurement, model_manager)
+                    old_measurements[prediction_id] = (measurement, True)
                     #
-                    line = np.stack((measurements[measurement_idxs[idx]], prediction_values[prediction_idxs[idx]]),
+                    if self.visualize: 
+                        line = np.stack((measurements[measurement_idxs[idx]], prediction_values[prediction_idxs[idx]]),
                                     axis=0)
-                    if self.visualize: plt.plot(line[:, 0], line[:, 1], c='green')
+                        plt.plot(line[:, 0], line[:, 1], c='green')
                 #
-                elif measurement_idxs[idx] >= len(measurements) and prediction_idxs[idx] < len(prediction_values):
+                elif measurement_idxs[idx] >= n_meas and prediction_idxs[idx] < n_pred:
                     # No measurement associated to existing track
                     counts[1] += 1
                     # feed it back its own prediction as measurement
@@ -173,15 +183,16 @@ class DataAssociation(object):
                         logging.debug('track finished!')
                         if self.visualize: plt.scatter([prediction[0]], [prediction[1]], c='black', label='track end')
                     #
-                    if self.visualize: circle = plt.Circle(prediction, self.distance_threshold, color='blue', fill=False, label='artificial track')
-                    if self.visualize: plt.gcf().gca().add_artist(circle)
-                    # only for visualization purposes
-                    pseudo_measurement = np.array(
-                        [prediction[0] + self.distance_threshold, prediction[1]])
-                    line = np.stack((pseudo_measurement, prediction), axis=0)
-                    if self.visualize: plt.plot(line[:, 0], line[:, 1], c='green')
+                    if self.visualize: 
+                        circle = plt.Circle(prediction, self.no_change_dist, color='blue', fill=False, label='artificial track')
+                        plt.gcf().gca().add_artist(circle)
+                        # only for visualization purposes
+                        pseudo_measurement = np.array(
+                            [prediction[0] + self.no_change_dist, prediction[1]])
+                        line = np.stack((pseudo_measurement, prediction), axis=0)
+                        plt.plot(line[:, 0], line[:, 1], c='green')
                 #
-                elif measurement_idxs[idx] < len(measurements) and prediction_idxs[idx] >= len(prediction_values):
+                elif measurement_idxs[idx] < n_meas and prediction_idxs[idx] >= n_pred:
                     # Measurement associated to new track
                     counts[2] += 1
                     #
@@ -191,16 +202,15 @@ class DataAssociation(object):
                     #
                     if self.visualize:
                         circle = plt.Circle(measurement,
-                                            self.distance_threshold,
+                                            self.no_change_dist,
                                             color='red',
                                             fill=False,
                                             label='artificial track')
                         plt.gcf().gca().add_artist(circle)
-                    #
-                    pseudo_prediction = np.array(
-                        [measurement[0] + self.distance_threshold, measurement[1]])
-                    line = np.stack((measurement, pseudo_prediction), axis=0)
-                    if self.visualize: plt.plot(line[:, 0], line[:, 1], c='green', label='matching')
+                        pseudo_prediction = np.array(
+                            [measurement[0] + self.no_change_dist, measurement[1]])
+                        line = np.stack((measurement, pseudo_prediction), axis=0)
+                        plt.plot(line[:, 0], line[:, 1], c='green', label='matching')
                 else:
                     counts[3] += 1
             logging.debug(list(counts))

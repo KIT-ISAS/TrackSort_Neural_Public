@@ -197,12 +197,13 @@
             "console": "integratedTerminal",
             "args": ["--is_loaded", "True",
                     "--config_path", "configs/test_pepper_all.json",
-                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
+                    "--dataset_dir", "data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv",
                     "--result_path", "results/pepper_all/",
-                    "--execute_evaluation", "True",
-                    "--execute_multi_target_tracking", "False",
-                    "--evaluate_mlp_mask", "True",
-                    "--no_show", "False"]
+                    "--execute_evaluation", "False",
+                    "--execute_multi_target_tracking", "True",
+                    "--visualize_multi_target_tracking", "True",
+                    "--evaluate_mlp_mask", "False",
+                    "--no_show", "True"]
         },
         {
             "name": "Kalman Hyperparameter Test",

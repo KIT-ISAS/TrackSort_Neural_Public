@@ -113,6 +113,8 @@ parser.add_argument('--evaluate_mlp_mask', type=str2bool, default=False,
                     help='Masks every model with a mlp masks to compare MLPs with other models in testing function.')
 parser.add_argument('--no_show', type=str2bool, default=False,
                     help='Set this to True if you do not want to show evaluation graphics and only save them.')
+parser.add_argument('--visualize_multi_target_tracking', type=str2bool, default=False,
+                    help='You can generate nice videos of the multitarget tracking.')
 args = parser.parse_args()
 
 global_config = {
@@ -135,7 +137,7 @@ global_config = {
     'Track': {
         'initial_is_alive_probability': 0.5,
         'is_alive_decrease': 0.25,
-        'is_alive_increase': 0.5,
+        'is_alive_increase': 0.5
     },
     #
     'num_timesteps': args.num_timesteps,
@@ -164,7 +166,7 @@ global_config = {
     'state_overwriting_started': False,
     'overwriting_activated': args.overwriting_activated,
     'verbose': 1,
-    'visualize': True,
+    'visualize': args.visualize_multi_target_tracking,
     'run_hyperparameter_search': args.run_hyperparameter_search,
     'debug': False,
     'test_noise_robustness': args.test_noise_robustness,
@@ -278,12 +280,14 @@ def run_global_config(global_config, experiment_series_names=''):
     if global_config.get('execute_multi_target_tracking'):
         ## Init tracks
         track_manager = TrackManager(model_config.get('data_association').get('track_config'))
+        ## Get multi-target tracking data
+        particle_time_list = data_source.get_particle_timestep_data()
         ## Run multi-target tracking
         data_association = DataAssociation(global_config.get('num_timesteps'), global_config.get('CsvDataSet').get('rotate_columns'),
                                         global_config.get("visualization_path"), global_config.get("visualize"),
                                         **model_config.get('data_association').get('association_config'))
-        particles = data_source.get_particles()
-        tracks = data_association.associate_data(data_source, track_manager, model_manager)
+        #particles = data_source.get_particles()
+        tracks = data_association.associate_data(particle_time_list, track_manager, model_manager, data_source.get_belt_limits())
 
         if global_config['visualize']:
             shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
