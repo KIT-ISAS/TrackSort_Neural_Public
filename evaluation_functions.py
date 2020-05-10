@@ -47,7 +47,9 @@ def calculate_error_first_and_second_kind(tracks, particle_ids):
             # Is this correct???
             sum_second += 1
     error_of_first_kind = sum_first/len(tracks)
+    logging.info("Error of first kind: {}".format(error_of_first_kind))
     error_of_second_kind = sum_second/len(particle_ids)
+    logging.info("Error of second kind: {}".format(error_of_second_kind))
     return error_of_first_kind, error_of_second_kind
 
 def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, 

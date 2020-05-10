@@ -103,7 +103,7 @@ class DataAssociation(object):
                     logging.error('number old_measurements different from number predictions!')
                     code.interact(local=dict(globals(), **locals()))
                 if self.visualize:
-                    for idx, prediction_id in enumerate(prediction_ids):
+                    for prediction_id in prediction_ids:
                         if old_measurements[prediction_id][1]:
                             plt.scatter([old_measurements[prediction_id][0][0]], [old_measurements[prediction_id][0][1]],
                                         c='cyan', label='old measurement')

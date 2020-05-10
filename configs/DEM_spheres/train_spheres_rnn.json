@@ -30,10 +30,13 @@
   },
   "data_association": {
     "association_config": {
-      "distance_threshold": 0.02,
-      "positional_probabilities": 0.0,
-      "is_alive_probability_weighting": 0.0,
-      "matching_algorithm": "global"
+      "matching_algorithm": "global",
+      "delta_start_end_phase":0.025,
+      "no_change_dist":0.005,
+      "new_track_at_beginning_dist":0.005,
+      "new_track_middle_dist":0.02,
+      "track_disappear_at_end_dist":0.005,
+      "track_disappear_at_middle_dist":0.02
     },
     "track_config": {
       "initial_is_alive_probability": 0.5,
