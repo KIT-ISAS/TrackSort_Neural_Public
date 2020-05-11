@@ -62,6 +62,7 @@ cd ..
 # ME
 ./main.py \
         --is_loaded True \
+        --is_loaded_gating_network True \
         --config_path configs/DEM_spheres/test_spheres_me_pos_id.json \
         --dataset_dir data/DEM_spheres.csv \
         --data_is_aligned False \

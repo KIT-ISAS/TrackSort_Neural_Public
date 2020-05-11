@@ -278,6 +278,10 @@ def run_global_config(global_config, experiment_series_names=''):
                                   no_show = global_config['no_show'])
 
     if global_config.get('execute_multi_target_tracking'):
+        # Check if result folder exists and create it if not.
+        save_path = os.path.dirname(global_config['result_path'])
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         ## Init tracks
         track_manager = TrackManager(model_config.get('data_association').get('track_config'))
         ## Get multi-target tracking data
