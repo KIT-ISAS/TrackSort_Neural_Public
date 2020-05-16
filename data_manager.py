@@ -668,25 +668,21 @@ class AbstractDataSet(ABC):
             aligned_track_data (np.array): The tracks in format: [n_tracks, length_tracks, 2]
 
         Returns:
-            np.array of sequence to sequence data (seq2seq)
+            np.array of sequence to sequence data (seq2seq), shape: [n_tracks, length_tracks-1, 4]
         """
         assert self.longest_track is not None, "self.longest_track not set"
         logging.info("longest_track={}".format(self.longest_track))
-        seq2seq_data = []
-
-        # for every track we create:
-        #  x, y, x_target, y_target nan_value-padded
-        for track_number in range(aligned_track_data.shape[0]):
-            last_index = self.get_last_timestep_of_track(aligned_track_data[track_number]) - 1
-            input_array = aligned_track_data[track_number, 0:last_index]
-            output_array = aligned_track_data[track_number, 1:last_index+1]
-            seq2seq_array = np.hstack((input_array, output_array))
-            # make sure the last entry of the arrays are nan-values
-            n_nan = self.longest_track - last_index
-            seq2seq_array = np.concatenate((seq2seq_array, np.full((n_nan, 4), self.nan_value)))
-
-            seq2seq_data.append(seq2seq_array)
-
+        n_tracks = aligned_track_data.shape[0]
+        track_length = aligned_track_data.shape[1]
+        seq2seq_data = np.full([n_tracks, track_length-1, 4], self.nan_value)
+        # Fill in start positions
+        seq2seq_data[:,:,:2] = aligned_track_data[:, 0:track_length-1]
+        # Fill in end positions
+        seq2seq_data[:,:,2:] = aligned_track_data[:, 1:track_length]
+        # Delete the point where there is only a start but not and end position
+        correct_pos = np.bitwise_and(seq2seq_data[:,:,0] != self.nan_value, seq2seq_data[:,:,3] == self.nan_value)
+        seq2seq_data[correct_pos,:2] = self.nan_value
+        # Return it :)
         return np.array(seq2seq_data)
 
     def _convert_aligned_tracks_to_mlp_data(self, aligned_track_data, n_inp_points = 5):
@@ -933,6 +929,9 @@ class AbstractDataSet(ABC):
         mask = mask.T.astype(np.bool)
         # hide data
         aligned_track_data[~mask, :] = self.nan_value
+        # Shorten tracks to new max length
+        longest_track = np.max(np.sum(np.all(aligned_track_data != self.nan_value, axis=-1), axis=-1))
+        aligned_track_data = aligned_track_data[:,:longest_track]
 
         # 6. temporal intersection: 
         #   use the euclidean distance to calculate a weighted average between the indices of Q and P
