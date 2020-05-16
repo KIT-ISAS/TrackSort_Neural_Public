@@ -469,7 +469,23 @@ class AbstractDataSet(ABC):
                                                       batch_size=64, 
                                                       random_seed=None,
                                                       time_normalization=22.):
-        
+        """Get the training and test datasets for RNN separation prediction.
+
+        input format: [[x_0, y_0], ..., [x_n, y_n]]
+        target format: [[x_1, y_1, y_nozzle, dt_nozzle]]
+            dt_nozzle describes the difference in time from the last measurement to the nozzle array.
+
+        Args:
+            normalized (Boolean):   Normalize the data
+            test_ration (double):   Ratio of test data to all data. Value between 0 and 1.
+            batch_size (int):       Batch size for training. This value gets multiplied with the total track length to generate more reasonable batch sizes that match the RNN data.
+            random_seed (int):      Random seed for train/test split. Set this to None to be random every time.
+            time_normalization (double):  Normalize the time step target with this parameter
+
+        Returns:
+            training_dataset (tf.Dataset): Batches of (input, target) pairs for training
+            testing_dataset (tf.Dataset)
+        """
         track_data = self.separation_track_data
         spatial_labels = self.separation_spatial_labels
         temporal_labels = self.separation_temporal_labels
@@ -485,7 +501,9 @@ class AbstractDataSet(ABC):
              ),
             axis=-1
         )
-
+        # Fill spatial and temporal labels with 0 in areas with no measurement
+        mask = np.all(tracks[:,:,:2]==self.nan_value, axis=2)
+        tracks[mask,4:] = self.nan_value
         if normalized:
             tracks[:, :, [0, 1, 2, 3]] /= self.normalization_constant
             # normalize spatial prediction
@@ -565,7 +583,8 @@ class AbstractDataSet(ABC):
                 # Set target [y_nozzle, dt_nozzle]
                 mlp_data[i, -2] = spatial_labels[i, 1]
                 mlp_data[i, -1] = temporal_labels[i]  - (n_measurements-1)
-            stop=0
+            else:
+                stop=0
 
         if normalized:
             # normalize spatial data
@@ -580,11 +599,11 @@ class AbstractDataSet(ABC):
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
         if random_seed is None:
-            minibatches_train = raw_train_dataset.shuffle(n_tracks).batch(batch_size * self.longest_track, drop_remainder=True)
-            minibatches_test = raw_test_dataset.shuffle(n_tracks).batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_train = raw_train_dataset.shuffle(n_tracks).batch(batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.shuffle(n_tracks).batch(batch_size, drop_remainder=True)
         else:
-            minibatches_train = raw_train_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
-            minibatches_test = raw_test_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_train = raw_train_dataset.batch(batch_size, drop_remainder=True)
+            minibatches_test = raw_test_dataset.batch(batch_size, drop_remainder=True)
 
         def split_input_target_separation(chunk):
             # split the tensor (x1, x2, ..., y1, y2, ..., y_pred_target, t_pred_target)
@@ -891,21 +910,13 @@ class AbstractDataSet(ABC):
         ].reshape(-1, 2)
 
         # 4. Intersect the nozzle_array with the line QP -> intersection "X"
-
         delta_xy = p_values - q_values
         slope = delta_xy[:, 1] / delta_xy[:, 0]
         # spatial intersection
         y_at_nozzle = q_values[:, 1] + slope * (virtual_nozzle_array_x_position - q_values[:, 0])
         spatial_labels = np.vstack((np.ones(y_at_nozzle.shape) * virtual_nozzle_array_x_position, y_at_nozzle)).T
-        # temporal intersection: use the euclidean distance to calculate a weighted average between
-        #     the indices of Q and P
-        qx = np.sqrt(np.sum((spatial_labels - q_values) ** 2, axis=1))
-        xp = np.sqrt(np.sum((spatial_labels - p_values) ** 2, axis=1))
-        # take the weighted average between both indices
-        temporal_labels = (qx * q_indices + xp * p_indices) / (qx + xp)
-
+        
         # 5. restrict dataset to measurements left of the virtual edge
-
         distance_to_edge = (aligned_track_data - virtual_belt_edge_x_position)
         distance_to_edge[distance_to_edge[:, :, 0] > 0] = -np.inf
         last_measurement_before_edge_indices = distance_to_edge[:, :, 0].argmax(axis=1)
@@ -923,6 +934,14 @@ class AbstractDataSet(ABC):
         # hide data
         aligned_track_data[~mask, :] = self.nan_value
 
+        # 6. temporal intersection: 
+        #   use the euclidean distance to calculate a weighted average between the indices of Q and P
+        #   We use the distance from the last measurement to the nozzle array as time label.
+        qx = np.sqrt(np.sum((spatial_labels - q_values) ** 2, axis=1))
+        xp = np.sqrt(np.sum((spatial_labels - p_values) ** 2, axis=1))
+        # take the weighted average between both indices
+        temporal_labels = (qx * q_indices + xp * p_indices) / (qx + xp) - last_measurement_before_edge_indices
+        
         return aligned_track_data, spatial_labels, temporal_labels
 
     def _convert_tracks_to_aligned_tracks(self, track_data):

@@ -86,8 +86,10 @@ parser.add_argument('--run_hyperparameter_search', type=str2bool, default=False,
                     help='Whether to run the hyperparameter search or not')
 parser.add_argument('--test_noise_robustness', type=str2bool, default=False,
                     help='Should the Dataset be tested with multiple noise values?')
+parser.add_argument('--tracking', type=str2bool, default=True,
+                    help='Perform tracking. This is the default mode.')
 parser.add_argument('--separation_prediction', type=str2bool, default=False,
-                    help='Should the RNN also predict the separation?')
+                    help='Perform separation predcition')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
 
 parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
@@ -117,6 +119,7 @@ args = parser.parse_args()
 
 global_config = {
     'separation_prediction': args.separation_prediction,
+    'tracking': args.tracking,
     'clear_state': args.clear_state,
     'time_normalization_constant': args.time_normalization_constant,
     'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
@@ -237,40 +240,61 @@ def run_global_config(global_config, experiment_series_names=''):
     model_manager = ModelManager(model_config, global_config.get("is_loaded"), 
                                 data_source.longest_track, global_config.get("overwriting_activated"))
 
-    # Seperate dataset into train and test set
-    # TODO: Ask for these arguments in main run args
+    ## Get tracking training and test dataset
+    # TODO: 
+    #   * Ask for these arguments in main run args
+    #   * Create Evaluation dataset
     random_seed = 0
     test_ratio = 0.1
-    mlp_dataset_train, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
-                                    normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
-                                    random_seed = random_seed)
+    if global_config["tracking"]:
+        mlp_dataset_train, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
+                                        normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
+                                        random_seed = random_seed)
 
-    seq2seq_dataset_train, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
-                                    normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
-                                    random_seed = random_seed)
+        seq2seq_dataset_train, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
+                                        normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
+                                        random_seed = random_seed)
     
-    #TODO: 
-    #   eval dataset
-    dataset_train, dataset_test = data_source.get_tf_data_sets_mlp_with_separation_data( 
-                                                      normalized=True, 
-                                                      test_ratio=test_ratio,
-                                                      batch_size=global_config['batch_size'], 
-                                                      random_seed=random_seed,
-                                                      time_normalization=global_config['time_normalization_constant'],
-                                                      n_inp_points = global_config['separation_mlp_input_dim'])
+    ## Get separation prediction training and test dataset
+    if global_config["separation_prediction"]:
+        mlp_dataset_train_sp, mlp_dataset_test_sp = data_source.get_tf_data_sets_mlp_with_separation_data( 
+                                                        normalized=True, 
+                                                        test_ratio=test_ratio,
+                                                        batch_size=global_config['batch_size'], 
+                                                        random_seed=random_seed,
+                                                        time_normalization=global_config['time_normalization_constant'],
+                                                        n_inp_points = global_config['separation_mlp_input_dim'])
 
+        seq2seq_dataset_train_sp, seq2seq_dataset_test_sp, num_time_steps = data_source.get_tf_data_sets_seq2seq_with_separation_data(
+                                                        normalized=True, 
+                                                        test_ratio=test_ratio,
+                                                        batch_size=global_config['batch_size'], 
+                                                        random_seed=random_seed,
+                                                        time_normalization=global_config['time_normalization_constant'])
     ## Train models
     if not global_config["is_loaded"]:
-        model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
-                                   seq2seq_dataset_train = seq2seq_dataset_train,
-                                   seq2seq_dataset_test = seq2seq_dataset_test, 
-                                   mlp_dataset_train = mlp_dataset_train,
-                                   mlp_dataset_test = mlp_dataset_test,
-                                   num_train_epochs = global_config.get("num_train_epochs"),
-                                   evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
-                                   improvement_break_condition = global_config.get("improvement_break_condition"),
-                                   lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
-                                   lr_decay = global_config.get("lr_decay_factor"))
+        if global_config["tracking"]:
+            model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                    seq2seq_dataset_train = seq2seq_dataset_train,
+                                    seq2seq_dataset_test = seq2seq_dataset_test, 
+                                    mlp_dataset_train = mlp_dataset_train,
+                                    mlp_dataset_test = mlp_dataset_test,
+                                    num_train_epochs = global_config.get("num_train_epochs"),
+                                    evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
+                                    improvement_break_condition = global_config.get("improvement_break_condition"),
+                                    lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
+                                    lr_decay = global_config.get("lr_decay_factor"))
+        if global_config["separation_prediction"]:
+            model_manager.train_models_separation_prediction(seq2seq_dataset_train = seq2seq_dataset_train_sp,
+                                    seq2seq_dataset_test = seq2seq_dataset_test_sp, 
+                                    mlp_dataset_train = mlp_dataset_train_sp,
+                                    mlp_dataset_test = mlp_dataset_test_sp,
+                                    num_train_epochs = global_config.get("num_train_epochs"),
+                                    evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
+                                    improvement_break_condition = global_config.get("improvement_break_condition"),
+                                    lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
+                                    lr_decay = global_config.get("lr_decay_factor"))
+    ## Train gating network                                
     if global_config["is_loaded_gating_network"]:
         model_manager.load_gating_network()
     else:

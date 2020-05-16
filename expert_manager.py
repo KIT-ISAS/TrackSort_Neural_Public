@@ -35,7 +35,7 @@ class Expert_Manager(object):
         n_experts (int):        The number of experts in the expert bank.
     """
     
-    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0):
+    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features=10):
         """Initialize an expert manager.
 
         Creates the expert models.
@@ -53,7 +53,8 @@ class Expert_Manager(object):
         # List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []
         self.experts = []
-        self.create_models(is_loaded, model_path, batch_size, num_time_steps)
+        self.separation_experts = []
+        self.create_models(is_loaded, model_path, batch_size, num_time_steps, n_mlp_features)
         self.n_experts = len(self.experts)
 
     def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 10):
@@ -65,25 +66,37 @@ class Expert_Manager(object):
         Create new experts if is_loaded is False.
 
         Args:
-            is_loaded (Boolean):  True for loading models, False for creating new models
-            model_path (String):  The path of the models if is_loaded is True
-            batch_size (int):     The batch size of the data
-            num_time_steps (int): The number of timesteps in the longest track
-            n_mlp_features (int): The number of features for MLP networks
+            is_loaded (Boolean):            True for loading models, False for creating new models
+            model_path (String):            The path of the models if is_loaded is True
+            batch_size (int):               The batch size of the data
+            num_time_steps (int):           The number of timesteps in the longest track
+            n_mlp_features (int):           The number of features for MLP networks
         """
         for expert_name in self.expert_config:
             expert = self.expert_config.get(expert_name)
             expert_type = expert.get("type")
             if expert_type == 'RNN':
-                # Create RNN model
                 model_path = expert.get("model_path")
-                rnn_model = RNN_Model(True, expert_name, model_path, expert.get("options"))
-                if is_loaded:
-                    rnn_model.load_model()
+                if "is_separator" in expert and expert.get("is_separator"):
+                    # Create RNN model for separation prediction
+                    rnn_model = RNN_Model(False, expert_name, model_path, expert.get("options"))
+                    if is_loaded:
+                        rnn_model.load_model()
+                    else:
+                        only_last_timestep_additional_loss = False if "only_last_timestep_additional_loss" not in expert else expert.get("only_last_timestep_additional_loss")
+                        rnn_model.create_model(batch_size=batch_size, 
+                                               num_time_steps=num_time_steps,
+                                               only_last_timestep_additional_loss=only_last_timestep_additional_loss)
+                    self.separation_experts.append(rnn_model)
                 else:
-                    rnn_model.create_model(batch_size, num_time_steps)
-                self.experts.append(rnn_model)
-                self.current_states.append([])
+                    # Create RNN model
+                    rnn_model = RNN_Model(True, expert_name, model_path, expert.get("options"))
+                    if is_loaded:
+                        rnn_model.load_model()
+                    else:
+                        rnn_model.create_model(batch_size, num_time_steps)
+                    self.experts.append(rnn_model)
+                    self.current_states.append([])
             elif expert_type == 'KF':
                 # Create Kalman filter model
                 sub_type = expert.get("sub_type")
@@ -119,7 +132,7 @@ class Expert_Manager(object):
     def train_batch(self, mlp_conversion_func,
                     seq2seq_inp = None, seq2seq_target = None, 
                     mlp_inp = None, mlp_target = None):
-        """Train one batch for all experts.
+        """Train one batch for all experts in tracking.
 
         The training information of each model should be provided in the expert configuration.
         Kalman filters and RNNs need a different data format than MLPs.
@@ -147,6 +160,46 @@ class Expert_Manager(object):
             
         return prediction_list
 
+    def train_batch_separation_prediction(self,                     
+                    seq2seq_inp = None, seq2seq_target = None, 
+                    mlp_inp = None, mlp_target = None):
+        """Train one batch for all experts in separation prediction.
+
+        TODO: Consider merging this funftion with train_batch
+
+        The training information of each model should be provided in the expert configuration.
+        Kalman filters and RNNs need a different data format than MLPs.
+
+        Args:
+            **_inp (tf.Tensor):    Input tensor of tracks
+            **_target (tf.Tensor): Target tensor of tracks
+
+        Returns:
+            predictions (list): Predictions for each expert
+            spatial_losses (list): Spacial loss for each expert 
+            temporal_losses (list): Temporal loss for each expert
+            spatial_maes (list): Spacial mae for each expert
+            temporal_maes (list): Temporal mae for each expert
+        """
+        prediction_list = []
+        spatial_losses = []
+        temporal_losses = []
+        spatial_maes = []
+        temporal_maes = []
+        for expert in self.separation_experts:
+            if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
+                prediction = expert.train_batch(seq2seq_inp, seq2seq_target) 
+                spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.get_separation_errors(seq2seq_target, prediction)
+            elif expert.type == Expert_Type.MLP:
+                prediction = expert.train_batch(mlp_inp, mlp_target)
+            prediction_list.append(prediction)
+            spatial_losses.append(spatial_loss)
+            temporal_losses.append(temporal_loss)
+            spatial_maes.append(spatial_mae)
+            temporal_maes.append(temporal_mae)
+            
+        return prediction_list, spatial_losses, temporal_losses, spatial_maes, temporal_maes
+
     def get_masks(self, mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target):
         """Return masks for each expert.
 
@@ -170,6 +223,30 @@ class Expert_Manager(object):
             mask = 1 - K.cast(mask, tf.float64)
             #mask = K.cast(mask, tf.float64)
             masks.append(mask)
+            
+        return masks
+
+    def get_masks_separation_prediction(self, mask_value, seq2seq_target, mlp_target):
+        """Return masks for each expert.
+
+        Args:
+            mask_value:          mask value to compare the target against to create the mask
+            seq2seq_target:      Target for seq2seq data
+            mlp_target:          Target for MLP data
+
+        Returns:
+            List of masks. One multidemensional mask for each expert.
+        """
+        
+        masks = []
+        for expert in self.separation_experts:
+            if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
+                tracking_mask = 1 - tf.cast(tf.reduce_all(tf.equal(seq2seq_target, mask_value), axis=-1), tf.int32)
+                mask_length = tf.reduce_sum(tracking_mask, axis=1) - 1
+                mask = tf.one_hot(indices=mask_length, depth=seq2seq_target.shape.as_list()[1], off_value=0)
+            elif expert.type == Expert_Type.MLP:
+                mask = 1 - tf.cast(tf.reduce_all(tf.equal(mlp_target, mask_value), axis=-1), tf.int32)
+            masks.append(tf.cast(mask, tf.float64))
             
         return masks
 
@@ -341,6 +418,10 @@ class Expert_Manager(object):
     def get_expert_names(self):
         """Return list of names."""
         return [expert.name for expert in self.experts]
+
+    def get_separation_expert_names(self):
+        """Return list of names."""
+        return [expert.name for expert in self.separation_experts]
 
     def get_expert_types(self):
         """Return a list of expert types."""
