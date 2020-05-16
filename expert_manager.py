@@ -10,6 +10,7 @@ import logging
 import tensorflow as tf
 import numpy as np
 import code
+import time
 
 from tensorflow.keras import backend as K
 
@@ -162,6 +163,7 @@ class Expert_Manager(object):
 
     def train_batch_separation_prediction(self,                     
                     seq2seq_inp = None, seq2seq_target = None, 
+                    seq2seq_tracking_mask = None, seq2seq_separation_mask = None,
                     mlp_inp = None, mlp_target = None):
         """Train one batch for all experts in separation prediction.
 
@@ -173,6 +175,8 @@ class Expert_Manager(object):
         Args:
             **_inp (tf.Tensor):    Input tensor of tracks
             **_target (tf.Tensor): Target tensor of tracks
+            seq2seq_tracking_mask (tf.Tensor): Mask the valid time steps for tracking
+            seq2seq_separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
 
         Returns:
             predictions (list): Predictions for each expert
@@ -188,8 +192,7 @@ class Expert_Manager(object):
         temporal_maes = []
         for expert in self.separation_experts:
             if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
-                prediction = expert.train_batch(seq2seq_inp, seq2seq_target) 
-                spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.get_separation_errors(seq2seq_target, prediction)
+                prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.train_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) 
             elif expert.type == Expert_Type.MLP:
                 prediction = expert.train_batch(mlp_inp, mlp_target)
             prediction_list.append(prediction)

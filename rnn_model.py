@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import time
 
 import tensorflow as tf
 import numpy as np
@@ -24,7 +25,7 @@ def rnn_model_factory(
         rnn_model_name='lstm',
         use_batchnorm_on_dense=True,
         num_time_steps=35, batch_size=128, nan_value=0, input_dim=2, output_dim=2,
-        unroll=True, stateful=True):
+        unroll=False, stateful=True):
     """
     Create a new keras model with the sequential API
 
@@ -116,14 +117,13 @@ def train_step_separation_prediction_generator(model, optimizer, nan_value=0, on
     """
 
     @tf.function
-    def train_step(inp, target):
+    def train_step(inp, target, tracking_mask, separation_mask):
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
             predictions = model(inp, training=True)
-
-            tracking_mask, separation_mask = create_separation_masks(inp=inp, mask_value=nan_value, only_last_timestep_additional_loss=only_last_timestep_additional_loss)
             tracking_loss = get_tracking_loss(predictions, target, tracking_mask)
             spatial_loss, temporal_loss = get_separation_loss(predictions, target, separation_mask)
+            spatial_mae, temporal_mae = get_separation_mae(predictions, target, separation_mask)
             total_loss = tracking_loss + spatial_loss + temporal_loss
             """
             #pred_mse = pred_mse_function(target[:, :, :2], predictions[:, :, :2]) * tracking_mask
@@ -185,7 +185,7 @@ def train_step_separation_prediction_generator(model, optimizer, nan_value=0, on
             """
         grads = tape.gradient(total_loss, model.trainable_variables)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
-        return predictions
+        return predictions, spatial_loss, temporal_loss, spatial_mae, temporal_mae
     return train_step
 
 def create_separation_masks(inp, mask_value=0, only_last_timestep_additional_loss=True):
@@ -484,6 +484,22 @@ class RNN_Model(Expert):
             self.rnn_model.reset_states()
         return self.train_step_fn(inp, target)
 
+    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+        """Train the rnn model on a batch of data.
+
+        Args:
+            inp (tf.Tensor): A batch of input tracks
+            target (tf.Tensor): The prediction targets to the inputs
+            tracking_mask (tf.Tensor): Mask the valid time steps for tracking
+            separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
+
+        Returns
+            prediction (tf.Tensor): Predicted positions for training instances
+        """
+        if self.clear_state:
+            self.rnn_model.reset_states()
+        return self.train_step_fn(inp, target, tracking_mask, separation_mask)
+
     def predict_batch(self, inp):
         """Predict a batch of input data."""
         if self.clear_state:
@@ -511,19 +527,24 @@ class RNN_Model(Expert):
         logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
         K.set_value(self.optimizer.lr, new_lr)
 
-    def get_separation_errors(self, seq2seq_target, prediction):
+    def get_separation_errors(self, seq2seq_target, prediction, tracking_mask, separation_mask):
         """Calculate spatial and temporal errors.
 
         Args:
             seq2seq_target (tf.Tensor): Target      [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
             prediction:                 Prediction  [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
+            tracking_mask (tf.Tensor):  Mask for all valid tracking indices
+            separation_mask (tf.Tensor):Mask for the indice(s) that are used to validate the separation prediction
 
         Returns:
             spatial_loss, temporal_loss, spatial_mae, temporal_mae
         """
-        tracking_mask, separation_mask = create_separation_masks(inp=seq2seq_target, only_last_timestep_additional_loss=True)
+        t_1 = time.time()
         spatial_loss, temporal_loss = get_separation_loss(prediction, seq2seq_target, separation_mask)
+        t_2 = time.time()
         spatial_mae, temporal_mae = get_separation_mae(prediction, seq2seq_target, separation_mask)
+        t_3 = time.time()
+        print("Time for loss calculation = {} s; Time for mae calculation = {} s".format(t_2-t_1, t_3-t_2))
         return spatial_loss, temporal_loss, spatial_mae, temporal_mae
         
 

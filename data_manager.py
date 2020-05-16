@@ -468,12 +468,19 @@ class AbstractDataSet(ABC):
                                                       test_ratio=0.1,
                                                       batch_size=64, 
                                                       random_seed=None,
-                                                      time_normalization=22.):
+                                                      time_normalization=22.,
+                                                      only_last_timestep_additional_loss = True):
         """Get the training and test datasets for RNN separation prediction.
 
         input format: [[x_0, y_0], ..., [x_n, y_n]]
         target format: [[x_1, y_1, y_nozzle, dt_nozzle]]
             dt_nozzle describes the difference in time from the last measurement to the nozzle array.
+
+        Produce two masks for the separation prediction:
+            tracking_mask: This mask is True for all (inp, target) pairs along the track
+            separation_mask: This mask is only True in the last valid (inp, target) pair in the track if only_last_timestep_additional_loss == True.
+                             This can be used to only take the last prediction of the RNN into account in the separation prediction.
+                             If only_last_timestep_additional_loss==False, the separation mask equals the tracking mask.
 
         Args:
             normalized (Boolean):   Normalize the data
@@ -481,10 +488,11 @@ class AbstractDataSet(ABC):
             batch_size (int):       Batch size for training. This value gets multiplied with the total track length to generate more reasonable batch sizes that match the RNN data.
             random_seed (int):      Random seed for train/test split. Set this to None to be random every time.
             time_normalization (double):  Normalize the time step target with this parameter
+            only_last_timestep_additional_loss (Boolean): Sets the style of the separation mask.
 
         Returns:
-            training_dataset (tf.Dataset): Batches of (input, target) pairs for training
-            testing_dataset (tf.Dataset)
+            training_dataset (tf.Dataset): Batches of (input, target, tracking_mask, separation_mask) pairs for training
+            testing_dataset (tf.Dataset): Batches of (input, target, tracking_mask, separation_mask) pairs for testing
         """
         track_data = self.separation_track_data
         spatial_labels = self.separation_spatial_labels
@@ -501,15 +509,24 @@ class AbstractDataSet(ABC):
              ),
             axis=-1
         )
+        # Build tracking and separation mask
+        tracking_mask = np.all(tracks[:,:,:2]!=self.nan_value, axis=2)
+        if only_last_timestep_additional_loss:
+            mask_length = np.sum(tracking_mask, axis=1) - 1
+            separation_mask = np.zeros(tracking_mask.shape, dtype=bool)
+            separation_mask[np.arange(mask_length.size), mask_length] = True
+        else:
+            separation_mask = tracking_mask
         # Fill spatial and temporal labels with 0 in areas with no measurement
-        mask = np.all(tracks[:,:,:2]==self.nan_value, axis=2)
-        tracks[mask,4:] = self.nan_value
+        tracks[~tracking_mask,4:6] = self.nan_value
         if normalized:
             tracks[:, :, [0, 1, 2, 3]] /= self.normalization_constant
             # normalize spatial prediction
             tracks[:, :, [4]] /= self.normalization_constant
             # normalize temporal prediction
             tracks[:, :, [5]] /= time_normalization
+
+        tracks = np.concatenate((tracks, tracking_mask[:,:,np.newaxis], separation_mask[:,:,np.newaxis]), axis=-1)
 
         train_tracks, test_tracks = train_test_split(tracks, test_size=test_ratio, random_state=random_seed)
 
@@ -528,8 +545,10 @@ class AbstractDataSet(ABC):
             # split the tensor (x, y, y_pred, t_pred, x_target, y_target, y_pred_target, t_pred_target)
             #  -> into two tensors (x, y) and (x_target, y_target)
             input_seq = chunk[:, :, :2]
-            target_seq = chunk[:, :, 2:]
-            return input_seq, target_seq
+            target_seq = chunk[:, :, 2:6]
+            tracking_mask = chunk[:, :, 6]
+            separation_mask = chunk[:, :, 7]
+            return input_seq, target_seq, tracking_mask, separation_mask
 
         dataset_train = minibatches_train.map(split_input_target_separation)
         dataset_test = minibatches_test.map(split_input_target_separation)

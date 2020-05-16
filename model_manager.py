@@ -522,11 +522,11 @@ class ModelManager(object):
             seq2seq_iter = iter(seq2seq_dataset_train)
             mlp_iter = iter(mlp_dataset_train)
 
-            for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
+            for (seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) in seq2seq_iter:
                 (mlp_inp, mlp_target) = next(mlp_iter)
                 # Train experts on a batch
                 predictions, spatial_losses, temporal_losses, spatial_maes, temporal_maes = \
-                    self.expert_manager.train_batch_separation_prediction(seq2seq_inp, seq2seq_target, mlp_inp, mlp_target)
+                    self.expert_manager.train_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target)
                 # Create a mask for end of tracks and for beginning of tracks (MLP)
                 #masks = self.expert_manager.get_masks_separation_prediction(mask_value, seq2seq_target, mlp_target)
                 # Calculate loss for all models
