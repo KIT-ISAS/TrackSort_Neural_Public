@@ -117,74 +117,18 @@ def train_step_separation_prediction_generator(model, optimizer, nan_value=0, on
     """
 
     @tf.function
-    def train_step(inp, target, tracking_mask, separation_mask):
+    def train_step(inp, target, tracking_mask, separation_mask, train = True):
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
-            predictions = model(inp, training=True)
+            predictions = model(inp, training=train)
             tracking_loss = get_tracking_loss(predictions, target, tracking_mask)
             spatial_loss, temporal_loss = get_separation_loss(predictions, target, separation_mask)
             spatial_mae, temporal_mae = get_separation_mae(predictions, target, separation_mask)
             total_loss = tracking_loss + spatial_loss + temporal_loss
-            """
-            #pred_mse = pred_mse_function(target[:, :, :2], predictions[:, :, :2]) * tracking_mask
-            #pred_mse = tf.reduce_sum(pred_mse) / K.sum(mask)
 
-            #pred_mae = pred_mse_function(target[:, :, :2], predictions[:, :, :2]) * mask
-            #pred_mae = K.sum(pred_mae) / K.sum(mask)
-
-            # find the last timestep for every track
-            # 1. find timesteps which equal [0,0]
-            # 2. get the first timestep for every track
-            # 2.1 [0,0,0,1,1,1]
-            # 2.2 [1,1,1,0,0,0] * length**2 + [0,0,0,1,1,1] * range(length)
-            # 2.3 argmin
-            # 3 Create a mask from that
-            
-            if only_last_timestep_additional_loss:
-                any_zero_element = K.equal(inp, [nan_value])
-                any_zero_element = K.cast(any_zero_element, tf.float64)
-                count_zeros_per_timestep = K.sum(any_zero_element, axis=-1)
-                two_zeros_per_timestep = K.equal(count_zeros_per_timestep, [input_dim])
-                is_zero = K.cast(two_zeros_per_timestep, tf.float64)
-                not_zero = (-1 * is_zero + 1) * (inp.shape[1] ** 2)
-                search_space = is_zero * range_2 + not_zero
-                last_timesteps = K.argmin(search_space, axis=1) - 1
-
-                mask_last_step = tf.one_hot(last_timesteps, depth=inp.shape[1], dtype=tf.bool, on_value=True,
-                                            off_value=False)
-                mask_last_step = K.cast(mask_last_step, tf.float64)
-
-            spatial_mse = spatial_temporal_mse_function(target[:, :, 2], predictions[:, :, 2]) * mask
-            #spatial_mae = tf.keras.losses.mean_absolute_error(target[:, :, 2], predictions[:, :, 2], reduction=tf.keras.losses.Reduction.NONE) * mask
-
-            print("spatial_mse.shape 1: {}".format(spatial_mse.shape))
-            if only_last_timestep_additional_loss:
-                spatial_mse = K.sum(spatial_mse * mask_last_step) / batch_size
-                #spatial_mae = K.sum(spatial_mae * mask_last_step) / batch_size
-            else:
-                spatial_mse = K.sum(spatial_mse) / K.sum(mask)
-                #spatial_mae = K.sum(spatial_mae) / K.sum(mask)
-            print("spatial_mse.shape 2: {}".format(spatial_mse.shape))
-            # new_time_target is like a countdown
-            new_time_target = (target[:, :, 3] - range_)
-            print("New time target: {}".format(new_time_target[0, :]))
-            temporal_mse = spatial_temporal_mse_function(new_time_target[:, :], predictions[:, :, 3]) * mask
-            #temporal_mae = tf.keras.losses.mean_squared_error(new_time_target[:, :],
-            #                                                  predictions[:, :, 3], 
-             #                                                 reduction=tf.keras.losses.Reduction.NONE) * mask
-
-            if only_last_timestep_additional_loss:
-                temporal_mse = K.sum(temporal_mse * mask_last_step) / batch_size
-                #temporal_mae = K.sum(temporal_mae * mask_last_step) / batch_size
-            else:
-                temporal_mse = K.sum(temporal_mse) / K.sum(mask)
-                #temporal_mae = K.sum(temporal_mae) / K.sum(mask)
-
-            mse = pred_mse + spatial_mse + temporal_mse
-            #mae = pred_mae + spatial_mae + temporal_mae
-            """
-        grads = tape.gradient(total_loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+        if train:
+            grads = tape.gradient(total_loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
         return predictions, spatial_loss, temporal_loss, spatial_mae, temporal_mae
     return train_step
 
@@ -499,6 +443,22 @@ class RNN_Model(Expert):
         if self.clear_state:
             self.rnn_model.reset_states()
         return self.train_step_fn(inp, target, tracking_mask, separation_mask)
+
+    def test_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+        """Test the rnn model on a batch of data.
+
+        Args:
+            inp (tf.Tensor): A batch of input tracks
+            target (tf.Tensor): The prediction targets to the inputs
+            tracking_mask (tf.Tensor): Mask the valid time steps for tracking
+            separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
+
+        Returns
+            prediction (tf.Tensor): Predicted positions for training instances
+        """
+        if self.clear_state:
+            self.rnn_model.reset_states()
+        return self.train_step_fn(inp, target, tracking_mask, separation_mask, train=False)
 
     def predict_batch(self, inp):
         """Predict a batch of input data."""

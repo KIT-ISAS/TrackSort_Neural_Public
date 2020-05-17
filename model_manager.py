@@ -539,11 +539,11 @@ class ModelManager(object):
             
             for i in range(len(spatial_train_summary_writers)):
                 with spatial_train_summary_writers[i].as_default():
-                    tf.summary.scalar('spatial loss', spatial_train_losses[i].result(), step=epoch)
-                    tf.summary.scalar('spatial mae', spatial_train_maes[i].result(), step=epoch)
+                    tf.summary.scalar('loss', spatial_train_losses[i].result(), step=epoch)
+                    tf.summary.scalar('mae', spatial_train_maes[i].result(), step=epoch)
                 with temporal_train_summary_writers[i].as_default():
-                    tf.summary.scalar('temporal loss', temporal_train_losses[i].result(), step=epoch)
-                    tf.summary.scalar('temporal mae', temporal_train_maes[i].result(), step=epoch)
+                    tf.summary.scalar('loss', temporal_train_losses[i].result(), step=epoch)
+                    tf.summary.scalar('mae', temporal_train_maes[i].result(), step=epoch)
 
             template = 'Epoch {}, Spatial Train Losses: {}, Temporal Train Losses: {}, Spatial Train MAEs: {}, Temporal Train MAEs: {}'
             logging.info((template.format(epoch+1,
@@ -560,42 +560,43 @@ class ModelManager(object):
                 temporal_train_maes[i].reset_states()
 
             # Run trained models on the test set every n epochs
-            """
             if (epoch + 1) % evaluate_every_n_epochs == 0 \
                     or (epoch + 1) == num_train_epochs:
                 seq2seq_iter = iter(seq2seq_dataset_test)
                 mlp_iter = iter(mlp_dataset_test)
 
-                for (seq2seq_inp, seq2seq_target) in seq2seq_iter:
+                for (seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) in seq2seq_iter:
                     (mlp_inp, mlp_target) = next(mlp_iter)
-                    # Test experts on a batch
-                    predictions = self.expert_manager.test_batch(mlp_conversion_func, seq2seq_inp, mlp_inp)
-                    masks = self.expert_manager.get_masks(mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target)
-                    # MLP mask to compare MLP with KF/RNN
-                    mlp_mask = K.all(K.equal(mlp_conversion_func(mlp_target), k_mask_value), axis=-1)
-                    mlp_mask = 1 - K.cast(mlp_mask, tf.float64)
+                    # Train experts on a batch
+                    predictions, spatial_losses, temporal_losses, spatial_maes, temporal_maes = \
+                        self.expert_manager.test_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target)
+                    # Create a mask for end of tracks and for beginning of tracks (MLP)
+                    #masks = self.expert_manager.get_masks_separation_prediction(mask_value, seq2seq_target, mlp_target)
                     # Calculate loss for all models
                     for i in range(len(predictions)):
-                        loss = loss_object(seq2seq_target, predictions[i], sample_weight = masks[i])
-                        mlp_loss = loss_object(seq2seq_target, predictions[i], sample_weight = mlp_mask)
-                        mae = mae_object(seq2seq_target, predictions[i], sample_weight = masks[i])
-                        test_losses[i](loss)
-                        test_maes[i](mae)
-                        test_mlp_losses[i](mlp_loss)
+                        spatial_test_losses[i](spatial_losses[i])
+                        temporal_test_losses[i](temporal_losses[i])
+                        spatial_test_maes[i](spatial_maes[i])
+                        temporal_test_maes[i](temporal_maes[i])
                     
-                for i in range(len(test_summary_writers)):
-                    with test_summary_writers[i].as_default():
-                        tf.summary.scalar('loss', test_losses[i].result(), step=epoch)
-                        tf.summary.scalar('mlp loss', test_mlp_losses[i].result(), step=epoch)
-                        tf.summary.scalar('mae', test_maes[i].result(), step=epoch)
+                
+                for i in range(len(spatial_test_summary_writers)):
+                    with spatial_test_summary_writers[i].as_default():
+                        tf.summary.scalar('loss', spatial_test_losses[i].result(), step=epoch)
+                        tf.summary.scalar('mae', spatial_test_maes[i].result(), step=epoch)
+                    with temporal_test_summary_writers[i].as_default():
+                        tf.summary.scalar('loss', temporal_test_losses[i].result(), step=epoch)
+                        tf.summary.scalar('mae', temporal_test_maes[i].result(), step=epoch)
 
-                template = 'Epoch {}, Test Losses: {}, Test MAEs: {}, Test MLP Losses: {}'
+                template = 'Epoch {}, Spatial test Losses: {}, Temporal test Losses: {}, Spatial test MAEs: {}, Temporal test MAEs: {}'
                 logging.info((template.format(epoch+1,
-                                            [test_loss.result().numpy() for test_loss in test_losses],
-                                            [test_mae.result().numpy() for test_mae in test_maes],
-                                            [test_mlp_loss.result().numpy() for test_mlp_loss in test_mlp_losses])))
+                                            [spatial_test_loss.result().numpy() for spatial_test_loss in spatial_test_losses],
+                                            [temporal_test_loss.result().numpy() for temporal_test_loss in temporal_test_losses],
+                                            [spatial_test_mae.result().numpy() for spatial_test_mae in spatial_test_maes],
+                                            [temporal_test_mae.result().numpy() for temporal_test_mae in temporal_test_maes])))
 
                 # Check testing break condition
+                """
                 break_condition = True
                 for i in range(len(old_test_losses)):
                     # If the percentage improvement of one expert is higher than the threshold, we do not break.
@@ -609,7 +610,7 @@ class ModelManager(object):
                                     improvement_break_condition*100)
                     logging.info(log_string)
                     break 
-            """
+                """
         # Save all models
         self.expert_manager.save_models()
 

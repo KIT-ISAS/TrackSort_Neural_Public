@@ -203,6 +203,48 @@ class Expert_Manager(object):
             
         return prediction_list, spatial_losses, temporal_losses, spatial_maes, temporal_maes
 
+    def test_batch_separation_prediction(self,                     
+                    seq2seq_inp = None, seq2seq_target = None, 
+                    seq2seq_tracking_mask = None, seq2seq_separation_mask = None,
+                    mlp_inp = None, mlp_target = None):
+        """Test one batch for all experts in separation prediction.
+
+        TODO: Consider merging this funftion with train_batch
+
+        The training information of each model should be provided in the expert configuration.
+        Kalman filters and RNNs need a different data format than MLPs.
+
+        Args:
+            **_inp (tf.Tensor):    Input tensor of tracks
+            **_target (tf.Tensor): Target tensor of tracks
+            seq2seq_tracking_mask (tf.Tensor): Mask the valid time steps for tracking
+            seq2seq_separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
+
+        Returns:
+            predictions (list): Predictions for each expert
+            spatial_losses (list): Spacial loss for each expert 
+            temporal_losses (list): Temporal loss for each expert
+            spatial_maes (list): Spacial mae for each expert
+            temporal_maes (list): Temporal mae for each expert
+        """
+        prediction_list = []
+        spatial_losses = []
+        temporal_losses = []
+        spatial_maes = []
+        temporal_maes = []
+        for expert in self.separation_experts:
+            if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
+                prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.test_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) 
+            elif expert.type == Expert_Type.MLP:
+                prediction = expert.train_batch(mlp_inp, mlp_target)
+            prediction_list.append(prediction)
+            spatial_losses.append(spatial_loss)
+            temporal_losses.append(temporal_loss)
+            spatial_maes.append(spatial_mae)
+            temporal_maes.append(temporal_mae)
+            
+        return prediction_list, spatial_losses, temporal_losses, spatial_maes, temporal_maes
+
     def get_masks(self, mlp_conversion_func, k_mask_value, seq2seq_target, mlp_target):
         """Return masks for each expert.
 
