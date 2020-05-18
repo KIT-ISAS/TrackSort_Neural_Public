@@ -327,12 +327,11 @@ def run_global_config(global_config, experiment_series_names=''):
                                     no_show = global_config['no_show'])
     if global_config["separation_prediction"]:
         if global_config.get('execute_evaluation'):
-            model_manager.test_models_separation_prediction(mlp_conversion_func = data_source.mlp_target_to_track_format,
-                                    result_dir = global_config['result_path'],
-                                    seq2seq_dataset_test = seq2seq_dataset_test, 
-                                    mlp_dataset_test = mlp_dataset_test,
+            model_manager.test_models_separation_prediction(result_dir = global_config['result_path'],
+                                    seq2seq_dataset_test = seq2seq_dataset_test_sp, 
+                                    mlp_dataset_test = mlp_dataset_test_sp,
                                     normalization_constant = data_source.normalization_constant,
-                                    evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
+                                    time_normalization_constant=global_config['time_normalization_constant'],
                                     no_show = global_config['no_show'])
     ## Execute MTT
     if global_config.get('execute_multi_target_tracking'):

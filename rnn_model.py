@@ -412,6 +412,12 @@ class RNN_Model(Expert):
         """Load a RNN model from its model path."""
         self.rnn_model = tf.keras.models.load_model(self.model_path)
         logging.info(self.rnn_model.summary())
+        self.optimizer = tf.keras.optimizers.Adam()
+        self.loss_object = tf.keras.losses.MeanSquaredError()
+        if self.is_next_step:
+            self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer, self.loss_object)
+        else:
+            self.train_step_fn = train_step_separation_prediction_generator(model = self.rnn_model, optimizer = self.optimizer)
         self.rnn_model.reset_states()
 
     def train_batch(self, inp, target):

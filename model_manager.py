@@ -636,16 +636,17 @@ class ModelManager(object):
             no_show (Boolean):                  Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks, all_weights = self.get_full_input_target_prediction_mask_from_dataset(
-            mlp_conversion_func = mlp_conversion_func,
-            seq2seq_dataset = seq2seq_dataset_test,
+        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
+            seq2seq_dataset=seq2seq_dataset_test,
             mlp_dataset = mlp_dataset_test,
-            create_weighted_output = True)
+            create_weighted_output = False)
 
         # Check if result folder exists and create it if not.
         save_path = os.path.dirname(result_dir)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
+
+        """
         # Error regions plot
         create_error_region_evaluation(target=all_targets, 
                                     predictions=all_predictions, 
@@ -672,27 +673,18 @@ class ModelManager(object):
                                         expert_names = expert_names,
                                         result_dir=result_dir,
                                         is_mlp_mask=True)
+        """
         # MSE and MSA box plots
-        if not evaluate_mlp_mask:
-            create_boxplot_evaluation(target=all_targets, 
-                                    predictions=all_predictions, 
-                                    masks=all_masks, 
-                                    expert_names = expert_names, 
-                                    normalization_constant=normalization_constant, 
-                                    result_dir=result_dir,
-                                    is_mlp_mask=False,
-                                    no_show = no_show)
-        else:
-            create_boxplot_evaluation(target=all_targets, 
-                                    predictions=all_predictions, 
-                                    masks=all_mlp_maks, 
-                                    expert_names = expert_names, 
-                                    normalization_constant=normalization_constant, 
-                                    result_dir=result_dir,
-                                    is_mlp_mask=True,
-                                    no_show = no_show)
+        create_boxplot_evaluation_separation_prediction(target=all_targets, 
+                                predictions=all_predictions, 
+                                masks=all_masks, 
+                                expert_names = expert_names, 
+                                normalization_constant=normalization_constant, 
+                                time_normalization_constant=time_normalization_constant,
+                                result_dir=result_dir,
+                                no_show = no_show)
         # Weight plot
-        create_weight_pos_evaluation(weights=all_weights, expert_names = expert_names[:-1], result_dir=result_dir, no_show = no_show)
+        #create_weight_pos_evaluation(weights=all_weights, expert_names = expert_names[:-1], result_dir=result_dir, no_show = no_show)
         """
         find_worst_predictions(np_targets, np_predictions, self.mask_value)
         """
@@ -726,6 +718,20 @@ class ModelManager(object):
             # Test experts on a batch
             predictions, _, _, _, _ = self.expert_manager.test_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target, mlp_mask)    
             masks = self.expert_manager.get_masks_separation_prediction(seq2seq_separation_mask, mlp_mask)
+            # Convert all masks and predictions to MLP style
+            np_predictions = []
+            np_masks = []
+            for i in range(len(predictions)):
+                if tf.is_tensor(predictions[i]):
+                    np_prediction = predictions[i].numpy()
+                else:
+                    np_prediction = predictions[i]
+                # If seq2seq
+                if np_prediction.ndim == 3:
+                    np_prediction = np_prediction[np.where(masks[i].numpy())][:,2:]
+                np_masks.append(mlp_mask.numpy())
+                np_predictions.append(np_prediction)
+                stop=0
             # Get weighting of experts
             if create_weighted_output:
                 """
@@ -744,27 +750,27 @@ class ModelManager(object):
                 """
                 logging.error("Gating network for separation prediction not implemented yet.")
             else:
-                weights = np.zeros(len(predictions), predictions[0].shape[0])
+                weights = np.zeros([len(predictions), predictions[0].shape[0]])
            
             # Add everything to the lists
             if all_targets.shape[0]==0:
                 all_inputs = seq2seq_inp.numpy()
-                all_targets = seq2seq_target.numpy()
-                all_predictions = np.array(predictions)
-                all_masks = np.array(masks)
+                all_targets = mlp_target.numpy()
+                all_predictions = np.array(np_predictions)
+                all_masks = np.array(np_masks)
                 all_weights = weights
             else:
                 all_inputs = np.concatenate((all_inputs, seq2seq_inp.numpy()),axis=0)
-                all_targets = np.concatenate((all_targets, seq2seq_target.numpy()),axis=0)
-                all_predictions = np.concatenate((all_predictions, np.array(predictions)), axis=1)
-                all_masks = np.concatenate((all_masks, np.array(masks)), axis=1)
+                all_targets = np.concatenate((all_targets, mlp_target.numpy()),axis=0)
+                all_predictions = np.concatenate((all_predictions, np.array(np_predictions)), axis=1)
+                all_masks = np.concatenate((all_masks, np.array(np_masks)), axis=1)
                 all_weights = np.concatenate((all_weights, weights), axis=1)
         # Create expert name list
         expert_names = self.expert_manager.get_separation_expert_names()
         if create_weighted_output:
             expert_names.append(self.gating_network.get_name())
         # Return all the stuff
-        return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_mlp_maks, all_weights
+        return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights
 
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     """ METHODS FOR MULTI TARGET TRACKING """

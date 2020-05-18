@@ -125,6 +125,10 @@ class KF_Model(Expert):
         """ 
         pass
     
+    def test_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+        """Copy of train_batch_separation_prediction."""
+        return self.train_batch_separation_prediction(inp, target, tracking_mask, separation_mask)
+
     @abstractmethod
     def get_zero_state(self, batch_size):
         """Return a list of dummy states of correct size for the corresponding model.

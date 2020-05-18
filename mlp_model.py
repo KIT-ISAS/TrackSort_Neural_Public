@@ -74,6 +74,12 @@ class MLP_Model(Expert):
         """Load a MLP model from its model path."""
         self.mlp_model = tf.keras.models.load_model(self.model_path)
         self.input_dim = self.mlp_model.input_shape[1]
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
+        self.loss_object = tf.keras.losses.MeanSquaredError()
+        if self.is_next_step:
+            self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
+        else:
+            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
         logging.info(self.mlp_model.summary())
 
     def train_batch(self, inp, target):
