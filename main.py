@@ -237,8 +237,13 @@ def run_global_config(global_config, experiment_series_names=''):
         model_config = json.load(f)
         
     ## Initialize models
-    model_manager = ModelManager(model_config, global_config.get("is_loaded"), 
-                                data_source.longest_track, global_config.get("overwriting_activated"))
+    # model_config, is_loaded, num_time_steps, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.
+    model_manager = ModelManager(model_config = model_config,
+                                 is_loaded = global_config.get("is_loaded"), 
+                                 num_time_steps = data_source.longest_track, 
+                                 overwriting_activated = global_config.get("overwriting_activated"),
+                                 x_pred_to = global_config.get("CsvDataSet").get("virtual_nozzle_array_x_position")/data_source.normalization_constant,
+                                 time_normalization = global_config['time_normalization_constant'])
 
     ## Get tracking training and test dataset
     # TODO: 

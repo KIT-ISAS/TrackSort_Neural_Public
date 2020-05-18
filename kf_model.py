@@ -86,6 +86,44 @@ class KF_Model(Expert):
             prediction (np.array): Predicted positions for training instances
         """
         pass
+
+    def predict_batch_separation(self, inp, separation_mask):
+        """Perform separation prediction on a batch of input data.
+
+        Args:
+            inp (tf.Tensor): A batch of input tracks
+            separation_mask (tf.Tensor): Indicating the last time step of the track
+
+        Returns
+            prediction (np.array): Predicted x, y, y_nozzel and dt_nozzle
+        """
+        pass
+
+    @abstractmethod
+    def train_batch(self, inp, target):
+        """Train the cv model on a batch of data."""
+        pass
+
+    @abstractmethod    
+    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+        """Train the cv model for separation prediction on a batch of data.
+
+        The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
+
+        Args:
+            inp (tf.Tensor):            Batch of track measurements
+            target (tf.Tensor):         Batch of track target measurements
+            tracking_mask (tf.Tensor):  Batch of tracking masks
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+
+        Returns:
+            prediction
+            spatial_loss
+            temporal_loss
+            spatial_mae
+            temporal_mae
+        """ 
+        pass
     
     @abstractmethod
     def get_zero_state(self, batch_size):

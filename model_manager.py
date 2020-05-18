@@ -51,7 +51,7 @@ class ModelManager(object):
         current_free_entries (set): Set of all dead free entries in batches
     """
 
-    def __init__(self, model_config, is_loaded, num_time_steps, overwriting_activated=True):
+    def __init__(self, model_config, is_loaded, num_time_steps, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.):
         """Initialize a model manager.
 
         Creates the expert manager and gating network.
@@ -61,10 +61,17 @@ class ModelManager(object):
             model_config (dict):  The json tree containing all information about the experts, gating network and weighting function
             num_time_steps (int): The number of timesteps in the longest track
             overwriting_activated (Boolean): Should expired tracks in batches be overwritten with new tracks
+            x_pred_to (double):   The x position of the nozzle array (only needed for kf separation prediction)
+            time_normalization (double): Time normalization constant (only needed for kf separation prediction)
         """
         # The manager of all the models
-        self.expert_manager = Expert_Manager(model_config.get('experts'), is_loaded, model_config.get('model_path'), 
-                                             model_config.get('batch_size'), num_time_steps)
+        self.expert_manager = Expert_Manager(expert_config = model_config.get('experts'), 
+                                             is_loaded = is_loaded, 
+                                             model_path = model_config.get('model_path'), 
+                                             batch_size = model_config.get('batch_size'), 
+                                             num_time_steps = num_time_steps, 
+                                             x_pred_to = x_pred_to, 
+                                             time_normalization = time_normalization)
         # The gating network that calculates all weights
         self.create_gating_network(model_config.get('gating'))
         self.overwriting_activated = overwriting_activated

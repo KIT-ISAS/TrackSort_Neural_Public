@@ -510,15 +510,15 @@ class AbstractDataSet(ABC):
             axis=-1
         )
         # Build tracking and separation mask
-        tracking_mask = np.all(tracks[:,:,:2]!=self.nan_value, axis=2)
+        tracking_mask = np.all(tracks[:,:,:4]!=self.nan_value, axis=2)
         if only_last_timestep_additional_loss:
-            mask_length = np.sum(tracking_mask, axis=1) - 1
+            mask_length = np.sum(tracking_mask, axis=1)
             separation_mask = np.zeros(tracking_mask.shape, dtype=bool)
             separation_mask[np.arange(mask_length.size), mask_length] = True
         else:
             separation_mask = tracking_mask
         # Fill spatial and temporal labels with 0 in areas with no measurement
-        tracks[~tracking_mask,4:6] = self.nan_value
+        #tracks[~tracking_mask,4:6] = self.nan_value
         if normalized:
             tracks[:, :, [0, 1, 2, 3]] /= self.normalization_constant
             # normalize spatial prediction
@@ -687,20 +687,21 @@ class AbstractDataSet(ABC):
             aligned_track_data (np.array): The tracks in format: [n_tracks, length_tracks, 2]
 
         Returns:
-            np.array of sequence to sequence data (seq2seq), shape: [n_tracks, length_tracks-1, 4]
+            np.array of sequence to sequence data (seq2seq), shape: [n_tracks, length_tracks, 4]
         """
         assert self.longest_track is not None, "self.longest_track not set"
         logging.info("longest_track={}".format(self.longest_track))
         n_tracks = aligned_track_data.shape[0]
         track_length = aligned_track_data.shape[1]
-        seq2seq_data = np.full([n_tracks, track_length-1, 4], self.nan_value)
+        seq2seq_data = np.full([n_tracks, track_length, 4], self.nan_value)
         # Fill in start positions
-        seq2seq_data[:,:,:2] = aligned_track_data[:, 0:track_length-1]
+        seq2seq_data[:,:,:2] = aligned_track_data[:, 0:track_length]
         # Fill in end positions
-        seq2seq_data[:,:,2:] = aligned_track_data[:, 1:track_length]
+        seq2seq_data[:,:-1,2:] = aligned_track_data[:, 1:track_length]
         # Delete the point where there is only a start but not and end position
-        correct_pos = np.bitwise_and(seq2seq_data[:,:,0] != self.nan_value, seq2seq_data[:,:,3] == self.nan_value)
-        seq2seq_data[correct_pos,:2] = self.nan_value
+        # ---> We don't do this anymore so there is the last measurement available for the separation prediction.
+        #correct_pos = np.bitwise_and(seq2seq_data[:,:,0] != self.nan_value, seq2seq_data[:,:,3] == self.nan_value)
+        #seq2seq_data[correct_pos,:2] = self.nan_value
         # Return it :)
         return np.array(seq2seq_data)
 

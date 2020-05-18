@@ -5,6 +5,7 @@ Todo:
 """
 
 import numpy as np
+import logging
 
 from kf_model import KF_Model, KF_State
 
@@ -16,7 +17,7 @@ class CV_Model(KF_Model):
 
     __metaclass__ = KF_Model
 
-    def __init__(self, name, dt=0.005, s_w=10E7, s_v=2, default_state_options = {}):
+    def __init__(self, name, x_pred_to = 1550, time_normalization = 22., dt=0.005, s_w=10E7, s_v=2, default_state_options = {}):
         """Initialize a new model to track particles with the CV Kalman filter.
 
         Default values are for pixel representation if 1 Pixel = 0.056 mm
@@ -26,7 +27,12 @@ class CV_Model(KF_Model):
             dt=0.005 (double):  The time difference between two measurements
             s_w=10E7 (double):  Power spectral density of particle noise (Highly dependent on particle type)
             s_v=2 (double):     Measurement noise variance (2 is default if input is in pixel)
+            x_pred_to (double):             The x position of the nozzle array (only needed for kf separation prediction)
+            time_normalization (double):    Time normalization constant (only needed for kf separation prediction)
         """
+        self.dt = dt
+        self.x_pred_to = x_pred_to
+        self.time_normalization = time_normalization
         # Transition matrix
         F = np.matrix([[1, dt, 0, 0],
                            [0,  1, 0, 0],
@@ -49,6 +55,33 @@ class CV_Model(KF_Model):
         """Train the cv model on a batch of data."""
         return self.predict_batch(inp)
 
+    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+        """Train the cv model for separation prediction on a batch of data.
+
+        The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
+
+        Args:
+            inp (tf.Tensor):            Batch of track measurements
+            target (tf.Tensor):         Batch of track target measurements
+            tracking_mask (tf.Tensor):  Batch of tracking masks
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+
+        Returns:
+            prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle]
+            spatial_loss (tf.Tensor):   mean((y_nozzle_pred - y_nozzle_target)^2)
+            temporal_loss (tf.Tensor):  mean((dt_nozzle_pred - dt_nozzle_target)^2)
+            spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
+            temporal_mae (tf.Tensor):   mean(abs(dt_nozzle_pred - dt_nozzle_target))
+        """ 
+        prediction = self.predict_batch_separation(inp, separation_mask)
+        target_np = target.numpy()
+        separation_mask_np = separation_mask.numpy()
+        spatial_loss = np.sum(np.power(prediction[:,:,2]-target_np[:,:,2], 2)*separation_mask_np) / np.sum(separation_mask_np)
+        temporal_loss = np.sum(np.power(prediction[:,:,3]-target_np[:,:,3], 2)*separation_mask_np) / np.sum(separation_mask_np)
+        spatial_mae = np.sum(np.abs(prediction[:,:,2]-target_np[:,:,2])*separation_mask_np) / np.sum(separation_mask_np)
+        temporal_mae = np.sum(np.abs(prediction[:,:,3]-target_np[:,:,3])*separation_mask_np) / np.sum(separation_mask_np)
+        return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae 
+
     def predict_batch(self, inp):
         """Predict a batch of data with the cv model."""
         np_inp = inp.numpy()
@@ -66,7 +99,46 @@ class CV_Model(KF_Model):
                     # predict
                     self.predict(cv_state)
                     predictions[i, j, :] = [cv_state.get_pos()[0], cv_state.get_pos()[1]]
+                else:
+                    break
                     
+        return predictions
+
+    def predict_batch_separation(self, inp, separation_mask):
+        """Predict a batch of data with the cv model."""
+        np_inp = inp.numpy()
+        np_separation_mask = separation_mask.numpy()
+
+        n_tracks = np_inp.shape[0]
+        track_length = np_inp.shape[1]
+        predictions = np.zeros([n_tracks, track_length, 4])
+        # For each track in batch
+        for i in range(n_tracks):
+            cv_state = CV_State(np_inp[i, 0], **self.default_state_options)
+            # For each instance in track
+            for j in range(track_length):
+                # Check if this there are still entries in track
+                if np_separation_mask[i, j] == 0:
+                    # update
+                    self.update(cv_state, np_inp[i, j])
+                    # predict
+                    self.predict(cv_state)
+                    predictions[i, j, :2] = [cv_state.get_pos()[0], cv_state.get_pos()[1]]
+                else:
+                    if j>= 1:
+                        # only perform update step
+                        self.update(cv_state, np_inp[i, j])
+                        # Make separation prediction
+                        v_last = cv_state.get_v()
+                        pos_last = cv_state.get_pos()
+                        dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
+                        y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
+                        predictions[i, j, 2] = y_pred
+                        predictions[i, j, 3] = dt_pred/self.time_normalization
+                    else:
+                        logging.warning("Track out of measurements at first time step.")
+                    break
+
         return predictions
 
     def get_zero_state(self, batch_size):

@@ -36,7 +36,7 @@ class Expert_Manager(object):
         n_experts (int):        The number of experts in the expert bank.
     """
     
-    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features=10):
+    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features=10, x_pred_to = 1550, time_normalization = 22.):
         """Initialize an expert manager.
 
         Creates the expert models.
@@ -48,6 +48,8 @@ class Expert_Manager(object):
             model_path (String):  The path of the models if is_loaded is True
             batch_size (int):     The batch size of the data
             num_time_steps (int): The number of timesteps in the longest track
+            x_pred_to (double):   The x position of the nozzle array (only needed for kf separation prediction)
+            time_normalization (double): Time normalization constant (only needed for kf separation prediction)
         """
         self.expert_config = expert_config
         self.batch_size = batch_size
@@ -55,10 +57,10 @@ class Expert_Manager(object):
         self.current_states = []
         self.experts = []
         self.separation_experts = []
-        self.create_models(is_loaded, model_path, batch_size, num_time_steps, n_mlp_features)
+        self.create_models(is_loaded, model_path, batch_size, num_time_steps, n_mlp_features, x_pred_to, time_normalization)
         self.n_experts = len(self.experts)
 
-    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 10):
+    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 10, x_pred_to = 1550, time_normalization = 22.):
         """Create list of experts.
 
         Creat experts based on self.expert_cofig.
@@ -72,6 +74,8 @@ class Expert_Manager(object):
             batch_size (int):               The batch size of the data
             num_time_steps (int):           The number of timesteps in the longest track
             n_mlp_features (int):           The number of features for MLP networks
+            x_pred_to (double):             The x position of the nozzle array (only needed for kf separation prediction)
+            time_normalization (double):    Time normalization constant (only needed for kf separation prediction)
         """
         for expert_name in self.expert_config:
             expert = self.expert_config.get(expert_name)
@@ -103,16 +107,18 @@ class Expert_Manager(object):
                 sub_type = expert.get("sub_type")
                 if sub_type == 'CV':
                     # Create constant velocity model
-                    cv_model = CV_Model(expert_name, **expert.get("model_options"), default_state_options=expert.get("state_options"))
-                    self.experts.append(cv_model)
-                    self.current_states.append([])
+                    kf_model = CV_Model(expert_name, x_pred_to, time_normalization, **expert.get("model_options"), default_state_options=expert.get("state_options"))
                 elif sub_type == 'CA':
-                    # Create constant velocity model
-                    ca_model = CA_Model(expert_name, **expert.get("model_options"), default_state_options=expert.get("state_options"))
-                    self.experts.append(ca_model)
-                    self.current_states.append([])
+                    # Create constant acceleration model
+                    kf_model = CA_Model(expert_name, x_pred_to, time_normalization, **expert.get("model_options"), default_state_options=expert.get("state_options"))
                 else:
                     logging.warning("Kalman filter subtype " + sub_type + " not supported. Will not create model.") 
+                    continue
+                if "is_separator" in expert and expert.get("is_separator"):
+                    self.separation_experts.append(kf_model)
+                else:
+                    self.experts.append(kf_model)
+                    self.current_states.append([])
             elif expert_type=='MLP':
                 model_path = expert.get("model_path")
                 mlp_model = MLP_Model(expert_name, model_path, True, expert.get("options"))
