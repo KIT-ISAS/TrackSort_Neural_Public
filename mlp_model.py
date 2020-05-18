@@ -310,7 +310,7 @@ def get_separation_mae(prediction, target, mask):
         spatial_mae, temporal_mae
     """
     # Spatial mae
-    spatial_mae = tf.reduce_sum(tf.pow(target[:, 0]-prediction[:, 0], 2) * mask)/tf.reduce_sum(mask)
+    spatial_mae = tf.reduce_sum(tf.abs(target[:, 0]-prediction[:, 0]) * mask)/tf.reduce_sum(mask)
      # Temporal mae
-    temporal_mae = tf.reduce_sum(tf.pow(target[:, 1]-prediction[:, 1], 2) * mask)/tf.reduce_sum(mask)
+    temporal_mae = tf.reduce_sum(tf.abs(target[:, 1]-prediction[:, 1]) * mask)/tf.reduce_sum(mask)
     return spatial_mae, temporal_mae

@@ -154,6 +154,11 @@ class Expert_Manager(object):
         for expert in self.experts:
             expert.save_model()
 
+    def save_separation_models(self):
+        """Save all separation models to their model paths."""
+        for expert in self.separation_experts:
+            expert.save_model()
+
     def train_batch(self, mlp_conversion_func,
                     seq2seq_inp = None, seq2seq_target = None, 
                     mlp_inp = None, mlp_target = None):
@@ -297,13 +302,12 @@ class Expert_Manager(object):
             
         return masks
 
-    def get_masks_separation_prediction(self, mask_value, seq2seq_target, mlp_target):
+    def get_masks_separation_prediction(self, seq2seq_separation_mask, mlp_mask):
         """Return masks for each expert.
 
         Args:
-            mask_value:          mask value to compare the target against to create the mask
-            seq2seq_target:      Target for seq2seq data
-            mlp_target:          Target for MLP data
+            seq2seq_separation_mask (tf.Tensor): The mask for seq2seq experts
+            mlp_mask (tf.Tensor): The mask for mlp experts
 
         Returns:
             List of masks. One multidemensional mask for each expert.
@@ -312,13 +316,9 @@ class Expert_Manager(object):
         masks = []
         for expert in self.separation_experts:
             if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
-                tracking_mask = 1 - tf.cast(tf.reduce_all(tf.equal(seq2seq_target, mask_value), axis=-1), tf.int32)
-                mask_length = tf.reduce_sum(tracking_mask, axis=1) - 1
-                mask = tf.one_hot(indices=mask_length, depth=seq2seq_target.shape.as_list()[1], off_value=0)
+                masks.append(seq2seq_separation_mask)
             elif expert.type == Expert_Type.MLP:
-                mask = 1 - tf.cast(tf.reduce_all(tf.equal(mlp_target, mask_value), axis=-1), tf.int32)
-            masks.append(tf.cast(mask, tf.float64))
-            
+                masks.append(mlp_mask)
         return masks
 
     def change_learning_rate(self, lr_change=1):

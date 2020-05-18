@@ -1,0 +1,97 @@
+{
+  "batch_size": 64,
+  "experts": {
+    "MLP": {
+      "type": "MLP",
+      "model_path": "models/pepper/MLP_separator.h5",
+      "is_separator": true,
+      "options": {
+        "base_learning_rate": 0.005,
+        "model_structure": {
+          "layers": [16, 16, 16, 16],
+          "activation": "leakly_relu"
+        }
+      }
+    },
+    "KF_CV": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CA": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18E3,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 180,
+        "accel_var_y": 1800
+      }
+    },
+    "LSTM": {
+      "type": "RNN",
+      "is_separator": true,
+      "only_last_timestep_additional_loss": true,
+      "model_path": "models/pepper/LSTM_1024_16_separation.h5",
+      "load_model": false,
+      "options": {
+        "clear_state": true,
+        "model_structure": {
+          "num_units_first_rnn": 1024,
+          "num_units_second_rnn": 16,
+          "num_units_third_rnn": 0,
+          "num_units_fourth_rnn": 0,
+          "num_units_first_dense": 0,
+          "num_units_second_dense": 0,
+          "num_units_third_dense": 0,
+          "num_units_fourth_dense": 0,
+          "rnn_model_name": "lstm",
+          "use_batchnorm_on_dense": true
+        }
+      }
+    }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "matching_algorithm": "global",
+      "delta_start_end_phase":0.025,
+      "no_change_dist":0.005,
+      "new_track_at_beginning_dist":0.005,
+      "new_track_middle_dist":0.02,
+      "track_disappear_at_end_dist":0.005,
+      "track_disappear_at_middle_dist":0.02
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}

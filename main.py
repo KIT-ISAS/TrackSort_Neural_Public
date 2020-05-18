@@ -301,26 +301,40 @@ def run_global_config(global_config, experiment_series_names=''):
                                     improvement_break_condition = global_config.get("improvement_break_condition"),
                                     lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
                                     lr_decay = global_config.get("lr_decay_factor"))
-    ## Train gating network                                
-    if global_config["is_loaded_gating_network"]:
-        model_manager.load_gating_network()
-    else:
-        model_manager.train_gating_network(mlp_conversion_func = data_source.mlp_target_to_track_format,
-                                            seq2seq_dataset_train = seq2seq_dataset_train,
-                                            mlp_dataset_train = mlp_dataset_train)
+    ## Train gating network     
+    if global_config["tracking"]:                           
+        if global_config["is_loaded_gating_network"]:
+            model_manager.load_gating_network()
+        else:
+            model_manager.train_gating_network(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                                seq2seq_dataset_train = seq2seq_dataset_train,
+                                                mlp_dataset_train = mlp_dataset_train)
+    if global_config["separation_prediction"]:
+        stop=0
+        # TODO: Implement separation prediction gating network
 
     ## Test models
     # TODO:
     #   * Test with an evaluation set instead of test set.
-    if global_config.get('execute_evaluation'):
-        model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
-                                  result_dir = global_config['result_path'],
-                                  seq2seq_dataset_test = seq2seq_dataset_test, 
-                                  mlp_dataset_test = mlp_dataset_test,
-                                  normalization_constant = data_source.normalization_constant,
-                                  evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
-                                  no_show = global_config['no_show'])
-
+    if global_config["tracking"]:
+        if global_config.get('execute_evaluation'):
+            model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                    result_dir = global_config['result_path'],
+                                    seq2seq_dataset_test = seq2seq_dataset_test, 
+                                    mlp_dataset_test = mlp_dataset_test,
+                                    normalization_constant = data_source.normalization_constant,
+                                    evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
+                                    no_show = global_config['no_show'])
+    if global_config["separation_prediction"]:
+        if global_config.get('execute_evaluation'):
+            model_manager.test_models_separation_prediction(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                    result_dir = global_config['result_path'],
+                                    seq2seq_dataset_test = seq2seq_dataset_test, 
+                                    mlp_dataset_test = mlp_dataset_test,
+                                    normalization_constant = data_source.normalization_constant,
+                                    evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
+                                    no_show = global_config['no_show'])
+    ## Execute MTT
     if global_config.get('execute_multi_target_tracking'):
         # Check if result folder exists and create it if not.
         save_path = os.path.dirname(global_config['result_path'])
