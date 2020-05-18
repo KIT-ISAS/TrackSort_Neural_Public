@@ -36,7 +36,7 @@ class Expert_Manager(object):
         n_experts (int):        The number of experts in the expert bank.
     """
     
-    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features=10, x_pred_to = 1550, time_normalization = 22.):
+    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features=10, n_mlp_features_separation_prediction = 7, x_pred_to = 1550, time_normalization = 22.):
         """Initialize an expert manager.
 
         Creates the expert models.
@@ -48,6 +48,8 @@ class Expert_Manager(object):
             model_path (String):  The path of the models if is_loaded is True
             batch_size (int):     The batch size of the data
             num_time_steps (int): The number of timesteps in the longest track
+            n_mlp_features (int): The numper of features for MLP tracking
+            n_mlp_features_separation_prediction (int): The number of features for MLP separation prediction networks
             x_pred_to (double):   The x position of the nozzle array (only needed for kf separation prediction)
             time_normalization (double): Time normalization constant (only needed for kf separation prediction)
         """
@@ -57,10 +59,10 @@ class Expert_Manager(object):
         self.current_states = []
         self.experts = []
         self.separation_experts = []
-        self.create_models(is_loaded, model_path, batch_size, num_time_steps, n_mlp_features, x_pred_to, time_normalization)
+        self.create_models(is_loaded, model_path, batch_size, num_time_steps, n_mlp_features, n_mlp_features_separation_prediction, x_pred_to, time_normalization)
         self.n_experts = len(self.experts)
 
-    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 10, x_pred_to = 1550, time_normalization = 22.):
+    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 5, n_mlp_features_separation_prediction = 7, x_pred_to = 1550, time_normalization = 22.):
         """Create list of experts.
 
         Creat experts based on self.expert_cofig.
@@ -68,12 +70,16 @@ class Expert_Manager(object):
         Load experts from model_path if is_loaded is True.
         Create new experts if is_loaded is False.
 
+        We multiply the number of MLP features by 2!
+            --> 1 point equals 2 coordinates (x and y)
+
         Args:
             is_loaded (Boolean):            True for loading models, False for creating new models
             model_path (String):            The path of the models if is_loaded is True
             batch_size (int):               The batch size of the data
             num_time_steps (int):           The number of timesteps in the longest track
             n_mlp_features (int):           The number of features for MLP networks
+            n_mlp_features_separation_prediction (int): The number of features for MLP separation prediction networks
             x_pred_to (double):             The x position of the nozzle array (only needed for kf separation prediction)
             time_normalization (double):    Time normalization constant (only needed for kf separation prediction)
         """
@@ -121,13 +127,25 @@ class Expert_Manager(object):
                     self.current_states.append([])
             elif expert_type=='MLP':
                 model_path = expert.get("model_path")
-                mlp_model = MLP_Model(expert_name, model_path, True, expert.get("options"))
-                if is_loaded:
-                    mlp_model.load_model()
+                
+                if "is_separator" in expert and expert.get("is_separator"):
+                    # Create MLP model for separation prediction
+                    mlp_model = MLP_Model(expert_name, model_path, False, expert.get("options"))
+                    if is_loaded:
+                        mlp_model.load_model()
+                    else:
+                        mlp_model.create_model(2 * n_mlp_features_separation_prediction)
+                    self.separation_experts.append(mlp_model)
                 else:
-                    mlp_model.create_model(n_mlp_features)
-                self.experts.append(mlp_model)
-                self.current_states.append([])
+                    # Create MLP model for tracking
+                    mlp_model = MLP_Model(expert_name, model_path, True, expert.get("options"))
+                    if is_loaded:
+                        mlp_model.load_model()
+                    else:
+                        mlp_model.create_model(2 * n_mlp_features)
+                    self.experts.append(mlp_model)
+                    self.current_states.append([])
+                
             else:
                 logging.warning("Expert type " + expert_type + " not supported. Will not create model.")
 
@@ -170,7 +188,7 @@ class Expert_Manager(object):
     def train_batch_separation_prediction(self,                     
                     seq2seq_inp = None, seq2seq_target = None, 
                     seq2seq_tracking_mask = None, seq2seq_separation_mask = None,
-                    mlp_inp = None, mlp_target = None):
+                    mlp_inp = None, mlp_target = None, mlp_mask=None):
         """Train one batch for all experts in separation prediction.
 
         TODO: Consider merging this funftion with train_batch
@@ -183,6 +201,7 @@ class Expert_Manager(object):
             **_target (tf.Tensor): Target tensor of tracks
             seq2seq_tracking_mask (tf.Tensor): Mask the valid time steps for tracking
             seq2seq_separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
+            mlp_mask (tf.Tensor):   Mask the tracks that have less than n points
 
         Returns:
             predictions (list): Predictions for each expert
@@ -200,7 +219,7 @@ class Expert_Manager(object):
             if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
                 prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.train_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) 
             elif expert.type == Expert_Type.MLP:
-                prediction = expert.train_batch(mlp_inp, mlp_target)
+                prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.train_batch_separation_prediction(mlp_inp, mlp_target, mlp_mask)
             prediction_list.append(prediction)
             spatial_losses.append(spatial_loss)
             temporal_losses.append(temporal_loss)
@@ -212,7 +231,7 @@ class Expert_Manager(object):
     def test_batch_separation_prediction(self,                     
                     seq2seq_inp = None, seq2seq_target = None, 
                     seq2seq_tracking_mask = None, seq2seq_separation_mask = None,
-                    mlp_inp = None, mlp_target = None):
+                    mlp_inp = None, mlp_target = None, mlp_mask=None):
         """Test one batch for all experts in separation prediction.
 
         TODO: Consider merging this funftion with train_batch
@@ -225,6 +244,7 @@ class Expert_Manager(object):
             **_target (tf.Tensor): Target tensor of tracks
             seq2seq_tracking_mask (tf.Tensor): Mask the valid time steps for tracking
             seq2seq_separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
+            mlp_mask (tf.Tensor):   Mask the tracks that have less than n points
 
         Returns:
             predictions (list): Predictions for each expert
@@ -242,7 +262,7 @@ class Expert_Manager(object):
             if expert.type == Expert_Type.KF or expert.type == Expert_Type.RNN:
                 prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.test_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) 
             elif expert.type == Expert_Type.MLP:
-                prediction = expert.train_batch(mlp_inp, mlp_target)
+                prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = expert.test_batch_separation_prediction(mlp_inp, mlp_target, mlp_mask)
             prediction_list.append(prediction)
             spatial_losses.append(spatial_loss)
             temporal_losses.append(temporal_loss)

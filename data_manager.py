@@ -41,6 +41,11 @@ class AbstractDataSet(ABC):
     seq2seq_data = np.array([])
     track_data = np.array([])
     aligned_track_data = np.array([])
+    mlp_data = np.array([])
+    track_num_mlp_id = dict()
+    separation_track_data = np.array([])
+    separation_spatial_labels = np.array([])
+    separation_temporal_labels = np.array([])
 
     def get_nan_value_ary(self):
         return [self.nan_value, self.nan_value]
@@ -568,6 +573,7 @@ class AbstractDataSet(ABC):
         target format: [y_nozzle, dt_nozzle]
             dt_nozzle describes the difference in time from the last measurement to the nozzle array.
             We don't take absolute time values because this minimizes the input to the network.
+        mask format: [is_masked]: Tracks with less than n_inp_points should be masked
 
         If there are not enough measurements in the track, the default input/target is: [0, 0, ..., 0], [0, 0]
 
@@ -580,16 +586,17 @@ class AbstractDataSet(ABC):
             n_inp_points (int):     Number of measurements for the input of the MLP
 
         Returns:
-            training_dataset (tf.Dataset): Batches of (input, target) pairs for training
-            testing_dataset (tf.Dataset)
+            training_dataset (tf.Dataset): Batches of (input, target, mask) sets for training
+            testing_dataset (tf.Dataset): Batches of (input, target, mask) sets for testing
         """
         track_data = self.separation_track_data
         spatial_labels = self.separation_spatial_labels
         temporal_labels = self.separation_temporal_labels
         
         n_tracks = track_data.shape[0]
-        mlp_data = np.zeros([n_tracks, 2*n_inp_points + 2])
+        mlp_data = np.zeros([n_tracks, 2*n_inp_points + 3])
         # Build MLP input and target for all tracks
+        missing_track_counter = 0
         for i in range(n_tracks):
             n_measurements = self.get_last_timestep_of_track(track_data[i])
             if n_measurements >= n_inp_points:
@@ -600,16 +607,20 @@ class AbstractDataSet(ABC):
                     mlp_data[i,c+n_inp_points] = track_data[i, index, 1]
                     c += 1
                 # Set target [y_nozzle, dt_nozzle]
-                mlp_data[i, -2] = spatial_labels[i, 1]
-                mlp_data[i, -1] = temporal_labels[i]  - (n_measurements-1)
+                mlp_data[i, -3] = spatial_labels[i, 1]
+                mlp_data[i, -2] = temporal_labels[i]
+                mlp_data[i, -1] = 1
             else:
-                stop=0
+                missing_track_counter += 1
+                mlp_data[i, -1] = 0
+
+        logging.info("Skipping {} tracks in the MLP separation prediction because their length was < {}".format(missing_track_counter, n_inp_points))
 
         if normalized:
             # normalize spatial data
-            mlp_data[:, :-1] /= self.normalization_constant
+            mlp_data[:, :-2] /= self.normalization_constant
             # normalize temporal prediction
-            mlp_data[:, -1] /= time_normalization
+            mlp_data[:, -2] /= time_normalization
 
         train_data, test_data = train_test_split(mlp_data, test_size=test_ratio, random_state=random_seed)
 
@@ -627,9 +638,10 @@ class AbstractDataSet(ABC):
         def split_input_target_separation(chunk):
             # split the tensor (x1, x2, ..., y1, y2, ..., y_pred_target, t_pred_target)
             #  -> into two tensors (x..., y...) and (y_pred_target, t_pred_target)
-            input_seq = chunk[:, :-2]
-            target_seq = chunk[:, -2:]
-            return input_seq, target_seq
+            input_seq = chunk[:, :-3]
+            target_seq = chunk[:, -3:-1]
+            mask_seq = chunk[:, -1]
+            return input_seq, target_seq, mask_seq
 
         dataset_train = minibatches_train.map(split_input_target_separation)
         dataset_test = minibatches_test.map(split_input_target_separation)
@@ -1019,7 +1031,7 @@ class FakeDataSet(AbstractDataSet):
         self.track_data = self._generate_tracks()
         self.aligned_track_data = self._convert_tracks_to_aligned_tracks(self.track_data)
         self.seq2seq_data = self._convert_aligned_tracks_to_seq2seq_data(self.aligned_track_data)
-        self._create_mlp_data(self.aligned_track_data, n_inp_points = mlp_input_dim)
+        #self._create_mlp_data(self.aligned_track_data, n_inp_points = mlp_input_dim)
         # if we don't have enough tracks, then the smaller split (usually test) is so small that is smaller
         # than a batch. Because we use drop_remainder=True we cannot allow this, or else the only batch
         # would be empty -> as a result we would not have test data

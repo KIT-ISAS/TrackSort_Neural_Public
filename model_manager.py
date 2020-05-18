@@ -51,7 +51,7 @@ class ModelManager(object):
         current_free_entries (set): Set of all dead free entries in batches
     """
 
-    def __init__(self, model_config, is_loaded, num_time_steps, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.):
+    def __init__(self, model_config, is_loaded, num_time_steps, n_mlp_features = 5, n_mlp_features_separation_prediction = 7, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.):
         """Initialize a model manager.
 
         Creates the expert manager and gating network.
@@ -70,6 +70,8 @@ class ModelManager(object):
                                              model_path = model_config.get('model_path'), 
                                              batch_size = model_config.get('batch_size'), 
                                              num_time_steps = num_time_steps, 
+                                             n_mlp_features = n_mlp_features,
+                                             n_mlp_features_separation_prediction = n_mlp_features_separation_prediction,
                                              x_pred_to = x_pred_to, 
                                              time_normalization = time_normalization)
         # The gating network that calculates all weights
@@ -530,10 +532,10 @@ class ModelManager(object):
             mlp_iter = iter(mlp_dataset_train)
 
             for (seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) in seq2seq_iter:
-                (mlp_inp, mlp_target) = next(mlp_iter)
+                (mlp_inp, mlp_target, mlp_mask) = next(mlp_iter)
                 # Train experts on a batch
                 predictions, spatial_losses, temporal_losses, spatial_maes, temporal_maes = \
-                    self.expert_manager.train_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target)
+                    self.expert_manager.train_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target, mlp_mask)
                 # Create a mask for end of tracks and for beginning of tracks (MLP)
                 #masks = self.expert_manager.get_masks_separation_prediction(mask_value, seq2seq_target, mlp_target)
                 # Calculate loss for all models
@@ -573,10 +575,10 @@ class ModelManager(object):
                 mlp_iter = iter(mlp_dataset_test)
 
                 for (seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) in seq2seq_iter:
-                    (mlp_inp, mlp_target) = next(mlp_iter)
+                    (mlp_inp, mlp_target, mlp_mask) = next(mlp_iter)
                     # Train experts on a batch
                     predictions, spatial_losses, temporal_losses, spatial_maes, temporal_maes = \
-                        self.expert_manager.test_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target)
+                        self.expert_manager.test_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target, mlp_mask)
                     # Create a mask for end of tracks and for beginning of tracks (MLP)
                     #masks = self.expert_manager.get_masks_separation_prediction(mask_value, seq2seq_target, mlp_target)
                     # Calculate loss for all models

@@ -12,6 +12,7 @@
           "activation": "leakly_relu"
         }
       }
+    }
   },
   "gating": {
     "type": "Simple_Ensemble",

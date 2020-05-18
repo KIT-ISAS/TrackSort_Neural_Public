@@ -241,6 +241,8 @@ def run_global_config(global_config, experiment_series_names=''):
     model_manager = ModelManager(model_config = model_config,
                                  is_loaded = global_config.get("is_loaded"), 
                                  num_time_steps = data_source.longest_track, 
+                                 n_mlp_features = global_config.get("mlp_input_dim"),
+                                 n_mlp_features_separation_prediction = global_config.get("separation_mlp_input_dim"),
                                  overwriting_activated = global_config.get("overwriting_activated"),
                                  x_pred_to = global_config.get("CsvDataSet").get("virtual_nozzle_array_x_position")/data_source.normalization_constant,
                                  time_normalization = global_config['time_normalization_constant'])

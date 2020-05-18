@@ -45,12 +45,13 @@ class MLP_Model(Expert):
             is_next_step (Boolean): Do we train a tracking or an seperation prediction net
             mlp_config (dict):      Arguments for the mlp_model_factory
         """
+        self.is_next_step = is_next_step
         self.model_structure = mlp_config.get("model_structure")
         if "base_learning_rate" in mlp_config:
             self.base_learning_rate = mlp_config.get("base_learning_rate")
         else:
             self.base_learning_rate = 0.005
-        self._label_dim = 2 if is_next_step else 4
+        self._label_dim = 2
         super().__init__(Expert_Type.MLP, name, model_path)
 
     def create_model(self, n_features):
@@ -64,7 +65,10 @@ class MLP_Model(Expert):
         logging.info(self.mlp_model.summary())
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
         self.loss_object = tf.keras.losses.MeanSquaredError()
-        self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
+        if self.is_next_step:
+            self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
+        else:
+            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
 
     def load_model(self):
         """Load a MLP model from its model path."""
@@ -83,6 +87,38 @@ class MLP_Model(Expert):
             prediction (tf.Tensor): Predicted positions for training instances
         """
         return self.train_step_fn(inp, target)
+
+    def train_batch_separation_prediction(self, inp, target, mask):
+        """Train the MLP model on a batch of data.
+
+        Args:
+            inp (tf.Tensor):    A batch of input tracks
+            target (tf.Tensor): The prediction targets to the inputs
+            mask (tf.Tensor):   Indicates which tracks are valid
+
+        Returns
+            prediction (tf.Tensor):     Predicted positions for training instances
+            spacial_loss (tf.Tensor):   MSE of y_nozzle prediction
+            temporal_loss (tf.Tensor):  MSE of dt_nozzle prediction
+            spacial_mae, temporal_mae:  MAE --""--
+        """
+        return self.train_step_fn(inp, target, mask, training=True)
+
+    def test_batch_separation_prediction(self, inp, target, mask):
+        """Test the MLP model on a batch of data.
+
+        Args:
+            inp (tf.Tensor):    A batch of input tracks
+            target (tf.Tensor): The prediction targets to the inputs
+            mask (tf.Tensor):   Indicates which tracks are valid
+
+        Returns
+            prediction (tf.Tensor):     Predicted positions for training instances
+            spacial_loss (tf.Tensor):   MSE of y_nozzle prediction
+            temporal_loss (tf.Tensor):  MSE of dt_nozzle prediction
+            spacial_mae, temporal_mae:  MAE --""--
+        """
+        return self.train_step_fn(inp, target, mask, training=False)
 
     def predict_batch(self, inp):
         """Predict a batch of input data."""
@@ -190,7 +226,6 @@ def train_step_generator(model, optimizer, loss_object):
     Args:
         model:      model according to estimator api
         optimizer:  tf estimator
-        nan_value:  e.g. 0
 
     Returns
         function which can be called to train the given model with the given optimizer
@@ -199,7 +234,7 @@ def train_step_generator(model, optimizer, loss_object):
     def train_step(inp, target):
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
-            predictions = model(inp)
+            predictions = model(inp, training=True)
 
             loss = loss_object(target, predictions)
 
@@ -210,11 +245,72 @@ def train_step_generator(model, optimizer, loss_object):
 
     return train_step
 
+def train_step_generator_separation_prediction(model, optimizer, loss_object):
+    """Build a function which returns a computational graph for tensorflow.
 
-# compile the model
-#model.compile(optimizer='adam', loss='mse')
-# fit the model
-#model.fit(X_train, y_train, epochs=150, batch_size=32, verbose=0)
-# evaluate the model
-#error = model.evaluate(X_test, y_test, verbose=0)
-#print('MSE: %.3f, RMSE: %.3f' % (error, sqrt(error)))
+    This function can be called to train the given model with the given optimizer.
+
+    TODO: Maybe merge this with the tracking training function?
+
+    Args:
+        model:      model according to estimator api
+        optimizer:  tf estimator
+
+    Returns
+        function which can be called to train the given model with the given optimizer
+    """
+    @tf.function
+    def train_step(inp, target, mask, training=True):
+        with tf.GradientTape() as tape:
+            #target = K.cast(target, tf.float64)
+            predictions = model(inp, training=training, mask=mask)
+            spatial_loss, temporal_loss = get_separation_loss(predictions, target, mask)
+            spatial_mae, temporal_mae = get_separation_loss(predictions, target, mask)
+            loss = 1/2 * (spatial_loss + temporal_loss)
+        if training:
+            grads = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        return predictions, spatial_loss, temporal_loss, spatial_mae, temporal_mae
+
+    return train_step
+
+def get_separation_loss(prediction, target, mask):
+    """Calculate the spatial and temporal loss in the separation prediction training.
+
+    temporal_loss = MSE([y_nozzle] prediction<->target)
+    spatial_loss = MSE([dt_nozzle] prediction<->target)
+
+    Args:
+        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        mask (tf.Tensor):       Indicates which instances are valid
+
+    Returns:
+        spatial_loss, temporal_loss
+    """
+    # Spatial loss
+    spatial_loss = tf.reduce_sum(tf.pow(target[:, 0]-prediction[:, 0], 2) * mask)/tf.reduce_sum(mask)
+     # Temporal loss
+    temporal_loss = tf.reduce_sum(tf.pow(target[:, 1]-prediction[:, 1], 2) * mask)/tf.reduce_sum(mask)
+    return spatial_loss, temporal_loss
+
+def get_separation_mae(prediction, target, mask):
+    """Calculate the spatial and temporal MAE in the separation prediction training.
+
+    temporal_loss = MAE([y_nozzle] prediction<->target)
+    spatial_loss = MAE([dt_nozzle] prediction<->target)
+
+    Args:
+        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        mask (tf.Tensor):       Indicates which instances are valid
+
+    Returns:
+        spatial_mae, temporal_mae
+    """
+    # Spatial mae
+    spatial_mae = tf.reduce_sum(tf.pow(target[:, 0]-prediction[:, 0], 2) * mask)/tf.reduce_sum(mask)
+     # Temporal mae
+    temporal_mae = tf.reduce_sum(tf.pow(target[:, 1]-prediction[:, 1], 2) * mask)/tf.reduce_sum(mask)
+    return spatial_mae, temporal_mae
