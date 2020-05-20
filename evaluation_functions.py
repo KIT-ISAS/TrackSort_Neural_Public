@@ -141,7 +141,7 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     """
     assert(len(expert_names) == predictions.shape[0])
     # Calculate errors
-    errors = np.repeat(target[np.newaxis,:,:], predictions.shape[0], axis=0) - predictions
+    errors = predictions - np.repeat(target[np.newaxis,:,:], predictions.shape[0], axis=0)
     # denormalize the errors
     spatial_errors = errors[:,:,0] * normalization_constant
     temporal_errors = errors[:,:,1] * time_normalization_constant

@@ -136,8 +136,21 @@ class CA_Model(KF_Model):
                         a_last = ca_state.get_a()
                         v_last = ca_state.get_v()
                         pos_last = ca_state.get_pos()
-                        dt_pred = 1/self.dt * (- v_last[0]/a_last[0] + np.sign(a_last[0]) * np.sqrt((v_last[0]/a_last[0])**2 - 2*(pos_last[0]-self.x_pred_to)/a_last[0]))
-                        y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt + 1/2 * dt_pred**2 * self.dt**2 * a_last[1]
+                        if a_last[0]==0:
+                            a_last[0]=0.000000000001
+                        sqrt_val = (v_last[0]/a_last[0])**2 - 2*(pos_last[0]-self.x_pred_to)/a_last[0]
+                        if sqrt_val >= 0:
+                            dt_pred = 1/self.dt * (- v_last[0]/a_last[0] + np.sign(a_last[0]) * np.sqrt(sqrt_val))
+                            y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt + 1/2 * dt_pred**2 * self.dt**2 * a_last[1]
+                        else:
+                            logging.warning("With the predicted velocity of {} and the predicted acceleration of {} the track {} would not reach the nozzle array. Perform cv prediction!".format(v_last[0], a_last[0], i))
+                            if v_last[0] > 0:
+                                dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
+                                y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
+                            else:
+                                logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model.".format(v_last[0], i))
+                                y_pred = pos_last[1]
+                                dt_pred = 11 # This is a fairly close value. Please investigate the issue!               
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                     else:

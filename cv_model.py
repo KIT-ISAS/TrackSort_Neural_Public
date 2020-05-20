@@ -131,8 +131,13 @@ class CV_Model(KF_Model):
                         # Make separation prediction
                         v_last = cv_state.get_v()
                         pos_last = cv_state.get_pos()
-                        dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
-                        y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
+                        if v_last[0] > 0:
+                            dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
+                            y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
+                        else:
+                            logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model.".format(v_last[0], i))
+                            y_pred = pos_last[1]
+                            dt_pred = 11 # This is a fairly close value. Please investigate the issue!
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                     else:
