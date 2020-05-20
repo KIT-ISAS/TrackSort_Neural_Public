@@ -971,7 +971,7 @@ class AbstractDataSet(ABC):
         qx = np.sqrt(np.sum((spatial_labels - q_values) ** 2, axis=1))
         xp = np.sqrt(np.sum((spatial_labels - p_values) ** 2, axis=1))
         # take the weighted average between both indices
-        temporal_labels = (qx * q_indices + xp * p_indices) / (qx + xp) - last_measurement_before_edge_indices
+        temporal_labels = q_indices + qx / (qx + xp) - last_measurement_before_edge_indices
         
         return aligned_track_data, spatial_labels, temporal_labels
 
