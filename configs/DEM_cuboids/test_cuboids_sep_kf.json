@@ -1,7 +1,7 @@
 {
   "batch_size": 64,
   "experts": {
-    "KF_CV": {
+    "KF_CVBC_CV": {
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
@@ -20,7 +20,7 @@
         "pos_var": 2
       }
     },
-    "KF_CV": {
+    "KF_CV_CV": {
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,

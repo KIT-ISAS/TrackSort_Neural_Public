@@ -6,7 +6,6 @@ Todo:
 
 import numpy as np
 import logging
-from os import path
 
 from enum import Enum, auto
 
@@ -102,7 +101,7 @@ class CV_Model(KF_Model):
         """Train the cv model on a batch of data."""
         return self.predict_batch(inp)
 
-    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask, no_train_mode=False):
         """Train the cv model for separation prediction on a batch of data.
 
         The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
@@ -112,6 +111,7 @@ class CV_Model(KF_Model):
             target (tf.Tensor):         Batch of track target measurements
             tracking_mask (tf.Tensor):  Batch of tracking masks
             separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+            no_train_mode (Boolean):    Option to disable training of spatial and temporal variable
 
         Returns:
             prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle]
@@ -120,13 +120,20 @@ class CV_Model(KF_Model):
             spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
             temporal_mae (tf.Tensor):   mean(abs(dt_nozzle_pred - dt_nozzle_target))
         """ 
-        prediction = self.predict_batch_separation(inp, separation_mask)
+        prediction = self.predict_batch_separation(inp=inp, separation_mask=separation_mask, is_training=not no_train_mode)
         target_np = target.numpy()
         separation_mask_np = separation_mask.numpy()
         spatial_loss = np.sum(np.power(prediction[:,:,2]-target_np[:,:,2], 2)*separation_mask_np) / np.sum(separation_mask_np)
         temporal_loss = np.sum(np.power(prediction[:,:,3]-target_np[:,:,3], 2)*separation_mask_np) / np.sum(separation_mask_np)
         spatial_mae = np.sum(np.abs(prediction[:,:,2]-target_np[:,:,2])*separation_mask_np) / np.sum(separation_mask_np)
         temporal_mae = np.sum(np.abs(prediction[:,:,3]-target_np[:,:,3])*separation_mask_np) / np.sum(separation_mask_np)
+
+        if self.temporal_prediction == CV_Temporal_Separation_Type.BC and not no_train_mode:
+            # Learn bias.
+            bias = np.sum((prediction[:,:,3]-target_np[:,:,3])*separation_mask_np) / np.sum(separation_mask_np)
+            self.temporal_variable = (self.batch_counter * self.temporal_variable + 1 * bias) / (self.batch_counter + 1)
+            
+        self.batch_counter += 1
         return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae 
 
     def predict_batch(self, inp):
@@ -151,7 +158,7 @@ class CV_Model(KF_Model):
                     
         return predictions
 
-    def predict_batch_separation(self, inp, separation_mask):
+    def predict_batch_separation(self, inp, separation_mask, is_training=False):
         """Predict a batch of data with the cv model."""
         np_inp = inp.numpy()
         np_separation_mask = separation_mask.numpy()
@@ -178,13 +185,33 @@ class CV_Model(KF_Model):
                         # Make separation prediction
                         v_last = cv_state.get_v()
                         pos_last = cv_state.get_pos()
-                        if v_last[0] > 0:
-                            dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
+                        # In training we only perform the default types
+                        temporal_separation_type = CV_Temporal_Separation_Type.Default if is_training else self.temporal_prediction
+                        spatial_separation_type =  CV_Spatial_Separation_Type.Default if is_training else self.spatial_prediction
+                        # Check if x velocity sanity
+                        # Default values
+                        dt_pred = 11 # This is a fairly close value. Please investigate the issue!
+                        y_pred = pos_last[1]
+                        if v_last[0] <= 0:
+                            logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model. \n \
+                                                Setting the time to default value = {}!!!".format(v_last[0], i, dt_pred))
+                            break
+                        # First perform temporal predicion
+                        if temporal_separation_type == CV_Temporal_Separation_Type.Default:
+                                dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
+                        elif temporal_separation_type == CV_Temporal_Separation_Type.BC:
+                                dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
+                                # Adjust prediction with bias
+                                dt_pred -= self.temporal_variable
+                        elif temporal_separation_type == CV_Temporal_Separation_Type.IA:
+                            logging.error("IA prediction not implemented yet.")
+                            dt_pred = 11
+                        # Then perform spatial prediction
+                        if spatial_separation_type == CV_Spatial_Separation_Type.Default:
                             y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
-                        else:
-                            logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model.".format(v_last[0], i))
+                        elif spatial_separation_type == CV_Spatial_Separation_Type.Ratio:
+                            logging.error("Ratio prediction not implemented yet.")
                             y_pred = pos_last[1]
-                            dt_pred = 11 # This is a fairly close value. Please investigate the issue!
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                     else:
@@ -200,20 +227,6 @@ class CV_Model(KF_Model):
             dummy_list.append(CV_State([0.0, 0.0], 0))
 
         return dummy_list
-
-    def load_model(self):
-        """Load parameters for CV model."""
-        if path.exists(self.model_path):
-            stop=0
-        else:
-            logging.warning("Model file for Kalman filter CV model '{}' does not exist at {}.".format(self.name, self.model_path))
-
-    def save_model(self):
-        """Save parameters for CV model."""
-        if path.exists(self.model_path):
-            stop=0
-        else:
-            logging.warning("Model file for Kalman filter CV model '{}' does not exist at {}.".format(self.name, self.model_path))
 
 
 class CV_State(KF_State):

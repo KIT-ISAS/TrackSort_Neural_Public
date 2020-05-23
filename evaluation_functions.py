@@ -172,7 +172,7 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
         plt.ylabel("Spatial deviation [mm]")
         plt.ylim([-10, 10])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
-    plt.savefig(result_dir + 'spatial_error_mse_box_plot.pdf') 
+    plt.savefig(result_dir + 'spatial_error_box_plot.pdf') 
     if not no_show:
         plt.show()
     # Show temporal plot
@@ -184,7 +184,7 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     else:
         plt.ylim([-2, 2])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
-    plt.savefig(result_dir + 'temporal_error_mse_box_plot.pdf') 
+    plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 
     if not no_show:
         plt.show()
 

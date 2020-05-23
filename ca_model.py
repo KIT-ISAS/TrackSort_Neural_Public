@@ -7,7 +7,6 @@ Todo:
 import numpy as np
 import logging
 from enum import Enum, auto
-from os import path
 
 from kf_model import KF_Model, KF_State
 
@@ -102,7 +101,7 @@ class CA_Model(KF_Model):
         """Train the cv model on a batch of data."""
         return self.predict_batch(inp)
 
-    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask, no_train_mode=False):
         """Train the cv model for separation prediction on a batch of data.
 
         The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
@@ -112,6 +111,7 @@ class CA_Model(KF_Model):
             target (tf.Tensor):         Batch of track target measurements
             tracking_mask (tf.Tensor):  Batch of tracking masks
             separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+            no_train_mode (Boolean):    Option to disable training of spatial and temporal variable
 
         Returns:
             prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle]
@@ -120,7 +120,7 @@ class CA_Model(KF_Model):
             spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
             temporal_mae (tf.Tensor):   mean(abs(dt_nozzle_pred - dt_nozzle_target))
         """ 
-        prediction = self.predict_batch_separation(inp, separation_mask)
+        prediction = self.predict_batch_separation(inp=inp, separation_mask=separation_mask, is_training=not no_train_mode)
         target_np = target.numpy()
         separation_mask_np = separation_mask.numpy()
         spatial_loss = np.sum(np.power(prediction[:,:,2]-target_np[:,:,2], 2)*separation_mask_np) / np.sum(separation_mask_np)
@@ -151,7 +151,7 @@ class CA_Model(KF_Model):
                     
         return predictions
 
-    def predict_batch_separation(self, inp, separation_mask):
+    def predict_batch_separation(self, inp, separation_mask, is_training=False):
         """Predict a batch of data with the cv model."""
         np_inp = inp.numpy()
         np_separation_mask = separation_mask.numpy()
@@ -179,13 +179,14 @@ class CA_Model(KF_Model):
                         a_last = ca_state.get_a()
                         v_last = ca_state.get_v()
                         pos_last = ca_state.get_pos()
+                        # In training we only perform the default types
+                        temporal_separation_type = CA_Temporal_Separation_Type.Default if is_training else self.temporal_prediction
+                        spatial_separation_type = CA_Spatial_Separation_Type.Default if is_training else self.spatial_prediction 
+                        # Sanity checks and error management
                         if a_last[0]==0:
                             a_last[0]=0.000000000001
                         sqrt_val = (v_last[0]/a_last[0])**2 - 2*(pos_last[0]-self.x_pred_to)/a_last[0]
-                        if sqrt_val >= 0:
-                            dt_pred = 1/self.dt * (- v_last[0]/a_last[0] + np.sign(a_last[0]) * np.sqrt(sqrt_val))
-                            y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt + 1/2 * dt_pred**2 * self.dt**2 * a_last[1]
-                        else:
+                        if sqrt_val < 0:
                             logging.warning("With the predicted velocity of {} and the predicted acceleration of {} the track {} would not reach the nozzle array. Perform cv prediction!".format(v_last[0], a_last[0], i))
                             if v_last[0] > 0:
                                 dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
@@ -193,7 +194,21 @@ class CA_Model(KF_Model):
                             else:
                                 logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model.".format(v_last[0], i))
                                 y_pred = pos_last[1]
-                                dt_pred = 11 # This is a fairly close value. Please investigate the issue!               
+                                dt_pred = 11 # This is a fairly close value. Please investigate the issue!   
+                            break 
+                        # First perform temporal predicion
+                        if temporal_separation_type == CA_Temporal_Separation_Type.Default:
+                            dt_pred = 1/self.dt * (- v_last[0]/a_last[0] + np.sign(a_last[0]) * np.sqrt(sqrt_val))
+                        elif temporal_separation_type == CA_Temporal_Separation_Type.LV:
+                            logging.error("LV prediction not implemented yet.")
+                            dt_pred = 11
+                        # Then perform spatial prediction
+                        if spatial_separation_type == CA_Spatial_Separation_Type.Default:
+                            y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt + 1/2 * dt_pred**2 * self.dt**2 * a_last[1]
+                        elif spatial_separation_type == CA_Spatial_Separation_Type.DSC:
+                            logging.error("DSC prediction not implemented yet.")
+                            y_pred = pos_last[1]
+                                       
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                     else:
@@ -209,20 +224,6 @@ class CA_Model(KF_Model):
             dummy_list.append(CA_State([0.0, 0.0], 0))
 
         return dummy_list
-
-    def load_model(self):
-        """Load parameters for CA model."""
-        if path.exists(self.model_path):
-            stop=0
-        else:
-            logging.warning("Model file for Kalman filter CA model '{}' does not exist at {}.".format(self.name, self.model_path))
-
-    def save_model(self):
-        """Save parameters for CA model."""
-        if path.exists(self.model_path):
-            stop=0
-        else:
-            logging.warning("Model file for Kalman filter CA model '{}' does not exist at {}.".format(self.name, self.model_path))
 
 
 class CA_State(KF_State):
