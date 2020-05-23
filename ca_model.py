@@ -151,7 +151,7 @@ class CA_Model(KF_Model):
                     
         return predictions
 
-    def predict_batch_separation(self, inp, separation_mask, is_training=False):
+    def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
         """Predict a batch of data with the cv model."""
         np_inp = inp.numpy()
         np_separation_mask = separation_mask.numpy()

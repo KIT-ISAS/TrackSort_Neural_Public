@@ -43,8 +43,6 @@ class KF_Model(Expert):
         # This variable can be filled in training to perform some of the spatial predictions.
         # This variable will be saved and loaded.
         self.spatial_variable = 0
-        # For training purposes
-        self.batch_counter = 0
         super().__init__(Expert_Type.KF, name, model_path)
 
     def predict(self, current_state):
@@ -89,6 +87,7 @@ class KF_Model(Expert):
         else:
             current_state.first = False
 
+    @abstractmethod
     def predict_batch(self, inp):
         """Predict a batch of input data for testing.
 
@@ -100,13 +99,15 @@ class KF_Model(Expert):
         """
         pass
 
-    def predict_batch_separation(self, inp, separation_mask, is_training=False):
+    @abstractmethod
+    def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
         """Perform separation prediction on a batch of input data.
 
         Args:
             inp (tf.Tensor):                A batch of input tracks
             separation_mask (tf.Tensor):    Indicating the last time step of the track
             is_training (Boolean):          Only perform default prediction style in training.
+            target (tf.Tensor):             The target is needed for training in some cases.
 
         Returns
             prediction (np.array): Predicted x, y, y_nozzel and dt_nozzle

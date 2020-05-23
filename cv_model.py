@@ -79,6 +79,10 @@ class CV_Model(KF_Model):
         else:
             logging.warning("Spatial separation prediction type '{}' is unknown. Setting to default.".format(spatial_separator)) 
             self.spatial_prediction = CV_Spatial_Separation_Type.Default
+        self.temporal_training_sum = 0
+        self.temporal_training_count = 0
+        self.spatial_training_sum = 0
+        self.spatial_training_count = 0
         # Transition matrix
         F = np.matrix([[1, dt, 0, 0],
                            [0,  1, 0, 0],
@@ -120,20 +124,14 @@ class CV_Model(KF_Model):
             spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
             temporal_mae (tf.Tensor):   mean(abs(dt_nozzle_pred - dt_nozzle_target))
         """ 
-        prediction = self.predict_batch_separation(inp=inp, separation_mask=separation_mask, is_training=not no_train_mode)
+        prediction = self.predict_batch_separation(inp=inp, separation_mask=separation_mask, is_training=not no_train_mode, target=target)
         target_np = target.numpy()
         separation_mask_np = separation_mask.numpy()
         spatial_loss = np.sum(np.power(prediction[:,:,2]-target_np[:,:,2], 2)*separation_mask_np) / np.sum(separation_mask_np)
         temporal_loss = np.sum(np.power(prediction[:,:,3]-target_np[:,:,3], 2)*separation_mask_np) / np.sum(separation_mask_np)
         spatial_mae = np.sum(np.abs(prediction[:,:,2]-target_np[:,:,2])*separation_mask_np) / np.sum(separation_mask_np)
         temporal_mae = np.sum(np.abs(prediction[:,:,3]-target_np[:,:,3])*separation_mask_np) / np.sum(separation_mask_np)
-
-        if self.temporal_prediction == CV_Temporal_Separation_Type.BC and not no_train_mode:
-            # Learn bias.
-            bias = np.sum((prediction[:,:,3]-target_np[:,:,3])*separation_mask_np) / np.sum(separation_mask_np)
-            self.temporal_variable = (self.batch_counter * self.temporal_variable + 1 * bias) / (self.batch_counter + 1)
-            
-        self.batch_counter += 1
+    
         return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae 
 
     def predict_batch(self, inp):
@@ -158,10 +156,14 @@ class CV_Model(KF_Model):
                     
         return predictions
 
-    def predict_batch_separation(self, inp, separation_mask, is_training=False):
+    def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
         """Predict a batch of data with the cv model."""
         np_inp = inp.numpy()
         np_separation_mask = separation_mask.numpy()
+        if target is not None:
+            target_np = target.numpy()
+        else:
+            target_np = None
 
         n_tracks = np_inp.shape[0]
         track_length = np_inp.shape[1]
@@ -185,9 +187,6 @@ class CV_Model(KF_Model):
                         # Make separation prediction
                         v_last = cv_state.get_v()
                         pos_last = cv_state.get_pos()
-                        # In training we only perform the default types
-                        temporal_separation_type = CV_Temporal_Separation_Type.Default if is_training else self.temporal_prediction
-                        spatial_separation_type =  CV_Spatial_Separation_Type.Default if is_training else self.spatial_prediction
                         # Check if x velocity sanity
                         # Default values
                         dt_pred = 11 # This is a fairly close value. Please investigate the issue!
@@ -197,19 +196,23 @@ class CV_Model(KF_Model):
                                                 Setting the time to default value = {}!!!".format(v_last[0], i, dt_pred))
                             break
                         # First perform temporal predicion
-                        if temporal_separation_type == CV_Temporal_Separation_Type.Default:
+                        if self.temporal_prediction == CV_Temporal_Separation_Type.Default:
                                 dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
-                        elif temporal_separation_type == CV_Temporal_Separation_Type.BC:
+                        elif self.temporal_prediction == CV_Temporal_Separation_Type.BC:
                                 dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
-                                # Adjust prediction with bias
-                                dt_pred -= self.temporal_variable
-                        elif temporal_separation_type == CV_Temporal_Separation_Type.IA:
+                                if is_training:
+                                    self.temporal_training_sum += dt_pred/self.time_normalization - target_np[i, j, 3]
+                                    self.temporal_training_count += 1
+                                else:
+                                    # Adjust prediction with bias
+                                    dt_pred -= self.temporal_variable
+                        elif self.temporal_prediction == CV_Temporal_Separation_Type.IA:
                             logging.error("IA prediction not implemented yet.")
                             dt_pred = 11
                         # Then perform spatial prediction
-                        if spatial_separation_type == CV_Spatial_Separation_Type.Default:
+                        if self.spatial_prediction == CV_Spatial_Separation_Type.Default:
                             y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
-                        elif spatial_separation_type == CV_Spatial_Separation_Type.Ratio:
+                        elif self.spatial_prediction == CV_Spatial_Separation_Type.Ratio:
                             logging.error("Ratio prediction not implemented yet.")
                             y_pred = pos_last[1]
                         predictions[i, j, 2] = y_pred
@@ -217,7 +220,8 @@ class CV_Model(KF_Model):
                     else:
                         logging.warning("Track out of measurements at first time step.")
                     break
-
+        if is_training and self.temporal_training_count>0:
+            self.temporal_variable = self.temporal_training_sum/self.temporal_training_count
         return predictions
 
     def get_zero_state(self, batch_size):
