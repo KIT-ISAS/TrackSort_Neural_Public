@@ -25,14 +25,14 @@ class KF_Model(Expert):
 
     __metaclass__ = Expert
 
-    def __init__(self, name, F, C_w, H, C_v, default_state_options):
+    def __init__(self, name, model_path, F, C_w, H, C_v, default_state_options):
         """Initialize a new Kalman filter with given matrices."""
         self.F = F
         self.C_w = C_w
         self.H = H
         self.C_v = C_v
         self.default_state_options = default_state_options
-        super().__init__(Expert_Type.KF, name)
+        super().__init__(Expert_Type.KF, name, model_path)
 
     def predict(self, current_state):
         """Execute the prediction step of the Kalman filter.
@@ -143,6 +143,7 @@ class KF_Model(Expert):
         """
         pass
 
+    @abstractmethod
     def load_model(self):
         """Load KF model.
 
@@ -150,6 +151,7 @@ class KF_Model(Expert):
         """
         pass
 
+    @abstractmethod
     def save_model(self):
         """Save KF model.
 

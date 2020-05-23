@@ -86,68 +86,46 @@ class Expert_Manager(object):
         for expert_name in self.expert_config:
             expert = self.expert_config.get(expert_name)
             expert_type = expert.get("type")
+            is_separation = "is_separator" in expert and expert.get("is_separator")
+            if expert.get("model_path") is not None:
+                model_path = expert.get("model_path") 
+            else:
+                logging.error("Model path of expert {} does not exist.".format(expert_name))
             if expert_type == 'RNN':
-                model_path = expert.get("model_path")
-                if "is_separator" in expert and expert.get("is_separator"):
-                    # Create RNN model for separation prediction
-                    rnn_model = RNN_Model(False, expert_name, model_path, expert.get("options"))
-                    if is_loaded:
-                        rnn_model.load_model()
-                    else:
-                        only_last_timestep_additional_loss = False if "only_last_timestep_additional_loss" not in expert else expert.get("only_last_timestep_additional_loss")
-                        rnn_model.create_model(batch_size=batch_size, 
-                                               num_time_steps=num_time_steps,
-                                               only_last_timestep_additional_loss=only_last_timestep_additional_loss)
-                    self.separation_experts.append(rnn_model)
+                model = RNN_Model(~is_separation, expert_name, model_path, expert.get("options"))
+                if is_loaded:
+                    model.load_model()
                 else:
-                    # Create RNN model
-                    rnn_model = RNN_Model(True, expert_name, model_path, expert.get("options"))
-                    if is_loaded:
-                        rnn_model.load_model()
-                    else:
-                        rnn_model.create_model(batch_size, num_time_steps)
-                    self.experts.append(rnn_model)
-                    self.current_states.append([])
+                    model.create_model(batch_size=batch_size, 
+                                       num_time_steps=num_time_steps)
             elif expert_type == 'KF':
                 # Create Kalman filter model
                 sub_type = expert.get("sub_type")
                 if sub_type == 'CV':
                     # Create constant velocity model
-                    kf_model = CV_Model(expert_name, x_pred_to, time_normalization, **expert.get("model_options"), default_state_options=expert.get("state_options"))
+                    model = CV_Model(expert_name, model_path, x_pred_to, time_normalization, **expert.get("model_options"), default_state_options=expert.get("state_options"))
                 elif sub_type == 'CA':
                     # Create constant acceleration model
-                    kf_model = CA_Model(expert_name, x_pred_to, time_normalization, **expert.get("model_options"), default_state_options=expert.get("state_options"))
+                    model = CA_Model(expert_name, model_path, x_pred_to, time_normalization, **expert.get("model_options"), default_state_options=expert.get("state_options"))
                 else:
                     logging.warning("Kalman filter subtype " + sub_type + " not supported. Will not create model.") 
                     continue
-                if "is_separator" in expert and expert.get("is_separator"):
-                    self.separation_experts.append(kf_model)
-                else:
-                    self.experts.append(kf_model)
-                    self.current_states.append([])
+                if is_loaded:
+                    model.load_model()  
             elif expert_type=='MLP':
-                model_path = expert.get("model_path")
-                
-                if "is_separator" in expert and expert.get("is_separator"):
-                    # Create MLP model for separation prediction
-                    mlp_model = MLP_Model(expert_name, model_path, False, expert.get("options"))
-                    if is_loaded:
-                        mlp_model.load_model()
-                    else:
-                        mlp_model.create_model(2 * n_mlp_features_separation_prediction)
-                    self.separation_experts.append(mlp_model)
+                model = MLP_Model(expert_name, model_path, ~is_separation, expert.get("options"))
+                if is_loaded:
+                    model.load_model()
                 else:
-                    # Create MLP model for tracking
-                    mlp_model = MLP_Model(expert_name, model_path, True, expert.get("options"))
-                    if is_loaded:
-                        mlp_model.load_model()
-                    else:
-                        mlp_model.create_model(2 * n_mlp_features)
-                    self.experts.append(mlp_model)
-                    self.current_states.append([])
-                
+                    model.create_model(2 * (n_mlp_features_separation_prediction if is_separation else n_mlp_features))
             else:
                 logging.warning("Expert type " + expert_type + " not supported. Will not create model.")
+
+            if is_separation:
+                self.separation_experts.append(model)
+            else:
+                self.experts.append(model)
+                self.current_states.append([])
 
     def save_models(self):
         """Save all models to their model paths."""

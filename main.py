@@ -328,8 +328,8 @@ def run_global_config(global_config, experiment_series_names=''):
     if global_config["separation_prediction"]:
         if global_config.get('execute_evaluation'):
             model_manager.test_models_separation_prediction(result_dir = global_config['result_path'],
-                                    seq2seq_dataset_test = seq2seq_dataset_test_sp, 
-                                    mlp_dataset_test = mlp_dataset_test_sp,
+                                    seq2seq_dataset_test = seq2seq_dataset_train_sp, 
+                                    mlp_dataset_test = mlp_dataset_train_sp,
                                     normalization_constant = data_source.normalization_constant,
                                     time_normalization_constant=global_config['time_normalization_constant'],
                                     no_show = global_config['no_show'])

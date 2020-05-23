@@ -5,32 +5,10 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CVBC_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
-        "s_v": 2,
-        "temporal_separator": "BC",
-        "spatial_separator": "default"
-      },
-      "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 2
-      }
-    },
-    "KF_CV": {
-      "type": "KF",
-      "sub_type": "CV",
-      "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CV_CV.pkl",
-      "model_options": {
-        "dt": 1,
-        "s_w": 1,
-        "s_v": 2,
-        "temporal_separator": "default",
-        "spatial_separator": "default"
+        "s_v": 2
       },
       "state_options": {
         "velocity_guess": 0.01,
@@ -43,7 +21,6 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CA.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,

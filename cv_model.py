@@ -6,8 +6,33 @@ Todo:
 
 import numpy as np
 import logging
+from os import path
+
+from enum import Enum, auto
 
 from kf_model import KF_Model, KF_State
+
+class CV_Temporal_Separation_Type(Enum):
+    """Simple enumeration class for temporal separion prediction with the CV model.
+    
+    Available options are:
+        * Default:  The CV motion model
+        * BC:       Bias Corrected CV model. Bias is learned on training data. Prediction will be corrected with bias.
+        * IA:       Identically Acceleration model. The median acceleration is learned on training data. CA model with the median acc is applied.
+    """
+    Default = auto()
+    BC = auto()
+    IA = auto()
+
+class CV_Spatial_Separation_Type(Enum):
+    """Simple enumeration class for spatial separion prediction with the CV model.
+    
+    Available options are:
+        * Default:  The CV motion model
+        * Ratio:    The ratio of speed change is learned on training data and applied with CA model.
+    """
+    Default = auto()
+    Ratio = auto()
 
 class CV_Model(KF_Model):
     """The Constant Velocity (CV) Kalman filter model.
@@ -17,22 +42,44 @@ class CV_Model(KF_Model):
 
     __metaclass__ = KF_Model
 
-    def __init__(self, name, x_pred_to = 1550, time_normalization = 22., dt=0.005, s_w=10E7, s_v=2, default_state_options = {}):
+    def __init__(self, name, model_path = "", x_pred_to = 1550, time_normalization = 22., dt=0.005, s_w=10E7, s_v=2, 
+                 temporal_separator = "default", spatial_separator = "default", default_state_options = {}):
         """Initialize a new model to track particles with the CV Kalman filter.
 
         Default values are for pixel representation if 1 Pixel = 0.056 mm
 
         Args:
-            name (String):      The name of the expert
-            dt=0.005 (double):  The time difference between two measurements
-            s_w=10E7 (double):  Power spectral density of particle noise (Highly dependent on particle type)
-            s_v=2 (double):     Measurement noise variance (2 is default if input is in pixel)
+            name (String):                  The name of the expert
+            model_path (String):            Path to save/load parameters. Optional for KF because default types do not need training.
             x_pred_to (double):             The x position of the nozzle array (only needed for kf separation prediction)
             time_normalization (double):    Time normalization constant (only needed for kf separation prediction)
+            dt=0.005 (double):              The time difference between two measurements
+            s_w=10E7 (double):              Power spectral density of particle noise (Highly dependent on particle type)
+            s_v=2 (double):                 Measurement noise variance (2 is default if input is in pixel)
+            temporal_separator (String):    Temporal separation prediction type ("default", "BC", "IA")
+            spatial_separator (String):     Spatial separation prediction type ("default", "ratio")
         """
         self.dt = dt
         self.x_pred_to = x_pred_to
         self.time_normalization = time_normalization
+        # Temporal separation prediction type
+        if temporal_separator == "default":
+            self.temporal_prediction = CV_Temporal_Separation_Type.Default
+        elif temporal_separator == "BC":
+            self.temporal_prediction = CV_Temporal_Separation_Type.BC 
+        elif temporal_separator == "IA":
+            self.temporal_prediction = CV_Temporal_Separation_Type.IA
+        else:
+            logging.warning("Temporal separation prediction type '{}' is unknown. Setting to default.".format(temporal_separator)) 
+            self.temporal_prediction = CV_Temporal_Separation_Type.Default
+        # Spatial separation prediction type
+        if spatial_separator == "default":
+            self.spatial_prediction = CV_Spatial_Separation_Type.Default
+        elif temporal_separator == "BC":
+            self.spatial_prediction = CV_Spatial_Separation_Type.Ratio
+        else:
+            logging.warning("Spatial separation prediction type '{}' is unknown. Setting to default.".format(spatial_separator)) 
+            self.spatial_prediction = CV_Spatial_Separation_Type.Default
         # Transition matrix
         F = np.matrix([[1, dt, 0, 0],
                            [0,  1, 0, 0],
@@ -49,7 +96,7 @@ class CV_Model(KF_Model):
         # Measurement covariance matrix
         C_v = s_v * np.matrix(np.eye(2))
         
-        super().__init__(name, F, C_w, H, C_v, default_state_options)
+        super().__init__(name, model_path, F, C_w, H, C_v, default_state_options)
 
     def train_batch(self, inp, target):
         """Train the cv model on a batch of data."""
@@ -153,6 +200,21 @@ class CV_Model(KF_Model):
             dummy_list.append(CV_State([0.0, 0.0], 0))
 
         return dummy_list
+
+    def load_model(self):
+        """Load parameters for CV model."""
+        if path.exists(self.model_path):
+            stop=0
+        else:
+            logging.warning("Model file for Kalman filter CV model '{}' does not exist at {}.".format(self.name, self.model_path))
+
+    def save_model(self):
+        """Save parameters for CV model."""
+        if path.exists(self.model_path):
+            stop=0
+        else:
+            logging.warning("Model file for Kalman filter CV model '{}' does not exist at {}.".format(self.name, self.model_path))
+
 
 class CV_State(KF_State):
     """The Constant Velocity Kalman filter state saves information about the state and covariance matrix of a particle.
