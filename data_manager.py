@@ -662,8 +662,8 @@ class AbstractDataSet(ABC):
         #     the indices of Q and P
         qx = np.sqrt(np.sum((spatial_labels - q_values) ** 2, axis=1))
         xp = np.sqrt(np.sum((spatial_labels - p_values) ** 2, axis=1))
-        # take the weighted average between both indices
-        temporal_labels = (qx * q_indices + xp * p_indices) / (qx + xp)
+        # linear interpolation
+        temporal_labels = q_indices + qx/(qx+xp) * (p_indices-q_indices)
 
         # 5. restrict dataset to measurements left of the virtual edge
 
