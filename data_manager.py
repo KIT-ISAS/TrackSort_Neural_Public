@@ -46,6 +46,7 @@ class AbstractDataSet(ABC):
     separation_track_data = np.array([])
     separation_spatial_labels = np.array([])
     separation_temporal_labels = np.array([])
+    y_velocity_labels = np.array([])
 
     def get_nan_value_ary(self):
         return [self.nan_value, self.nan_value]
@@ -478,7 +479,7 @@ class AbstractDataSet(ABC):
         """Get the training and test datasets for RNN separation prediction.
 
         input format: [[x_0, y_0], ..., [x_n, y_n]]
-        target format: [[x_1, y_1, y_nozzle, dt_nozzle]]
+        target format: [[x_1, y_1, y_nozzle, dt_nozzle, y_velocity_nozzle]]
             dt_nozzle describes the difference in time from the last measurement to the nozzle array.
 
         Produce two masks for the separation prediction:
@@ -502,6 +503,7 @@ class AbstractDataSet(ABC):
         track_data = self.separation_track_data
         spatial_labels = self.separation_spatial_labels
         temporal_labels = self.separation_temporal_labels
+        y_velocity_labels = self.y_velocity_labels
         tracks = self._convert_aligned_tracks_to_seq2seq_data(track_data)
         num_time_steps = tracks.shape[1]
 
@@ -510,7 +512,8 @@ class AbstractDataSet(ABC):
         tracks = np.concatenate(
             (tracks,
              np.repeat(spatial_labels[:, 1][None], num_time_steps, axis=0).T.reshape(-1, tracks.shape[1], 1),
-             np.repeat(temporal_labels[None], num_time_steps, axis=0).T.reshape(-1, tracks.shape[1], 1)
+             np.repeat(temporal_labels[None], num_time_steps, axis=0).T.reshape(-1, tracks.shape[1], 1),
+             np.repeat(y_velocity_labels[None], num_time_steps, axis=0).T.reshape(-1, tracks.shape[1], 1)
              ),
             axis=-1
         )
@@ -523,13 +526,14 @@ class AbstractDataSet(ABC):
         else:
             separation_mask = tracking_mask
         # Fill spatial and temporal labels with 0 in areas with no measurement
-        #tracks[~tracking_mask,4:6] = self.nan_value
         if normalized:
             tracks[:, :, [0, 1, 2, 3]] /= self.normalization_constant
             # normalize spatial prediction
             tracks[:, :, [4]] /= self.normalization_constant
             # normalize temporal prediction
             tracks[:, :, [5]] /= time_normalization
+            # normalize velocity - The velocity is in pixel/frame
+            tracks[:, :, [6]] /= self.normalization_constant
 
         tracks = np.concatenate((tracks, tracking_mask[:,:,np.newaxis], separation_mask[:,:,np.newaxis]), axis=-1)
 
@@ -550,9 +554,9 @@ class AbstractDataSet(ABC):
             # split the tensor (x, y, y_pred, t_pred, x_target, y_target, y_pred_target, t_pred_target)
             #  -> into two tensors (x, y) and (x_target, y_target)
             input_seq = chunk[:, :, :2]
-            target_seq = chunk[:, :, 2:6]
-            tracking_mask = chunk[:, :, 6]
-            separation_mask = chunk[:, :, 7]
+            target_seq = chunk[:, :, 2:7]
+            tracking_mask = chunk[:, :, 7]
+            separation_mask = chunk[:, :, 8]
             return input_seq, target_seq, tracking_mask, separation_mask
 
         dataset_train = minibatches_train.map(split_input_target_separation)
@@ -592,9 +596,10 @@ class AbstractDataSet(ABC):
         track_data = self.separation_track_data
         spatial_labels = self.separation_spatial_labels
         temporal_labels = self.separation_temporal_labels
-        
+        y_velocity_labels = self.y_velocity_labels
+
         n_tracks = track_data.shape[0]
-        mlp_data = np.zeros([n_tracks, 2*n_inp_points + 3])
+        mlp_data = np.zeros([n_tracks, 2*n_inp_points + 4])
         # Build MLP input and target for all tracks
         missing_track_counter = 0
         for i in range(n_tracks):
@@ -607,8 +612,9 @@ class AbstractDataSet(ABC):
                     mlp_data[i,c+n_inp_points] = track_data[i, index, 1]
                     c += 1
                 # Set target [y_nozzle, dt_nozzle]
-                mlp_data[i, -3] = spatial_labels[i, 1]
-                mlp_data[i, -2] = temporal_labels[i]
+                mlp_data[i, -4] = spatial_labels[i, 1]
+                mlp_data[i, -3] = temporal_labels[i]
+                mlp_data[i, -2] = y_velocity_labels[i]
                 mlp_data[i, -1] = 1
             else:
                 missing_track_counter += 1
@@ -618,9 +624,11 @@ class AbstractDataSet(ABC):
 
         if normalized:
             # normalize spatial data
-            mlp_data[:, :-2] /= self.normalization_constant
+            mlp_data[:, :-3] /= self.normalization_constant
             # normalize temporal prediction
-            mlp_data[:, -2] /= time_normalization
+            mlp_data[:, -3] /= time_normalization
+            # normalize velocity prediction
+            mlp_data[:, -2] /= self.normalization_constant
 
         train_data, test_data = train_test_split(mlp_data, test_size=test_ratio, random_state=random_seed)
 
@@ -638,8 +646,8 @@ class AbstractDataSet(ABC):
         def split_input_target_separation(chunk):
             # split the tensor (x1, x2, ..., y1, y2, ..., y_pred_target, t_pred_target)
             #  -> into two tensors (x..., y...) and (y_pred_target, t_pred_target)
-            input_seq = chunk[:, :-3]
-            target_seq = chunk[:, -3:-1]
+            input_seq = chunk[:, :-4]
+            target_seq = chunk[:, -4:-1]
             mask_seq = chunk[:, -1]
             return input_seq, target_seq, mask_seq
 
@@ -972,8 +980,12 @@ class AbstractDataSet(ABC):
         xp = np.sqrt(np.sum((spatial_labels - p_values) ** 2, axis=1))
         # take the weighted average between both indices
         temporal_labels = q_indices + qx / (qx + xp) - last_measurement_before_edge_indices
+
+        # 7. y speed label:
+        #   Velocity of particle at the nozzle array in y direction
+        y_velo_labels = (p_values[:, 1] - q_values[:, 1]) / 1
         
-        return aligned_track_data, spatial_labels, temporal_labels
+        return aligned_track_data, spatial_labels, temporal_labels, y_velo_labels
 
     def _convert_tracks_to_aligned_tracks(self, track_data):
         """
@@ -1174,10 +1186,11 @@ class CsvDataSet(AbstractDataSet):
         self.belt_height = self.belt_width
         # Create data for separation prediction
         if is_separation_prediction:
-            self.separation_track_data, self.separation_spatial_labels, self.separation_temporal_labels = self.get_separation_prediction_data(
-                virtual_belt_edge_x_position=virtual_belt_edge_x_position,
-                virtual_nozzle_array_x_position=virtual_nozzle_array_x_position,
-                min_measurements_count = min_measurements_count)
+            self.separation_track_data, self.separation_spatial_labels, \
+                self.separation_temporal_labels, self.y_velocity_labels = self.get_separation_prediction_data(
+                    virtual_belt_edge_x_position=virtual_belt_edge_x_position,
+                    virtual_nozzle_array_x_position=virtual_nozzle_array_x_position,
+                    min_measurements_count = min_measurements_count)
 
     def _load_tracks(self, data_is_aligned=True, rotate_columns=False, min_measurements_count=3):
         """Load tracks from csv files.

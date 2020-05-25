@@ -6,7 +6,6 @@ Todo:
 
 import numpy as np
 import logging
-
 from enum import Enum, auto
 
 from kf_model import KF_Model, KF_State
@@ -74,15 +73,13 @@ class CV_Model(KF_Model):
         # Spatial separation prediction type
         if spatial_separator == "default":
             self.spatial_prediction = CV_Spatial_Separation_Type.Default
-        elif temporal_separator == "BC":
+        elif spatial_separator == "ratio":
             self.spatial_prediction = CV_Spatial_Separation_Type.Ratio
         else:
             logging.warning("Spatial separation prediction type '{}' is unknown. Setting to default.".format(spatial_separator)) 
             self.spatial_prediction = CV_Spatial_Separation_Type.Default
-        self.temporal_training_sum = 0
-        self.temporal_training_count = 0
-        self.spatial_training_sum = 0
-        self.spatial_training_count = 0
+        self.temporal_training_list = []
+        self.spatial_training_list = []
         # Transition matrix
         F = np.matrix([[1, dt, 0, 0],
                            [0,  1, 0, 0],
@@ -190,38 +187,56 @@ class CV_Model(KF_Model):
                         # Check if x velocity sanity
                         # Default values
                         dt_pred = 11 # This is a fairly close value. Please investigate the issue!
-                        y_pred = pos_last[1]
-                        if v_last[0] <= 0:
+                        y_pred = pos_last[1,0]
+                        if v_last[0,0] <= 0:
                             logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model. \n \
-                                                Setting the time to default value = {}!!!".format(v_last[0], i, dt_pred))
+                                                Setting the time to default value = {}!!!".format(v_last[0,0], i, dt_pred))
                             break
                         # First perform temporal predicion
-                        if self.temporal_prediction == CV_Temporal_Separation_Type.Default:
-                                dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
-                        elif self.temporal_prediction == CV_Temporal_Separation_Type.BC:
-                                dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
-                                if is_training:
-                                    self.temporal_training_sum += dt_pred/self.time_normalization - target_np[i, j, 3]
-                                    self.temporal_training_count += 1
-                                else:
-                                    # Adjust prediction with bias
-                                    dt_pred -= self.temporal_variable
+                        dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                        target_time = target_np[i, j, 3]*self.time_normalization
+                        if self.temporal_prediction == CV_Temporal_Separation_Type.BC:
+                            if is_training:
+                                self.temporal_training_list.append(dt_pred - target_time)
+                            else:
+                                # Adjust prediction with bias
+                                dt_pred -= self.temporal_variable
                         elif self.temporal_prediction == CV_Temporal_Separation_Type.IA:
-                            logging.error("IA prediction not implemented yet.")
-                            dt_pred = 11
+                            if is_training:
+                                # Find optimal acceleration value
+                                a_x_opt = 2*(self.x_pred_to-pos_last[0,0]-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
+                                self.temporal_training_list.append(a_x_opt)
+                            else:
+                                # Perform CA prediction with a_opt instead of a_last
+                                a_best = self.temporal_variable
+                                sqrt_val = (v_last[0,0]/a_best)**2 - 2*(pos_last[0,0]-self.x_pred_to)/a_best
+                                if sqrt_val >= 0:
+                                    dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
+                                else:
+                                    logging.warning("Can not perform IA prediction with last x velocity of {} and best acceleration {}.".format(v_last[0], a_best))
                         # Then perform spatial prediction
-                        if self.spatial_prediction == CV_Spatial_Separation_Type.Default:
-                            y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
-                        elif self.spatial_prediction == CV_Spatial_Separation_Type.Ratio:
-                            logging.error("Ratio prediction not implemented yet.")
-                            y_pred = pos_last[1]
+                        y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
+                        if self.spatial_prediction == CV_Spatial_Separation_Type.Ratio:
+                            if is_training:
+                                if j>=2:
+                                    v_nozzle_target = target_np[i, j, 4]/self.dt 
+                                    r_i = v_nozzle_target/v_last[1,0]
+                                    self.spatial_training_list.append(r_i)
+                            else:
+                                r = self.spatial_variable
+                                a_ratio = -(1-r)*v_last[1,0]/(dt_pred*self.dt)
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_pred * self.dt + 1/2 * (dt_pred * self.dt)**2 * a_ratio
+                        # Save predictions
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                     else:
                         logging.warning("Track out of measurements at first time step.")
                     break
-        if is_training and self.temporal_training_count>0:
-            self.temporal_variable = self.temporal_training_sum/self.temporal_training_count
+        if is_training:
+            if len(self.temporal_training_list)>0:
+                self.temporal_variable = np.nanmedian(self.temporal_training_list)
+            if len(self.spatial_training_list)>0:
+                self.spatial_variable = np.nanmedian(self.spatial_training_list)
         return predictions
 
     def get_zero_state(self, batch_size):

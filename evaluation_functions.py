@@ -141,7 +141,7 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     """
     assert(len(expert_names) == predictions.shape[0])
     # Calculate errors
-    errors = predictions - np.repeat(target[np.newaxis,:,:], predictions.shape[0], axis=0)
+    errors = predictions - np.repeat(target[np.newaxis,:,0:2], predictions.shape[0], axis=0)
     # denormalize the errors
     spatial_errors = errors[:,:,0] * normalization_constant
     temporal_errors = errors[:,:,1] * time_normalization_constant
@@ -159,6 +159,19 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
         temporal_box_values[expert_names[i]] = get_box_values(temporal_error)
         temporal_boxplot_inputs.append(temporal_error[0])
 
+    # Show temporal plot
+    plt.figure()
+    plt.boxplot(temporal_boxplot_inputs, sym='', labels=expert_names)
+    plt.ylabel("Temporal deviation [frames]")
+    if normalization_constant >= 100:
+        plt.ylim([-2, 2])
+    else:
+        plt.ylim([-0.4, 0.4])
+    plt.grid(b=True, which='major', axis='y', linestyle='--')
+    plt.xticks(rotation=60)
+    plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 
+    if not no_show:
+        plt.show()
     # Show spatial plot
     plt.figure()
     if normalization_constant >= 100:
@@ -170,21 +183,10 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
             spatial_boxplot_inputs[i] = spatial_boxplot_inputs[i]*1000
         plt.boxplot(spatial_boxplot_inputs, sym='', labels=expert_names)
         plt.ylabel("Spatial deviation [mm]")
-        plt.ylim([-10, 10])
+        plt.ylim([-2, 2])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
+    plt.xticks(rotation=60)
     plt.savefig(result_dir + 'spatial_error_box_plot.pdf') 
-    if not no_show:
-        plt.show()
-    # Show temporal plot
-    plt.figure()
-    plt.boxplot(temporal_boxplot_inputs, sym='', labels=expert_names)
-    plt.ylabel("Temporal deviation [frames]")
-    if normalization_constant >= 100:
-        plt.ylim([-2, 2])
-    else:
-        plt.ylim([-2, 2])
-    plt.grid(b=True, which='major', axis='y', linestyle='--')
-    plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 
     if not no_show:
         plt.show()
 

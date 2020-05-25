@@ -271,7 +271,7 @@ def train_step_generator_separation_prediction(model, optimizer, loss_object):
             #target = K.cast(target, tf.float64)
             predictions = model(inp, training=training, mask=mask)
             spatial_loss, temporal_loss = get_separation_loss(predictions, target, mask)
-            spatial_mae, temporal_mae = get_separation_loss(predictions, target, mask)
+            spatial_mae, temporal_mae = get_separation_mae(predictions, target, mask)
             loss = 1/2 * (spatial_loss + temporal_loss)
         if training:
             grads = tape.gradient(loss, model.trainable_variables)

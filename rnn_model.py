@@ -165,7 +165,7 @@ def get_tracking_loss(prediction, target, tracking_mask):
 
     Args:
         prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
+        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
         tracking_mask from create_separation_masks(...)
 
     Returns:
@@ -185,7 +185,7 @@ def get_separation_loss(prediction, target, separation_mask):
 
     Args:
         prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
+        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
         separation_mask from create_separation_masks(...)
 
     Returns:
@@ -207,7 +207,7 @@ def get_separation_mae(prediction, target, separation_mask):
 
     Args:
         prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
+        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
         separation_mask from create_separation_masks(...)
 
     Returns:

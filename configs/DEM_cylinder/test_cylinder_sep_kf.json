@@ -5,7 +5,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CV_CV_CV.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CV_CV_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -24,7 +24,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CV_CVBC_CV.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -43,7 +43,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CV_IA_CV.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CV_IA_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -62,7 +62,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CV_CV_Ratio.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CV_CV_Ratio.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -81,7 +81,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CV_CVBC_Ratio.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CV_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -100,7 +100,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CV_IA_Ratio.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CV_IA_Ratio.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -119,7 +119,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CA_CA.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CA_CA.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -141,7 +141,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CVBC_CA.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CVBC_CA.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -163,7 +163,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_IA_CA.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_IA_CA.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -185,7 +185,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_LV_CA.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_LV_CA.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -208,7 +208,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CA_CV.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CA_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -230,7 +230,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CVBC_CV.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CVBC_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -252,7 +252,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_IA_CV.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_IA_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -274,7 +274,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_LV_CV.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_LV_CV.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -297,7 +297,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CA_Ratio.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CA_Ratio.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -319,7 +319,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CVBC_Ratio.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -341,7 +341,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_IA_Ratio.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_IA_Ratio.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -363,7 +363,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_LV_Ratio.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_LV_Ratio.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -386,7 +386,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CA_DSC.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CA_DSC.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -408,7 +408,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_CVBC_DSC.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_CVBC_DSC.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -430,7 +430,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_IA_DSC.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_IA_DSC.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -452,7 +452,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/DEM_spheres/KF_sep_CA_LV_DSC.pkl",
+      "model_path": "models/DEM_cylinder/KF_sep_CA_LV_DSC.pkl",
       "model_options": {
         "dt": 1,
         "s_w": 1,
@@ -474,7 +474,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/DEM_spheres/simple_gating.pkl",
+    "model_path": "models/DEM_cylinder/simple_gating.pkl",
     "options": {
 
     }

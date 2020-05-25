@@ -16,9 +16,13 @@ class CA_Temporal_Separation_Type(Enum):
     
     Available options are:
         * Default:  The CA motion model
+        * CVBC:     The bias corrected CV motion model
+        * IA:     Identically Acceleration model. The median acceleration is learned on training data. CA model with the median acc is applied.
         * LV:       CA model with Limited Velocity - Particles will not be faster than belt speed
     """
     Default = auto()
+    CVBC = auto()
+    IA = auto()
     LV = auto()
 
 class CA_Spatial_Separation_Type(Enum):
@@ -26,9 +30,13 @@ class CA_Spatial_Separation_Type(Enum):
     
     Available options are:
         * Default:  The CA motion model
+        * CV:       The CV motion model
+        * Ratio:    The ratio of speed change is learned on training data and applied with CA model.
         * DSC:      CA model Disallowing Sign Changes - Particles decellerate until v=0. Then won't change y position.
     """
     Default = auto()
+    CV = auto()
+    Ratio = auto()
     DSC = auto()
 
 class CA_Model(KF_Model):
@@ -40,7 +48,7 @@ class CA_Model(KF_Model):
     __metaclass__ = KF_Model
 
     def __init__(self, name, model_path="", x_pred_to = 1550, time_normalization = 22., dt=0.005, s_w=10E10, s_v=2, 
-                 temporal_separator = "default", spatial_separator = "default", default_state_options = {}):
+                 temporal_separator = "default", spatial_separator = "default", belt_velocity = 1.5, default_state_options = {}):
         """Initialize a new model to track particles with the CA Kalman filter.
 
         Default values are for pixel representation if 1 Pixel = 0.056 mm
@@ -55,13 +63,19 @@ class CA_Model(KF_Model):
             time_normalization (double):    Time normalization constant (only needed for kf separation prediction)
             temporal_separator (String):    Temporal separation prediction type ("default", "LV")
             spatial_separator (String):     Spatial separation prediction type ("default", "DSC")
+            belt_velocity (double):         The velocity of the belt. Only needed for temporal prediction type limited velocity "LV".
         """
         self.dt = dt        
         self.x_pred_to = x_pred_to
         self.time_normalization = time_normalization
+        self.belt_velocity = belt_velocity
         # Temporal separation prediction type
         if temporal_separator == "default":
             self.temporal_prediction = CA_Temporal_Separation_Type.Default
+        elif temporal_separator == "CVBC":
+            self.temporal_prediction = CA_Temporal_Separation_Type.CVBC
+        elif temporal_separator == "IA":
+            self.temporal_prediction = CA_Temporal_Separation_Type.IA
         elif temporal_separator == "LV":
             self.temporal_prediction = CA_Temporal_Separation_Type.LV
         else:
@@ -70,11 +84,18 @@ class CA_Model(KF_Model):
         # Spatial separation prediction type
         if spatial_separator == "default":
             self.spatial_prediction = CA_Spatial_Separation_Type.Default
-        elif temporal_separator == "DSC":
+        elif spatial_separator == "CV":
+            self.spatial_prediction = CA_Spatial_Separation_Type.CV
+        elif spatial_separator == "ratio":
+            self.spatial_prediction = CA_Spatial_Separation_Type.Ratio
+        elif spatial_separator == "DSC":
             self.spatial_prediction = CA_Spatial_Separation_Type.DSC
         else:
             logging.warning("Spatial separation prediction type '{}' is unknown. Setting to default.".format(spatial_separator)) 
             self.spatial_prediction = CA_Spatial_Separation_Type.Default
+        
+        self.temporal_training_list = []
+        self.spatial_training_list = []
         # Transition matrix
         F = np.matrix([[1, dt, dt**2/2, 0, 0, 0],
                        [0, 1, dt, 0, 0, 0],
@@ -120,7 +141,7 @@ class CA_Model(KF_Model):
             spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
             temporal_mae (tf.Tensor):   mean(abs(dt_nozzle_pred - dt_nozzle_target))
         """ 
-        prediction = self.predict_batch_separation(inp=inp, separation_mask=separation_mask, is_training=not no_train_mode)
+        prediction = self.predict_batch_separation(inp=inp, separation_mask=separation_mask, is_training=not no_train_mode, target = target)
         target_np = target.numpy()
         separation_mask_np = separation_mask.numpy()
         spatial_loss = np.sum(np.power(prediction[:,:,2]-target_np[:,:,2], 2)*separation_mask_np) / np.sum(separation_mask_np)
@@ -155,7 +176,10 @@ class CA_Model(KF_Model):
         """Predict a batch of data with the cv model."""
         np_inp = inp.numpy()
         np_separation_mask = separation_mask.numpy()
-
+        if target is not None:
+            target_np = target.numpy()
+        else:
+            target_np = None
         n_tracks = np_inp.shape[0]
         track_length = np_inp.shape[1]
         predictions = np.zeros([n_tracks, track_length, 4])
@@ -179,42 +203,88 @@ class CA_Model(KF_Model):
                         a_last = ca_state.get_a()
                         v_last = ca_state.get_v()
                         pos_last = ca_state.get_pos()
-                        # In training we only perform the default types
-                        temporal_separation_type = CA_Temporal_Separation_Type.Default if is_training else self.temporal_prediction
-                        spatial_separation_type = CA_Spatial_Separation_Type.Default if is_training else self.spatial_prediction 
                         # Sanity checks and error management
-                        if a_last[0]==0:
-                            a_last[0]=0.000000000001
-                        sqrt_val = (v_last[0]/a_last[0])**2 - 2*(pos_last[0]-self.x_pred_to)/a_last[0]
+                        if a_last[0,0]==0:
+                            a_last[0,0]=0.000000000001
+                        sqrt_val = (v_last[0,0]/a_last[0,0])**2 - 2*(pos_last[0,0]-self.x_pred_to)/a_last[0,0]
                         if sqrt_val < 0:
                             logging.warning("With the predicted velocity of {} and the predicted acceleration of {} the track {} would not reach the nozzle array. Perform cv prediction!".format(v_last[0], a_last[0], i))
-                            if v_last[0] > 0:
-                                dt_pred = 1/(v_last[0] * self.dt) * (self.x_pred_to-pos_last[0])
-                                y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt
+                            if v_last[0,0] > 0:
+                                dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                                y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
                             else:
                                 logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model.".format(v_last[0], i))
-                                y_pred = pos_last[1]
+                                y_pred = pos_last[1,0]
                                 dt_pred = 11 # This is a fairly close value. Please investigate the issue!   
                             break 
-                        # First perform temporal predicion
-                        if temporal_separation_type == CA_Temporal_Separation_Type.Default:
-                            dt_pred = 1/self.dt * (- v_last[0]/a_last[0] + np.sign(a_last[0]) * np.sqrt(sqrt_val))
-                        elif temporal_separation_type == CA_Temporal_Separation_Type.LV:
-                            logging.error("LV prediction not implemented yet.")
-                            dt_pred = 11
-                        # Then perform spatial prediction
-                        if spatial_separation_type == CA_Spatial_Separation_Type.Default:
-                            y_pred = pos_last[1] + dt_pred * v_last[1] * self.dt + 1/2 * dt_pred**2 * self.dt**2 * a_last[1]
-                        elif spatial_separation_type == CA_Spatial_Separation_Type.DSC:
-                            logging.error("DSC prediction not implemented yet.")
-                            y_pred = pos_last[1]
-                                       
+                        ## First perform temporal predicion
+                        dt_pred = 1/self.dt * (- v_last[0,0]/a_last[0,0] + np.sign(a_last[0,0]) * np.sqrt(sqrt_val))
+                        target_time = target_np[i, j, 3]*self.time_normalization
+                        if self.temporal_prediction == CA_Temporal_Separation_Type.CVBC:
+                            dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                            if is_training:
+                                self.temporal_training_list.append(dt_pred - target_time)
+                            else:
+                                # Adjust prediction with bias
+                                dt_pred -= self.temporal_variable
+                        elif self.temporal_prediction == CA_Temporal_Separation_Type.IA:
+                            dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                            if is_training:
+                                # Find optimal acceleration value
+                                a_x_opt = 2*(self.x_pred_to-pos_last[0,0]-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
+                                self.temporal_training_list.append(a_x_opt)
+                            else:
+                                # Perform CA prediction with a_opt instead of a_last
+                                a_best = self.temporal_variable
+                                sqrt_val = (v_last[0,0]/a_best)**2 - 2*(pos_last[0,0]-self.x_pred_to)/a_best
+                                if sqrt_val >= 0:
+                                    dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
+                                else:
+                                    logging.warning("Can not perform IA prediction with last x velocity of {} and best acceleration {}.".format(v_last[0], a_best))
+                        elif self.temporal_prediction == CA_Temporal_Separation_Type.LV:
+                            if ~is_training:
+                                t_max_vel = 1/self.dt * (self.belt_velocity-v_last[0,0])/a_last[0,0]
+                                # If the paticle x velocity would exceed the belt velocity before the nozzle array
+                                if t_max_vel < dt_pred and t_max_vel>0:
+                                    # Distance to exceeding point
+                                    x_ca = pos_last[0,0] + v_last[0,0]  * self.dt * t_max_vel + 1/2 * a_last[0,0] * (self.dt * t_max_vel)**2
+                                    # CV with v_x = v_belt afterwards
+                                    dt_pred = t_max_vel + 1/self.dt * (self.x_pred_to - x_ca)/self.belt_velocity
+                                
+                        ## Then perform spatial prediction
+                        y_pred = pos_last[1,0] + v_last[1,0] * dt_pred * self.dt + 1/2 * (dt_pred * self.dt)**2 * a_last[1,0]
+                        if self.spatial_prediction == CA_Spatial_Separation_Type.DSC:
+                            if ~is_training:
+                                t_sign_change = 1/self.dt * (0-v_last[1,0])/a_last[1,0]
+                                # If the paticle y velocity would hit a sign change before the nozzle array
+                                if t_sign_change < dt_pred:
+                                    # Y position is fix after t sign change
+                                    y_pred = pos_last[1,0] + v_last[1,0] * t_sign_change * self.dt + 1/2 * (t_sign_change * self.dt)**2 * a_last[1,0]
+                        elif self.spatial_prediction == CA_Spatial_Separation_Type.CV:
+                            y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
+                        elif self.spatial_prediction == CA_Spatial_Separation_Type.Ratio:
+                            y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
+                            if is_training:
+                                if j>=2:
+                                    v_nozzle_target = target_np[i, j, 4]/self.dt 
+                                    r_i = v_nozzle_target/v_last[1,0]
+                                    self.spatial_training_list.append(r_i)
+                            else:
+                                r = self.spatial_variable
+                                a_ratio = -(1-r)*v_last[1,0]/(dt_pred*self.dt)
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_pred * self.dt + 1/2 * (dt_pred * self.dt)**2 * a_ratio
+
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                     else:
                         logging.warning("Track out of measurements at first time step.")
                     break
 
+        if is_training:
+            if len(self.temporal_training_list)>0:
+                self.temporal_variable = np.nanmedian(self.temporal_training_list)
+            if len(self.spatial_training_list)>0:
+                self.spatial_variable = np.nanmedian(self.spatial_training_list)
         return predictions
 
     def get_zero_state(self, batch_size):
