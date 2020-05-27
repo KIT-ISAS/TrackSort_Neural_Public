@@ -234,8 +234,8 @@ def run_global_config(global_config, experiment_series_names=''):
     
     # PLAY AROUND WITH VARIOUS KALMAN FILTERS
     # should be commented out...
-    kalman_playground(data_source.aligned_track_data, data_source.normalization_constant)
-    #velocity_plot(data_source.aligned_track_data, data_source.normalization_constant)
+    #kalman_playground(data_source.aligned_track_data, data_source.normalization_constant)
+    #velocity_plot(data_source.aligned_track_data, 1, 0.005)#17857
 
     ## Import model config to json tree
     # TODO: Create json schema to check config validity
