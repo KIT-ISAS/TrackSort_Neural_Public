@@ -367,9 +367,8 @@
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
-            "args": ["--dataset_dir=data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
-                     "--dataset_type", "CsvDataset",
-                     "--normalization_constant", "1"]
+            "args": ["--dataset_dir=data/Pfeffer/trackSortResultPfeffer/001_trackHistory_NothingDeleted.csv",
+                     "--dataset_type", "CsvDataset"]
         },
         {
             "name": "Plot activation",

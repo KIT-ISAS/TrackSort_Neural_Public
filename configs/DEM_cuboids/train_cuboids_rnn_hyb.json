@@ -5,7 +5,7 @@
       "type": "RNN",
       "is_separator": true,
       "only_last_timestep_additional_loss": true,
-      "model_path": "models/pepper/LSTM_1024_16_separation.h5",
+      "model_path": "models/DEM_cuboids/LSTM_1024_16_separation.h5",
       "options": {
         "clear_state": true,
         "model_structure": {
@@ -25,7 +25,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating.pkl",
+    "model_path": "models/DEM_cuboids/simple_gating.pkl",
     "options": {
 
     }

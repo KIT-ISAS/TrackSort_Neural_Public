@@ -1,31 +1,24 @@
 {
   "batch_size": 64,
   "experts": {
-    "LSTM": {
-      "type": "RNN",
+    "MLP": {
+      "type": "MLP",
+      "model_path": "models/DEM_cuboids/MLP_separator.h5",
       "is_separator": true,
-      "only_last_timestep_additional_loss": true,
-      "model_path": "models/pepper/LSTM_1024_16_separation.h5",
       "options": {
-        "clear_state": true,
+        "base_learning_rate": 0.005,
         "model_structure": {
-          "num_units_first_rnn": 1024,
-          "num_units_second_rnn": 16,
-          "num_units_third_rnn": 0,
-          "num_units_fourth_rnn": 0,
-          "num_units_first_dense": 0,
-          "num_units_second_dense": 0,
-          "num_units_third_dense": 0,
-          "num_units_fourth_dense": 0,
-          "rnn_model_name": "lstm",
-          "use_batchnorm_on_dense": true
+          "layers": [16, 16, 16, 16],
+          "activation": "leakly_relu",
+          "l1_regularization": 5e-8,
+          "l2_regularization": 0
         }
       }
     }
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating.pkl",
+    "model_path": "models/DEM_cuboids/simple_gating.pkl",
     "options": {
 
     }
