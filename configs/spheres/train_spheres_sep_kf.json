@@ -124,8 +124,8 @@
         "dt": 0.005,
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
-        "temporal_separator": "default",
-        "spatial_separator": "default"
+        "temporal_separator": "CA",
+        "spatial_separator": "CA"
       },
       "state_options": {
         "velocity_guess": 1.8,
@@ -147,7 +147,7 @@
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
         "temporal_separator": "CVBC",
-        "spatial_separator": "default"
+        "spatial_separator": "CA"
       },
       "state_options": {
         "velocity_guess": 1.8,
@@ -169,7 +169,7 @@
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
         "temporal_separator": "IA",
-        "spatial_separator": "default"
+        "spatial_separator": "CA"
       },
       "state_options": {
         "velocity_guess": 1.8,
@@ -191,7 +191,7 @@
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
         "temporal_separator": "LV",
-        "spatial_separator": "default",
+        "spatial_separator": "CA",
         "belt_velocity": 0.0115
       },
       "state_options": {
@@ -213,7 +213,7 @@
         "dt": 0.005,
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
-        "temporal_separator": "default",
+        "temporal_separator": "CA",
         "spatial_separator": "CV"
       },
       "state_options": {
@@ -302,7 +302,7 @@
         "dt": 0.005,
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
-        "temporal_separator": "default",
+        "temporal_separator": "CA",
         "spatial_separator": "ratio"
       },
       "state_options": {
@@ -391,7 +391,7 @@
         "dt": 0.005,
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
-        "temporal_separator": "default",
+        "temporal_separator": "CA",
         "spatial_separator": "DSC"
       },
       "state_options": {

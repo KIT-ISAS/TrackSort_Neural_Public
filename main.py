@@ -94,7 +94,7 @@ parser.add_argument('--tracking', type=str2bool, default=True,
 parser.add_argument('--separation_prediction', type=str2bool, default=False,
                     help='Perform separation predcition')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
-
+parser.add_argument('--logfile', default='', help='Path to logfile. Leave this out to only log to console.')
 parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
 
 parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
@@ -194,12 +194,24 @@ global_config = {
 
 # setup logging
 log_level = int(logging._nameToLevel[args.verbosity])
-logger = logging.getLogger()
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(log_level)
+if args.logfile != "":
+    # Check if log folder exists and create it if not.
+    save_path = os.path.dirname(args.logfile)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    logging.basicConfig(filename=args.logfile,
+                        filemode='a',
+                        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                        datefmt='%H:%M:%S',
+                        level=logging._nameToLevel[args.verbosity])
+    logger = logging.getLogger()
+else:
+    logger = logging.getLogger()
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(log_level)
 logging.log(log_level, "LOG LEVEL: %s", log_level)
 
 
