@@ -64,22 +64,22 @@ class MLP_Model(Expert):
         self.input_dim = n_features
         logging.info(self.mlp_model.summary())
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
-        self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
+            self.loss_object = tf.keras.losses.MeanSquaredError()
             self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
         else:
-            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
+            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer)
 
     def load_model(self):
         """Load a MLP model from its model path."""
         self.mlp_model = tf.keras.models.load_model(self.model_path)
         self.input_dim = self.mlp_model.input_shape[1]
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
-        self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
+            self.loss_object = tf.keras.losses.MeanSquaredError()
             self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
         else:
-            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
+            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer)
         logging.info(self.mlp_model.summary())
 
     def train_batch(self, inp, target):
@@ -195,32 +195,42 @@ class MLP_Model(Expert):
 
 """Model creation and training functionality"""
 
-def mlp_model_factory(input_dim=10, output_dim=2, layers=[16, 16, 16], activation='leakly_relu'):
+def mlp_model_factory(input_dim=10, output_dim=2, layers=[16, 16, 16], activation='leakly_relu',
+                      l1_regularization=0, l2_regularization=0):
     """Create a new keras MLP model
 
     Args:
-        input_dim (int):    The number of features as input to the model
-        output_dim (int):   The number of outputs of the model (usually 2 - [x, y])
-    
+        input_dim (int):            The number of features as input to the model
+        output_dim (int):           The number of outputs of the model (usually 2 - [x, y])
+        layers (list):              List of integers. Each entry results in a new Dense layer with n neurons.
+        activation (String):        Activation function of all layers (except output layer)
+        l1_regularization (double): L1 Regularization factor
+        l2_regularization (double): L2 Regularization factor
+
     Returns: 
         the model
     """
-    # define model
+    # Define regularization
+    regularization = tf.keras.regularizers.l1_l2(l1=l1_regularization, l2=l2_regularization)
+    # Define model
     model = tf.keras.Sequential()
     is_first = True
     # Add hidden layers
     for n_Neurons in layers:
         if is_first:
-            model.add(tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', input_shape=(input_dim,)))
+            model.add(tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', input_shape=(input_dim,), 
+                kernel_regularizer=regularization, bias_regularizer=regularization))
         else:
-            model.add(tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal'))
+            model.add(tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', 
+                kernel_regularizer=regularization, bias_regularizer=regularization))
         if activation == 'leakly_relu':
             model.add(tf.keras.layers.LeakyReLU(alpha=0.01))
         else:
             logging.warning("Activation function {} not implemented yet :(".format(activation))
 
     # Add output layer
-    model.add(tf.keras.layers.Dense(output_dim, activation='linear'))
+    model.add(tf.keras.layers.Dense(output_dim, activation='linear', 
+                kernel_regularizer=regularization, bias_regularizer=regularization))
 
     return model
 
@@ -232,6 +242,7 @@ def train_step_generator(model, optimizer, loss_object):
     Args:
         model:      model according to estimator api
         optimizer:  tf estimator
+        loss_object: Loss object like keras.losses.MeanSquaredError
 
     Returns
         function which can be called to train the given model with the given optimizer
@@ -251,7 +262,7 @@ def train_step_generator(model, optimizer, loss_object):
 
     return train_step
 
-def train_step_generator_separation_prediction(model, optimizer, loss_object):
+def train_step_generator_separation_prediction(model, optimizer):
     """Build a function which returns a computational graph for tensorflow.
 
     This function can be called to train the given model with the given optimizer.

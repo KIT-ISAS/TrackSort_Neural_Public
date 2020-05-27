@@ -9,7 +9,9 @@
         "base_learning_rate": 0.005,
         "model_structure": {
           "layers": [16, 16, 16, 16],
-          "activation": "leakly_relu"
+          "activation": "leakly_relu",
+          "l1_regularization": 5e-8,
+          "l2_regularization": 0
         }
       }
     }
