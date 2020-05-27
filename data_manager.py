@@ -357,33 +357,54 @@ class AbstractDataSet(ABC):
 
         return input_seq, target_seq
 
-    def get_tf_data_sets_seq2seq_data(self, normalized=True, test_ratio=0.1, batch_size=64, random_seed = None):
+    def get_tf_data_sets_seq2seq_data(self, normalized=True, evaluation_ratio = 0.15, test_ratio=0.15, batch_size=64, random_seed = None):
+        """Seperate Seq2Seq data in training, evaluation and test set and convert them to Tensor data.
+
+        Set random_seed to not None to fix the shuffling of training, eval and test data.
+
+        Args:
+            normalized (Boolean):       Normalize the data
+            evaluation_ratio (double):  Rate of data that is turned into evaluation data
+            test_ratio (double):        Rate of data that is turned into test data
+            batch_size (int):           Batch size for training and test data
+            random_seed (int):          None: Random shuffling; int: Fixed shuffling
+
+        Returns:
+            dataset_train, dataset_eval, dataset_test (tf.Tensor): Train, evaluation and test data in tensorflow format
+        """
+        assert( 1 - (evaluation_ratio + test_ratio) > max([evaluation_ratio, test_ratio]), \
+            "The train set should be greater than the evaluation and test set.")
         tracks = self.get_seq2seq_data()
         if normalized:
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
         
         # Create ids for train and test tracks with optional random seed
-        train_ids, test_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
+        t_e_ids, test_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
+        train_ids, eval_ids = train_test_split(t_e_ids, test_size=evaluation_ratio, random_state=random_seed)
         
         train_tracks = tracks[train_ids]
+        eval_tracks = tracks[eval_ids]
         test_tracks = tracks[test_ids]
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
+        raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_tracks)
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
         if random_seed is None:
             minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(batch_size, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.shuffle(eval_tracks.shape[0]).batch(batch_size, drop_remainder=True)
             minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(batch_size, drop_remainder=True)
             logging.warning("Always use a random seed if you want to combine MLPs and RNNs/KFs!")
         else:
             minibatches_train = raw_train_dataset.batch(batch_size, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.batch(batch_size, drop_remainder=True)
             minibatches_test = raw_test_dataset.batch(batch_size, drop_remainder=True)
 
-        
-
-        self.minibatches_train = minibatches_train
-        self.minibatches_test = minibatches_test
+        # TODO: Check for dependency and delte this!
+        #self.minibatches_train = minibatches_train
+        #self.minibatches_eval = minibatches_eval
+        #self.minibatches_test = minibatches_test
 
         def split_input_target(chunk):
             # split the tensor (x, y, x_target, y_target)
@@ -393,53 +414,65 @@ class AbstractDataSet(ABC):
             return input_seq, target_seq
 
         dataset_train = minibatches_train.map(split_input_target)
+        dataset_eval = minibatches_eval.map(split_input_target)
         dataset_test = minibatches_test.map(split_input_target)
 
-        return dataset_train, dataset_test
+        return dataset_train, dataset_eval, dataset_test
 
-    def get_tf_data_sets_mlp_data(self, normalized=True, test_ratio=0.1, batch_size=64, random_seed = None):
-        """Seperate MLP data in training and test set and convert them to Tensor data.
+    def get_tf_data_sets_mlp_data(self, normalized=True, evaluation_ratio = 0.15, test_ratio=0.15, batch_size=64, random_seed = None):
+        """Seperate MLP data in training, evaluation and test set and convert them to Tensor data.
 
-        Set random_seed to not None to fix the shuffling of training and test data.
+        Set random_seed to not None to fix the shuffling of training, eval and test data.
 
         Args:
-            normalized (Boolean):   Normalize the data
-            test_ratio (double):    Rate of data that is turned into test data
-            batch_size (int):       Batch size for training and test data
-            random_seed (int):      None: Random shuffling; int: Fixed shuffling
+            normalized (Boolean):       Normalize the data
+            evaluation_ratio (double):  Rate of data that is turned into evaluation data
+            test_ratio (double):        Rate of data that is turned into test data
+            batch_size (int):           Batch size for training and test data
+            random_seed (int):          None: Random shuffling; int: Fixed shuffling
 
         Returns:
-            dataset_train, dataset_test (tf.Tensor): Train and test data in tensorflow format
+            dataset_train, dataset_eval, dataset_test (tf.Tensor): Train, evaluation and test data in tensorflow format
         """
+        assert( 1 - (evaluation_ratio + test_ratio) > max([evaluation_ratio, test_ratio]), \
+            "The train set should be greater than the evaluation and test set.")
         tracks = self.aligned_track_data
         mlp_data = self.mlp_data
         if normalized:
             mlp_data = self.normalize_data(mlp_data)
         
-        # Create ids for train and test tracks with optional random seed
-        train_track_ids, test_track_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
+        # Create ids for train, evaluation and test tracks with optional random seed
+        t_e_track_ids, test_track_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
+        train_track_ids, eval_track_ids = train_test_split(t_e_track_ids, test_size=evaluation_ratio, random_state=random_seed)
         
         # Get the mlp data ids of the track ids
         train_ids = []
+        eval_ids = []
         test_ids = []
         for track_id in train_track_ids:
             train_ids.extend(self.track_num_mlp_id.get(track_id))
+        for track_id in eval_track_ids:
+            eval_ids.extend(self.track_num_mlp_id.get(track_id))
         for track_id in test_track_ids:
             test_ids.extend(self.track_num_mlp_id.get(track_id))
         
         train_data = mlp_data[train_ids]
+        eval_data = mlp_data[eval_ids]
         test_data = mlp_data[test_ids]
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
+        raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_data)
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_data)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
         if random_seed is None:
             minibatches_train = raw_train_dataset.shuffle(train_data.shape[0]).batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.shuffle(eval_data.shape[0]).batch(batch_size * self.longest_track, drop_remainder=True)
             minibatches_test = raw_test_dataset.shuffle(test_data.shape[0]).batch(batch_size * self.longest_track, drop_remainder=True)
             logging.warning("Always use a random seed if you want to combine MLPs and RNNs/KFs!")
         else:
             minibatches_train = raw_train_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
             minibatches_test = raw_test_dataset.batch(batch_size * self.longest_track, drop_remainder=True)
 
         def split_input_target(chunk):
@@ -450,9 +483,10 @@ class AbstractDataSet(ABC):
             return input_seq, target_seq
 
         dataset_train = minibatches_train.map(split_input_target)
+        dataset_eval = minibatches_eval.map(split_input_target)
         dataset_test = minibatches_test.map(split_input_target)
 
-        return dataset_train, dataset_test
+        return dataset_train, dataset_eval, dataset_test
 
     def mlp_target_to_track_format(self, mlp_target):
         """Convert a batch of MLP targets/predictions into tracks
@@ -471,12 +505,13 @@ class AbstractDataSet(ABC):
 
 
     def get_tf_data_sets_seq2seq_with_separation_data(self, normalized=True, 
-                                                      test_ratio=0.1,
+                                                      evaluation_ratio=0.15,
+                                                      test_ratio=0.15,
                                                       batch_size=64, 
                                                       random_seed=None,
                                                       time_normalization=22.,
                                                       only_last_timestep_additional_loss = True):
-        """Get the training and test datasets for RNN separation prediction.
+        """Get the training, evaluation and test datasets for RNN separation prediction.
 
         input format: [[x_0, y_0], ..., [x_n, y_n]]
         target format: [[x_1, y_1, y_nozzle, dt_nozzle, y_velocity_nozzle]]
@@ -489,17 +524,21 @@ class AbstractDataSet(ABC):
                              If only_last_timestep_additional_loss==False, the separation mask equals the tracking mask.
 
         Args:
-            normalized (Boolean):   Normalize the data
-            test_ration (double):   Ratio of test data to all data. Value between 0 and 1.
-            batch_size (int):       Batch size for training. This value gets multiplied with the total track length to generate more reasonable batch sizes that match the RNN data.
-            random_seed (int):      Random seed for train/test split. Set this to None to be random every time.
-            time_normalization (double):  Normalize the time step target with this parameter
+            normalized (Boolean):           Normalize the data
+            evaluation_ratio (double):      Ratio of evaluation data to all data. Value between 0 and 1.
+            test_ration (double):           Ratio of test data to all data. Value between 0 and 1.
+            batch_size (int):               Batch size for training. This value gets multiplied with the total track length to generate more reasonable batch sizes that match the RNN data.
+            random_seed (int):              Random seed for train/test split. Set this to None to be random every time.
+            time_normalization (double):    Normalize the time step target with this parameter
             only_last_timestep_additional_loss (Boolean): Sets the style of the separation mask.
 
         Returns:
-            training_dataset (tf.Dataset): Batches of (input, target, tracking_mask, separation_mask) pairs for training
-            testing_dataset (tf.Dataset): Batches of (input, target, tracking_mask, separation_mask) pairs for testing
+            training_dataset (tf.Dataset):      Batches of (input, target, tracking_mask, separation_mask) pairs for training
+            evaluation_dataset (tf.Dataset):    Batches of (input, target, tracking_mask, separation_mask) pairs for evaluation
+            testing_dataset (tf.Dataset):       Batches of (input, target, tracking_mask, separation_mask) pairs for testing
         """
+        assert( 1 - (evaluation_ratio + test_ratio) > max([evaluation_ratio, test_ratio]), \
+            "The train set should be greater than the evaluation and test set.")
         track_data = self.separation_track_data
         spatial_labels = self.separation_spatial_labels
         temporal_labels = self.separation_temporal_labels
@@ -537,17 +576,21 @@ class AbstractDataSet(ABC):
 
         tracks = np.concatenate((tracks, tracking_mask[:,:,np.newaxis], separation_mask[:,:,np.newaxis]), axis=-1)
 
-        train_tracks, test_tracks = train_test_split(tracks, test_size=test_ratio, random_state=random_seed)
+        t_e_tracks, test_tracks = train_test_split(tracks, test_size=test_ratio, random_state=random_seed)
+        train_tracks, eval_tracks = train_test_split(t_e_tracks, test_size=evaluation_ratio, random_state=random_seed)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
+        raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_tracks)
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_tracks)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
         if random_seed is None:
             minibatches_train = raw_train_dataset.shuffle(train_tracks.shape[0]).batch(batch_size=batch_size, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.shuffle(eval_tracks.shape[0]).batch(batch_size=batch_size, drop_remainder=True)
             minibatches_test = raw_test_dataset.shuffle(test_tracks.shape[0]).batch(batch_size=batch_size, drop_remainder=True)
         else:
             minibatches_train = raw_train_dataset.batch(batch_size=batch_size, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.batch(batch_size=batch_size, drop_remainder=True)
             minibatches_test = raw_test_dataset.batch(batch_size=batch_size, drop_remainder=True)
 
         def split_input_target_separation(chunk):
@@ -560,18 +603,20 @@ class AbstractDataSet(ABC):
             return input_seq, target_seq, tracking_mask, separation_mask
 
         dataset_train = minibatches_train.map(split_input_target_separation)
+        dataset_eval = minibatches_eval.map(split_input_target_separation)
         dataset_test = minibatches_test.map(split_input_target_separation)
 
-        return dataset_train, dataset_test, num_time_steps
+        return dataset_train, dataset_eval, dataset_test, num_time_steps
 
     def get_tf_data_sets_mlp_with_separation_data(self, 
                                                   normalized=True, 
-                                                  test_ratio=0.1,
+                                                  evaluation_ratio=0.15,
+                                                  test_ratio=0.15,
                                                   batch_size=64, 
                                                   random_seed=None,
                                                   time_normalization=22.,
                                                   n_inp_points = 5):
-        """Get the training and test datasets for MLP separation prediction.
+        """Get the training, evaluation and test datasets for MLP separation prediction.
 
         input format: [x_1, x_2, ..., x_n_inp, y_1, y_2, ..., y_n_inp]
         target format: [y_nozzle, dt_nozzle]
@@ -582,17 +627,21 @@ class AbstractDataSet(ABC):
         If there are not enough measurements in the track, the default input/target is: [0, 0, ..., 0], [0, 0]
 
         Args:
-            normalized (Boolean):   Normalize the data
-            test_ration (double):   Ratio of test data to all data. Value between 0 and 1.
-            batch_size (int):       Batch size for training. This value gets multiplied with the total track length to generate more reasonable batch sizes that match the RNN data.
-            random_seed (int):      Random seed for train/test split. Set this to None to be random every time.
+            normalized (Boolean):       Normalize the data
+            evaluation_ratio (double):  Ratio of evaluation data to all data. Value between 0 and 1.
+            test_ration (double):       Ratio of test data to all data. Value between 0 and 1.
+            batch_size (int):           Batch size for training. This value gets multiplied with the total track length to generate more reasonable batch sizes that match the RNN data.
+            random_seed (int):          Random seed for train/test split. Set this to None to be random every time.
             time_normalization (double):  Normalize the time step target with this parameter
-            n_inp_points (int):     Number of measurements for the input of the MLP
+            n_inp_points (int):         Number of measurements for the input of the MLP
 
         Returns:
             training_dataset (tf.Dataset): Batches of (input, target, mask) sets for training
+            evaluation_dataset (tf.Dataset): Batches of (input, target, mask) sets for evaluation
             testing_dataset (tf.Dataset): Batches of (input, target, mask) sets for testing
         """
+        assert( 1 - (evaluation_ratio + test_ratio) > max([evaluation_ratio, test_ratio]), \
+            "The train set should be greater than the evaluation and test set.")
         track_data = self.separation_track_data
         spatial_labels = self.separation_spatial_labels
         temporal_labels = self.separation_temporal_labels
@@ -630,17 +679,21 @@ class AbstractDataSet(ABC):
             # normalize velocity prediction
             mlp_data[:, -2] /= self.normalization_constant
 
-        train_data, test_data = train_test_split(mlp_data, test_size=test_ratio, random_state=random_seed)
+        t_e_data, test_data = train_test_split(mlp_data, test_size=test_ratio, random_state=random_seed)
+        train_data, eval_data = train_test_split(t_e_data, test_size=evaluation_ratio, random_state=random_seed)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
+        raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_data)
         raw_test_dataset = tf.data.Dataset.from_tensor_slices(test_data)
 
         # for optimal shuffling the shuffle buffer has to be of the size of the number of tracks
         if random_seed is None:
             minibatches_train = raw_train_dataset.shuffle(n_tracks).batch(batch_size, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.shuffle(n_tracks).batch(batch_size, drop_remainder=True)
             minibatches_test = raw_test_dataset.shuffle(n_tracks).batch(batch_size, drop_remainder=True)
         else:
             minibatches_train = raw_train_dataset.batch(batch_size, drop_remainder=True)
+            minibatches_eval = raw_eval_dataset.batch(batch_size, drop_remainder=True)
             minibatches_test = raw_test_dataset.batch(batch_size, drop_remainder=True)
 
         def split_input_target_separation(chunk):
@@ -652,9 +705,10 @@ class AbstractDataSet(ABC):
             return input_seq, target_seq, mask_seq
 
         dataset_train = minibatches_train.map(split_input_target_separation)
+        dataset_eval = minibatches_eval.map(split_input_target_separation)
         dataset_test = minibatches_test.map(split_input_target_separation)
 
-        return dataset_train, dataset_test
+        return dataset_train, dataset_eval, dataset_test
 
     def get_last_timestep_of_track(self, track, use_nan=False, beginning=None):
         if beginning is None:

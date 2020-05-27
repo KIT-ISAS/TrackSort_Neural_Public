@@ -60,6 +60,8 @@ parser.add_argument('--distance_threshold', type=float, default=0.02,
 parser.add_argument('--config_path', default="configs/default_config.json",
                     help='Path to config file including information about experts, gating network and weighting function.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
+parser.add_argument('--evaluation_ratio', type=float, default=0.15, help='The ratio of data used for evaluation.')
+parser.add_argument('--test_ratio', type=float, default=0.15, help='The ratio of data used for the final unbiased test.')
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
@@ -134,6 +136,8 @@ global_config = {
     'distance_threshold': args.distance_threshold,
     'config_path': args.config_path,
     'batch_size': args.batch_size,
+    'evaluation_ratio': args.evaluation_ratio,
+    'test_ratio': args.test_ratio,
     'matching_algorithm': args.matching_algorithm,
     #
     'Track': {
@@ -252,42 +256,50 @@ def run_global_config(global_config, experiment_series_names=''):
     ## Get tracking training and test dataset
     # TODO: 
     #   * Ask for these arguments in main run args
-    #   * Create Evaluation dataset
     random_seed = 0
-    test_ratio = 0.1
     if global_config["tracking"]:
-        mlp_dataset_train, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
-                                        normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
+        mlp_dataset_train, mlp_dataset_eval, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
+                                        normalized=True, 
+                                        evaluation_ratio = global_config.get("evaluation_ratio"), 
+                                        test_ratio= global_config.get("test_ratio"),
+                                        batch_size = global_config.get('batch_size'), 
                                         random_seed = random_seed)
 
-        seq2seq_dataset_train, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
-                                        normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
+        seq2seq_dataset_train, seq2seq_dataset_eval, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
+                                        normalized=True, 
+                                        evaluation_ratio = global_config.get("evaluation_ratio"), 
+                                        test_ratio= global_config.get("test_ratio"),
+                                        batch_size = global_config.get('batch_size'), 
                                         random_seed = random_seed)
     
     ## Get separation prediction training and test dataset
     if global_config["separation_prediction"]:
-        mlp_dataset_train_sp, mlp_dataset_test_sp = data_source.get_tf_data_sets_mlp_with_separation_data( 
-                                                        normalized=True, 
-                                                        test_ratio=test_ratio,
-                                                        batch_size=global_config['batch_size'], 
-                                                        random_seed=random_seed,
-                                                        time_normalization=global_config['time_normalization_constant'],
-                                                        n_inp_points = global_config['separation_mlp_input_dim'])
+        mlp_dataset_train_sp, mlp_dataset_eval_sp, mlp_dataset_test_sp = \
+            data_source.get_tf_data_sets_mlp_with_separation_data( 
+                normalized=True, 
+                evaluation_ratio = global_config.get("evaluation_ratio"), 
+                test_ratio= global_config.get("test_ratio"),
+                batch_size=global_config['batch_size'], 
+                random_seed=random_seed,
+                time_normalization=global_config['time_normalization_constant'],
+                n_inp_points = global_config['separation_mlp_input_dim'])
 
-        seq2seq_dataset_train_sp, seq2seq_dataset_test_sp, num_time_steps = data_source.get_tf_data_sets_seq2seq_with_separation_data(
-                                                        normalized=True, 
-                                                        test_ratio=test_ratio,
-                                                        batch_size=global_config['batch_size'], 
-                                                        random_seed=random_seed,
-                                                        time_normalization=global_config['time_normalization_constant'])
+        seq2seq_dataset_train_sp, seq2seq_dataset_eval_sp, seq2seq_dataset_test_sp, num_time_steps = \
+            data_source.get_tf_data_sets_seq2seq_with_separation_data(
+                normalized=True, 
+                evaluation_ratio = global_config.get("evaluation_ratio"), 
+                test_ratio= global_config.get("test_ratio"),
+                batch_size=global_config['batch_size'], 
+                random_seed=random_seed,
+                time_normalization=global_config['time_normalization_constant'])
     ## Train models
     if not global_config["is_loaded"]:
         if global_config["tracking"]:
             model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
                                     seq2seq_dataset_train = seq2seq_dataset_train,
-                                    seq2seq_dataset_test = seq2seq_dataset_test, 
+                                    seq2seq_dataset_test = seq2seq_dataset_eval, 
                                     mlp_dataset_train = mlp_dataset_train,
-                                    mlp_dataset_test = mlp_dataset_test,
+                                    mlp_dataset_test = mlp_dataset_eval,
                                     num_train_epochs = global_config.get("num_train_epochs"),
                                     evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
                                     improvement_break_condition = global_config.get("improvement_break_condition"),
@@ -295,9 +307,9 @@ def run_global_config(global_config, experiment_series_names=''):
                                     lr_decay = global_config.get("lr_decay_factor"))
         if global_config["separation_prediction"]:
             model_manager.train_models_separation_prediction(seq2seq_dataset_train = seq2seq_dataset_train_sp,
-                                    seq2seq_dataset_test = seq2seq_dataset_test_sp, 
+                                    seq2seq_dataset_test = seq2seq_dataset_eval_sp, 
                                     mlp_dataset_train = mlp_dataset_train_sp,
-                                    mlp_dataset_test = mlp_dataset_test_sp,
+                                    mlp_dataset_test = mlp_dataset_eval_sp,
                                     num_train_epochs = global_config.get("num_train_epochs"),
                                     evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
                                     improvement_break_condition = global_config.get("improvement_break_condition"),
@@ -322,16 +334,16 @@ def run_global_config(global_config, experiment_series_names=''):
         if global_config.get('execute_evaluation'):
             model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
                                     result_dir = global_config['result_path'],
-                                    seq2seq_dataset_test = seq2seq_dataset_test, 
-                                    mlp_dataset_test = mlp_dataset_test,
+                                    seq2seq_dataset_test = seq2seq_dataset_eval, 
+                                    mlp_dataset_test = mlp_dataset_eval,
                                     normalization_constant = data_source.normalization_constant,
                                     evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
                                     no_show = global_config['no_show'])
     if global_config["separation_prediction"]:
         if global_config.get('execute_evaluation'):
             model_manager.test_models_separation_prediction(result_dir = global_config['result_path'],
-                                    seq2seq_dataset_test = seq2seq_dataset_test_sp, 
-                                    mlp_dataset_test = mlp_dataset_test_sp,
+                                    seq2seq_dataset_test = seq2seq_dataset_eval_sp, 
+                                    mlp_dataset_test = mlp_dataset_eval_sp,
                                     normalization_constant = data_source.normalization_constant,
                                     time_normalization_constant=global_config['time_normalization_constant'],
                                     no_show = global_config['no_show'])
