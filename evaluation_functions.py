@@ -166,7 +166,7 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     if normalization_constant >= 100:
         plt.ylim([-2, 2])
     else:
-        plt.ylim([-0.4, 0.4])
+        plt.ylim([-4, 4])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
     plt.xticks(rotation=60)
     plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 

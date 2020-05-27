@@ -21,6 +21,7 @@ from mlp_model import MLP_Model
 from kf_model import KF_Model, KF_State
 from cv_model import CV_Model, CV_State
 from ca_model import CA_Model, CA_State
+from dq_model import DQ_Model
 from expert import Expert, Expert_Type
 
 class Expert_Manager(object):
@@ -92,7 +93,7 @@ class Expert_Manager(object):
             else:
                 logging.error("Model path of expert {} does not exist.".format(expert_name))
             if expert_type == 'RNN':
-                model = RNN_Model(~is_separation, expert_name, model_path, expert.get("options"))
+                model = RNN_Model(not is_separation, expert_name, model_path, expert.get("options"))
                 if is_loaded:
                     model.load_model()
                 else:
@@ -107,13 +108,16 @@ class Expert_Manager(object):
                 elif sub_type == 'CA':
                     # Create constant acceleration model
                     model = CA_Model(expert_name, model_path, x_pred_to, time_normalization, **expert.get("model_options"), default_state_options=expert.get("state_options"))
+                elif sub_type == 'DQ':
+                    # Create differential quotient model
+                    model = DQ_Model(expert_name, model_path, x_pred_to, time_normalization, **expert.get("model_options"))
                 else:
                     logging.warning("Kalman filter subtype " + sub_type + " not supported. Will not create model.") 
                     continue
                 if is_loaded:
                     model.load_model()  
             elif expert_type=='MLP':
-                model = MLP_Model(expert_name, model_path, ~is_separation, expert.get("options"))
+                model = MLP_Model(expert_name, model_path, not is_separation, expert.get("options"))
                 if is_loaded:
                     model.load_model()
                 else:

@@ -19,6 +19,7 @@ from data_association import DataAssociation
 from data_manager import FakeDataSet, CsvDataSet
 from evaluation_functions import calculate_error_first_and_second_kind
 from kalman_playground import kalman_playground
+from velocity_plot import velocity_plot
 # Test
 from cv_model import *
 from ca_model import *
@@ -230,6 +231,7 @@ def run_global_config(global_config, experiment_series_names=''):
     # PLAY AROUND WITH VARIOUS KALMAN FILTERS
     # should be commented out...
     #kalman_playground(data_source.aligned_track_data)
+    #velocity_plot(data_source.aligned_track_data)
 
     ## Import model config to json tree
     # TODO: Create json schema to check config validity

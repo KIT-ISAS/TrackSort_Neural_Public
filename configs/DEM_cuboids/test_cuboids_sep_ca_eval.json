@@ -1,0 +1,161 @@
+{
+  "batch_size": 64,
+  "experts": {
+    "KF_CA_CVBC_CV": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/DEM_cuboids/KF_CA_CVBC_CV.pkl",
+      "model_options": {
+        "dt": 1,
+        "s_w": 1E20,
+        "s_v": 1E-20,
+        "temporal_separator": "CVBC",
+        "spatial_separator": "CV"
+      },
+      "state_options": {
+        "velocity_guess": 0.01,
+        "velo_var_x": 0.002,
+        "velo_var_y": 0.005,
+        "pos_var": 1E-20,
+        "accel_guess": 0.0,
+        "accel_var_x": 0.0002,
+        "accel_var_y": 0.0005
+      }
+    },
+    "KF_CA_CA_CA": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/DEM_cuboids/KF_CA_CA_CA.pkl",
+      "model_options": {
+        "dt": 1,
+        "s_w": 1E20,
+        "s_v": 1E-20,
+        "temporal_separator": "CA",
+        "spatial_separator": "CA"
+      },
+      "state_options": {
+        "velocity_guess": 0.01,
+        "velo_var_x": 0.002,
+        "velo_var_y": 0.005,
+        "pos_var": 1E-20,
+        "accel_guess": 0.0,
+        "accel_var_x": 0.0002,
+        "accel_var_y": 0.0005
+      }
+    },
+    "KF_CA_CALV_CADSC": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/DEM_cuboids/KF_CA_CALV_CADSC.pkl",
+      "model_options": {
+        "dt": 1,
+        "s_w": 1E20,
+        "s_v": 1E-20,
+        "temporal_separator": "LV",
+        "spatial_separator": "DSC",
+        "belt_velocity": 1.5
+      },
+      "state_options": {
+        "velocity_guess": 0.01,
+        "velo_var_x": 0.002,
+        "velo_var_y": 0.005,
+        "pos_var": 1E-20,
+        "accel_guess": 0.0,
+        "accel_var_x": 0.0002,
+        "accel_var_y": 0.0005
+      }
+    },
+    "KF_CA_IA_CV": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/DEM_cuboids/KF_CA_IA_CV.pkl",
+      "model_options": {
+        "dt": 1,
+        "s_w": 1E20,
+        "s_v": 1E-20,
+        "temporal_separator": "IA",
+        "spatial_separator": "CV"
+      },
+      "state_options": {
+        "velocity_guess": 0.01,
+        "velo_var_x": 0.002,
+        "velo_var_y": 0.005,
+        "pos_var": 1E-20,
+        "accel_guess": 0.0,
+        "accel_var_x": 0.0002,
+        "accel_var_y": 0.0005
+      }
+    },
+    "KF_CA_IA_CA": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/DEM_cuboids/KF_CA_IA_CA.pkl",
+      "model_options": {
+        "dt": 1,
+        "s_w": 1E20,
+        "s_v": 1E-20,
+        "temporal_separator": "IA",
+        "spatial_separator": "CA"
+      },
+      "state_options": {
+        "velocity_guess": 0.01,
+        "velo_var_x": 0.002,
+        "velo_var_y": 0.005,
+        "pos_var": 1E-20,
+        "accel_guess": 0.0,
+        "accel_var_x": 0.0002,
+        "accel_var_y": 0.0005
+      }
+    },
+    "KF_CA_IA_Ratio": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/DEM_cuboids/KF_CA_IA_Ratio.pkl",
+      "model_options": {
+        "dt": 1,
+        "s_w": 1E20,
+        "s_v": 1E-20,
+        "temporal_separator": "IA",
+        "spatial_separator": "ratio"
+      },
+      "state_options": {
+        "velocity_guess": 0.01,
+        "velo_var_x": 0.002,
+        "velo_var_y": 0.005,
+        "pos_var": 1E-20,
+        "accel_guess": 0.0,
+        "accel_var_x": 0.0002,
+        "accel_var_y": 0.0005
+      }
+    }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/DEM_cuboids/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "matching_algorithm": "global",
+      "delta_start_end_phase":0.025,
+      "no_change_dist":0.005,
+      "new_track_at_beginning_dist":0.005,
+      "new_track_middle_dist":0.02,
+      "track_disappear_at_end_dist":0.005,
+      "track_disappear_at_middle_dist":0.02
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}

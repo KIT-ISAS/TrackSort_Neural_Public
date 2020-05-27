@@ -967,11 +967,6 @@ class AbstractDataSet(ABC):
             else:
                 mask = np.hstack((mask, m[:, None]))
         mask = mask.T.astype(np.bool)
-        # hide data
-        aligned_track_data[~mask, :] = self.nan_value
-        # Shorten tracks to new max length
-        longest_track = np.max(np.sum(np.all(aligned_track_data != self.nan_value, axis=-1), axis=-1))
-        aligned_track_data = aligned_track_data[:,:longest_track]
 
         # 6. temporal intersection: 
         #   use the euclidean distance to calculate a weighted average between the indices of Q and P
@@ -984,6 +979,12 @@ class AbstractDataSet(ABC):
         # 7. y speed label:
         #   Velocity of particle at the nozzle array in y direction
         y_velo_labels = (p_values[:, 1] - q_values[:, 1]) / 1
+
+        # hide data
+        aligned_track_data[~mask, :] = self.nan_value
+        # Shorten tracks to new max length
+        longest_track = np.max(np.sum(np.all(aligned_track_data != self.nan_value, axis=-1), axis=-1))
+        aligned_track_data = aligned_track_data[:,:longest_track]
         
         return aligned_track_data, spatial_labels, temporal_labels, y_velo_labels
 

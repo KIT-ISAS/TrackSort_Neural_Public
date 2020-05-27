@@ -8,7 +8,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CV_CV_CV.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "default",
         "spatial_separator": "default"
@@ -27,7 +27,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "BC",
         "spatial_separator": "default"
@@ -46,7 +46,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CV_IA_CV.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "IA",
         "spatial_separator": "default"
@@ -65,7 +65,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CV_CV_Ratio.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "default",
         "spatial_separator": "ratio"
@@ -84,7 +84,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CV_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "BC",
         "spatial_separator": "ratio"
@@ -103,7 +103,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CV_IA_Ratio.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "IA",
         "spatial_separator": "ratio"
@@ -122,7 +122,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_CA.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "default",
         "spatial_separator": "default"
@@ -144,7 +144,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_CA.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "CVBC",
         "spatial_separator": "default"
@@ -166,7 +166,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_CA.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "IA",
         "spatial_separator": "default"
@@ -188,7 +188,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_CA.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "LV",
         "spatial_separator": "default",
@@ -211,7 +211,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_CV.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "default",
         "spatial_separator": "CV"
@@ -233,7 +233,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_CV.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "CVBC",
         "spatial_separator": "CV"
@@ -255,7 +255,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_CV.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "IA",
         "spatial_separator": "CV"
@@ -277,7 +277,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_CV.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "LV",
         "spatial_separator": "CV",
@@ -300,7 +300,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_Ratio.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "default",
         "spatial_separator": "ratio"
@@ -322,7 +322,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "CVBC",
         "spatial_separator": "ratio"
@@ -344,7 +344,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_Ratio.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "IA",
         "spatial_separator": "ratio"
@@ -366,7 +366,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_Ratio.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "LV",
         "spatial_separator": "ratio",
@@ -389,7 +389,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_DSC.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "default",
         "spatial_separator": "DSC"
@@ -411,7 +411,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_DSC.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "CVBC",
         "spatial_separator": "DSC"
@@ -433,7 +433,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_DSC.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "IA",
         "spatial_separator": "DSC"
@@ -455,7 +455,7 @@
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_DSC.pkl",
       "model_options": {
         "dt": 1,
-        "s_w": 1,
+        "s_w": 1E20,
         "s_v": 1E-20,
         "temporal_separator": "LV",
         "spatial_separator": "DSC",
