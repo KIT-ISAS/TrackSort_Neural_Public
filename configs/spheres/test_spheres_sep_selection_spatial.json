@@ -3,7 +3,7 @@
   "experts": {
     "MLP": {
       "type": "MLP",
-      "model_path": "models/pepper/MLP_separator.h5",
+      "model_path": "models/spheres/MLP_separator.h5",
       "is_separator": true,
       "options": {
         "base_learning_rate": 0.005,
@@ -19,7 +19,7 @@
       "type": "RNN",
       "is_separator": true,
       "only_last_timestep_additional_loss": true,
-      "model_path": "models/pepper/LSTM_1024_16_separation.h5",
+      "model_path": "models/spheres/LSTM_1024_16_separation.h5",
       "options": {
         "clear_state": true,
         "model_structure": {
@@ -36,74 +36,17 @@
         }
       }
     },
-    "KF_CV_CV_CV": {
-      "type": "KF",
-      "sub_type": "CV",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CV_CV.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 18,
-        "s_v": 3.6E-7,
-        "temporal_separator": "default",
-        "spatial_separator": "default"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7
-      }
-    },
     "KF_CV_CVBC_CV": {
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CVBC_CV.pkl",
+      "model_path": "models/spheres/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
         "s_v": 3.6E-7,
         "temporal_separator": "BC",
         "spatial_separator": "default"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7
-      }
-    },
-    "KF_CV_IA_CV": {
-      "type": "KF",
-      "sub_type": "CV",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_IA_CV.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 18,
-        "s_v": 3.6E-7,
-        "temporal_separator": "IA",
-        "spatial_separator": "default"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7
-      }
-    },
-    "KF_CV_CV_Ratio": {
-      "type": "KF",
-      "sub_type": "CV",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CV_Ratio.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 18,
-        "s_v": 3.6E-7,
-        "temporal_separator": "default",
-        "spatial_separator": "ratio"
       },
       "state_options": {
         "velocity_guess": 1.8,
@@ -116,7 +59,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CVBC_Ratio.pkl",
+      "model_path": "models/spheres/KF_sep_CV_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -131,30 +74,33 @@
         "pos_var": 3.6E-7
       }
     },
-    "KF_CV_IA_Ratio": {
+    "KF_CA_CVBC_Ratio": {
       "type": "KF",
-      "sub_type": "CV",
+      "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_IA_Ratio.pkl",
+      "model_path": "models/spheres/KF_sep_CA_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
-        "s_w": 18,
+        "s_w": 1.8E3,
         "s_v": 3.6E-7,
-        "temporal_separator": "IA",
+        "temporal_separator": "CVBC",
         "spatial_separator": "ratio"
       },
       "state_options": {
         "velocity_guess": 1.8,
         "velo_var_x": 0.13,
         "velo_var_y": 0.5,
-        "pos_var": 3.6E-7
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CA_CA": {
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_CA.pkl",
+      "model_path": "models/spheres/KF_sep_CA_CA_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -172,11 +118,58 @@
         "accel_var_y": 18000
       }
     },
+    "KF_CA_CA_CV": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/spheres/KF_sep_CA_CA_CV.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
+        "temporal_separator": "CA",
+        "spatial_separator": "CV"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    },
+    "KF_CA_CA_Ratio": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/spheres/KF_sep_CA_CA_Ratio.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
+        "temporal_separator": "CA",
+        "spatial_separator": "ratio"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    },
+
+
+
     "KF_CA_CVBC_CA": {
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_CA.pkl",
+      "model_path": "models/spheres/KF_sep_CA_CVBC_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -198,7 +191,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_CA.pkl",
+      "model_path": "models/spheres/KF_sep_CA_IA_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -220,7 +213,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_CA.pkl",
+      "model_path": "models/spheres/KF_sep_CA_LV_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -239,33 +232,12 @@
         "accel_var_y": 18000
       }
     },
-    "KF_CA_CA_CV": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_CV.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "CA",
-        "spatial_separator": "CV"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
+
     "KF_CA_CVBC_CV": {
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_CV.pkl",
+      "model_path": "models/spheres/KF_sep_CA_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -287,7 +259,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_CV.pkl",
+      "model_path": "models/spheres/KF_sep_CA_IA_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -309,7 +281,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_CV.pkl",
+      "model_path": "models/spheres/KF_sep_CA_LV_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -328,173 +300,17 @@
         "accel_var_y": 18000
       }
     },
-    "KF_CA_CA_Ratio": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_Ratio.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "CA",
-        "spatial_separator": "ratio"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
-    "KF_CA_CVBC_Ratio": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_Ratio.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "CVBC",
-        "spatial_separator": "ratio"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
-    "KF_CA_IA_Ratio": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_Ratio.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "IA",
-        "spatial_separator": "ratio"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
-    "KF_CA_LV_Ratio": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_Ratio.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "LV",
-        "spatial_separator": "ratio",
-        "belt_velocity": 0.0115
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
     "KF_CA_CA_DSC": {
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_DSC.pkl",
+      "model_path": "models/spheres/KF_sep_CA_CA_DSC.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
         "temporal_separator": "CA",
         "spatial_separator": "DSC"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
-    "KF_CA_CVBC_DSC": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_DSC.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "CVBC",
-        "spatial_separator": "DSC"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
-    "KF_CA_IA_DSC": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_DSC.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "IA",
-        "spatial_separator": "DSC"
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
-      }
-    },
-    "KF_CA_LV_DSC": {
-      "type": "KF",
-      "sub_type": "CA",
-      "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_DSC.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7,
-        "temporal_separator": "LV",
-        "spatial_separator": "DSC",
-        "belt_velocity": 0.0115
       },
       "state_options": {
         "velocity_guess": 1.8,
@@ -509,7 +325,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating.pkl",
+    "model_path": "models/spheres/simple_gating.pkl",
     "options": {
 
     }

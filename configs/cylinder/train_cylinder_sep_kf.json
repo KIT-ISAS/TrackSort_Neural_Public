@@ -1,46 +1,11 @@
 {
   "batch_size": 64,
   "experts": {
-    "MLP": {
-      "type": "MLP",
-      "model_path": "models/pepper/MLP_separator.h5",
-      "is_separator": true,
-      "options": {
-        "base_learning_rate": 0.005,
-        "model_structure": {
-          "layers": [16, 16, 16, 16],
-          "activation": "leakly_relu",
-          "l1_regularization": 5e-8,
-          "l2_regularization": 0
-        }
-      }
-    },
-    "LSTM": {
-      "type": "RNN",
-      "is_separator": true,
-      "only_last_timestep_additional_loss": true,
-      "model_path": "models/pepper/LSTM_1024_16_separation.h5",
-      "options": {
-        "clear_state": true,
-        "model_structure": {
-          "num_units_first_rnn": 1024,
-          "num_units_second_rnn": 16,
-          "num_units_third_rnn": 0,
-          "num_units_fourth_rnn": 0,
-          "num_units_first_dense": 0,
-          "num_units_second_dense": 0,
-          "num_units_third_dense": 0,
-          "num_units_fourth_dense": 0,
-          "rnn_model_name": "lstm",
-          "use_batchnorm_on_dense": true
-        }
-      }
-    },
     "KF_CV_CV_CV": {
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CV_CV.pkl",
+      "model_path": "models/cylinder/KF_sep_CV_CV_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -59,7 +24,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CVBC_CV.pkl",
+      "model_path": "models/cylinder/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -78,7 +43,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_IA_CV.pkl",
+      "model_path": "models/cylinder/KF_sep_CV_IA_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -97,7 +62,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CV_Ratio.pkl",
+      "model_path": "models/cylinder/KF_sep_CV_CV_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -116,7 +81,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CVBC_Ratio.pkl",
+      "model_path": "models/cylinder/KF_sep_CV_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -135,7 +100,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_IA_Ratio.pkl",
+      "model_path": "models/cylinder/KF_sep_CV_IA_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -154,7 +119,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_CA.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CA_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -176,7 +141,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_CA.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CVBC_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -198,7 +163,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_CA.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_IA_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -220,7 +185,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_CA.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_LV_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -243,7 +208,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_CV.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CA_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -265,7 +230,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_CV.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -287,7 +252,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_CV.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_IA_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -309,7 +274,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_CV.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_LV_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -332,7 +297,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_Ratio.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CA_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -354,7 +319,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_Ratio.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -376,7 +341,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_Ratio.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_IA_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -398,7 +363,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_Ratio.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_LV_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -421,7 +386,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_DSC.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CA_DSC.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -443,7 +408,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CVBC_DSC.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_CVBC_DSC.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -465,7 +430,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_IA_DSC.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_IA_DSC.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -487,7 +452,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_LV_DSC.pkl",
+      "model_path": "models/cylinder/KF_sep_CA_LV_DSC.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -509,7 +474,7 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating.pkl",
+    "model_path": "models/cylinder/simple_gating.pkl",
     "options": {
 
     }

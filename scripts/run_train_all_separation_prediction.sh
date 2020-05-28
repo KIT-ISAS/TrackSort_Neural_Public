@@ -206,6 +206,74 @@ cd ..
   --no_show True \
   --logfile logs/terminal_logs/run_train_all_separation_prediction.log
 
+## Data: Cylinder
+# MLP
+./main.py \
+  --separation_prediction True \
+  --tracking False \
+  --virtual_belt_edge_x_position 800 \
+  --virtual_nozzle_array_x_position 1550 \
+  --is_loaded False \
+  --config_path configs/cylinder/train_cylinder_mlp_sep.json \
+  --dataset_dir 'data/Zylinder/trackSortResultZylinder/*_trackHistory_NothingDeleted.csv' \
+  --separation_mlp_input_dim 7 \
+  --num_train_epochs 2000 \
+  --batch_size 64 \
+  --evaluation_ratio 0.15 \
+  --test_ratio 0.15 \
+  --evaluate_every_n_epochs 20 \
+  --lr_decay_after_epochs 300 \
+  --lr_decay_factor 0.5 \
+  --time_normalization_constant 22 \
+  --result_path results/cylinder_all/separation_prediction_default/ \
+  --execute_evaluation False \
+  --execute_multi_target_tracking False \
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_all_separation_prediction.log
+
+# RNN
+./main.py \
+  --separation_prediction True \
+  --tracking False \
+  --virtual_belt_edge_x_position 800 \
+  --virtual_nozzle_array_x_position 1550 \
+  --is_loaded False \
+  --config_path configs/cylinder/train_cylinder_rnn_hyb.json \
+  --dataset_dir 'data/Zylinder/trackSortResultZylinder/*_trackHistory_NothingDeleted.csv' \
+  --num_train_epochs 1000 \
+  --batch_size 64 \
+  --evaluation_ratio 0.15 \
+  --test_ratio 0.15 \
+  --evaluate_every_n_epochs 20 \
+  --lr_decay_after_epochs 150 \
+  --lr_decay_factor 0.1 \
+  --time_normalization_constant 22 \
+  --result_path results/cylinder_all/separation_prediction_default/ \
+  --execute_evaluation False \
+  --execute_multi_target_tracking False \
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_all_separation_prediction.log
+
+# KF
+./main.py \
+  --separation_prediction True \
+  --tracking False \
+  --virtual_belt_edge_x_position 800 \
+  --virtual_nozzle_array_x_position 1550 \
+  --is_loaded False \
+  --config_path configs/cylinder/train_cylinder_sep_kf.json \
+  --dataset_dir 'data/Zylinder/trackSortResultZylinder/*_trackHistory_NothingDeleted.csv' \
+  --num_train_epochs 1 \
+  --batch_size 64 \
+  --evaluation_ratio 0.15 \
+  --test_ratio 0.15 \
+  --time_normalization_constant 22 \
+  --result_path results/cylinder_all/separation_prediction_default/ \
+  --execute_evaluation False \
+  --execute_multi_target_tracking False \
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_all_separation_prediction.log
+
 ## Data: DEM cuboids
 # MLP
 ./main.py \
@@ -240,8 +308,8 @@ cd ..
 ./main.py \
   --separation_prediction True \
   --tracking False \
-  --virtual_belt_edge_x_position 800 \
-  --virtual_nozzle_array_x_position 1550 \
+  --virtual_belt_edge_x_position 0.55 \
+  --virtual_nozzle_array_x_position 0.7 \
   --is_loaded False \
   --config_path configs/DEM_cuboids/train_cuboids_rnn_hyb.json \
   --dataset_dir 'data/DEM_Data/csv_converted/Cuboids_115_200Hz.csv' \
@@ -268,8 +336,8 @@ cd ..
 ./main.py \
   --separation_prediction True \
   --tracking False \
-  --virtual_belt_edge_x_position 800 \
-  --virtual_nozzle_array_x_position 1550 \
+  --virtual_belt_edge_x_position 0.55 \
+  --virtual_nozzle_array_x_position 0.7 \
   --is_loaded False \
   --config_path configs/DEM_cuboids/train_cuboids_sep_kf.json \
   --dataset_dir 'data/DEM_Data/csv_converted/Cuboids_115_200Hz.csv' \
@@ -323,8 +391,8 @@ cd ..
 ./main.py \
   --separation_prediction True \
   --tracking False \
-  --virtual_belt_edge_x_position 800 \
-  --virtual_nozzle_array_x_position 1550 \
+  --virtual_belt_edge_x_position 0.55 \
+  --virtual_nozzle_array_x_position 0.7 \
   --is_loaded False \
   --config_path configs/DEM_cylinder/train_cylinder_rnn_hyb.json \
   --dataset_dir 'data/DEM_Data/csv_converted/Cylinders_115_200Hz.csv' \
@@ -351,8 +419,8 @@ cd ..
 ./main.py \
   --separation_prediction True \
   --tracking False \
-  --virtual_belt_edge_x_position 800 \
-  --virtual_nozzle_array_x_position 1550 \
+  --virtual_belt_edge_x_position 0.55 \
+  --virtual_nozzle_array_x_position 0.7 \
   --is_loaded False \
   --config_path configs/DEM_cylinder/train_cylinder_sep_kf.json \
   --dataset_dir 'data/DEM_Data/csv_converted/Cylinders_115_200Hz.csv' \
