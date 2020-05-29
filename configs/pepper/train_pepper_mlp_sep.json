@@ -3,7 +3,7 @@
   "experts": {
     "MLP": {
       "type": "MLP",
-      "model_path": "models/pepper/MLP_separator.h5",
+      "model_path": "models/pepper/MLP_separator_no_l1.h5",
       "is_separator": true,
       "options": {
         "base_learning_rate": 0.005,
