@@ -51,7 +51,10 @@ class MLP_Model(Expert):
             self.base_learning_rate = mlp_config.get("base_learning_rate")
         else:
             self.base_learning_rate = 0.005
-        self._label_dim = 2
+        if is_next_step:
+            self._label_dim = 2
+        else:
+            self._label_dim = 2
         super().__init__(Expert_Type.MLP, name, model_path)
 
     def create_model(self, n_features):
@@ -64,22 +67,22 @@ class MLP_Model(Expert):
         self.input_dim = n_features
         logging.info(self.mlp_model.summary())
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
+        self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
-            self.loss_object = tf.keras.losses.MeanSquaredError()
             self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
         else:
-            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer)
+            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
 
     def load_model(self):
         """Load a MLP model from its model path."""
         self.mlp_model = tf.keras.models.load_model(self.model_path)
         self.input_dim = self.mlp_model.input_shape[1]
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
+        self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
-            self.loss_object = tf.keras.losses.MeanSquaredError()
             self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
         else:
-            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer)
+            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
         logging.info(self.mlp_model.summary())
 
     def train_batch(self, inp, target):
@@ -262,7 +265,7 @@ def train_step_generator(model, optimizer, loss_object):
 
     return train_step
 
-def train_step_generator_separation_prediction(model, optimizer):
+def train_step_generator_separation_prediction(model, optimizer, loss_object):
     """Build a function which returns a computational graph for tensorflow.
 
     This function can be called to train the given model with the given optimizer.
@@ -283,7 +286,7 @@ def train_step_generator_separation_prediction(model, optimizer):
             predictions = model(inp, training=training, mask=mask)
             spatial_loss, temporal_loss = get_separation_loss(predictions, target, mask)
             spatial_mae, temporal_mae = get_separation_mae(predictions, target, mask)
-            loss = 1/2 * (spatial_loss + temporal_loss)
+            loss = loss_object(tf.gather(target, [0,1], axis=1), predictions, sample_weight=mask)
         if training:
             grads = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
