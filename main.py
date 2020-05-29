@@ -19,6 +19,7 @@ from data_association import DataAssociation
 from data_manager import FakeDataSet, CsvDataSet
 from evaluation_functions import calculate_error_first_and_second_kind
 from kalman_playground import kalman_playground
+from velocity_plot import velocity_plot
 # Test
 from cv_model import *
 from ca_model import *
@@ -59,6 +60,8 @@ parser.add_argument('--distance_threshold', type=float, default=0.02,
 parser.add_argument('--config_path', default="configs/default_config.json",
                     help='Path to config file including information about experts, gating network and weighting function.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
+parser.add_argument('--evaluation_ratio', type=float, default=0.15, help='The ratio of data used for evaluation.')
+parser.add_argument('--test_ratio', type=float, default=0.15, help='The ratio of data used for the final unbiased test.')
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
@@ -75,10 +78,9 @@ parser.add_argument('--birth_rate_std', type=float, default=2.0,
 parser.add_argument('--normalization_constant', type=float, default=None, help='Normalization value')
 parser.add_argument('--evaluate_every_n_epochs', type=int, default=50)
 parser.add_argument('--time_normalization_constant', type=float, default=22.0, help='Normalization for time prediction')
-parser.add_argument('--min_number_detections', type=int, default=6,
-                    help='The min_number_detections value, that is used by the DataManager')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
 parser.add_argument('--mlp_input_dim', type=int, default=5, help='The dimension of input points for the MLP')
+parser.add_argument('--separation_mlp_input_dim', type=int, default=7, help='The dimension of input points for the separation MLP')
 parser.add_argument('--data_is_aligned', type=str2bool, default=True,
                     help='Whether the data used by the DataManger is aligned or not.')
 parser.add_argument('--rotate_columns', type=str2bool, default=False,
@@ -87,20 +89,21 @@ parser.add_argument('--run_hyperparameter_search', type=str2bool, default=False,
                     help='Whether to run the hyperparameter search or not')
 parser.add_argument('--test_noise_robustness', type=str2bool, default=False,
                     help='Should the Dataset be tested with multiple noise values?')
+parser.add_argument('--tracking', type=str2bool, default=True,
+                    help='Perform tracking. This is the default mode.')
 parser.add_argument('--separation_prediction', type=str2bool, default=False,
-                    help='Should the RNN also predict the separation?')
+                    help='Perform separation predcition')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
-
+parser.add_argument('--logfile', default='', help='Path to logfile. Leave this out to only log to console.')
 parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
 
 parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
 parser.add_argument('--virtual_nozzle_array_x_position', type=float, default=1550,
                     help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_first_rnn', type=int, default=1024,
-                    help='Where should the virtual nozzle array be?')
-parser.add_argument('--num_units_second_rnn', type=int, default=16,
-                    help='Where should the virtual nozzle array be?')
+parser.add_argument('--min_measurements_count', type=int, default=3,
+                    help='Ignore tracks with less measurements.')                    
+
 parser.add_argument('--clear_state', type=str2bool, default=True,
                     help='Whether a new track should be initialized with empty state?')
 parser.add_argument('--overwriting_activated', type=str2bool, default=True,
@@ -119,6 +122,7 @@ args = parser.parse_args()
 
 global_config = {
     'separation_prediction': args.separation_prediction,
+    'tracking': args.tracking,
     'clear_state': args.clear_state,
     'time_normalization_constant': args.time_normalization_constant,
     'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
@@ -132,6 +136,8 @@ global_config = {
     'distance_threshold': args.distance_threshold,
     'config_path': args.config_path,
     'batch_size': args.batch_size,
+    'evaluation_ratio': args.evaluation_ratio,
+    'test_ratio': args.test_ratio,
     'matching_algorithm': args.matching_algorithm,
     #
     'Track': {
@@ -146,7 +152,6 @@ global_config = {
     #
     'CsvDataSet': {
         'glob_file_pattern': args.dataset_dir,
-        'min_number_detections': args.min_number_detections,
         'nan_value': args.nan_value,
         'input_dim': args.input_dim,
         'mlp_input_dim': args.mlp_input_dim,
@@ -155,8 +160,14 @@ global_config = {
         'birth_rate_std': args.birth_rate_std,
         'rotate_columns': args.rotate_columns,
         'normalization_constant': args.normalization_constant,
-        'additive_noise_stddev': args.additive_noise_stddev
+        'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
+        'virtual_nozzle_array_x_position': args.virtual_nozzle_array_x_position, 
+        'min_measurements_count': args.min_measurements_count,
+        'additive_noise_stddev': args.additive_noise_stddev,
+        'is_separation_prediction': args.separation_prediction
     },
+    'separation_mlp_input_dim': args.separation_mlp_input_dim,
+
     'num_train_epochs': args.num_train_epochs,
     'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
     'improvement_break_condition': args.improvement_break_condition,
@@ -183,12 +194,24 @@ global_config = {
 
 # setup logging
 log_level = int(logging._nameToLevel[args.verbosity])
-logger = logging.getLogger()
-handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(log_level)
+if args.logfile != "":
+    # Check if log folder exists and create it if not.
+    save_path = os.path.dirname(args.logfile)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    logging.basicConfig(filename=args.logfile,
+                        filemode='a',
+                        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                        datefmt='%H:%M:%S',
+                        level=logging._nameToLevel[args.verbosity])
+    logger = logging.getLogger()
+else:
+    logger = logging.getLogger()
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(log_level)
 logging.log(log_level, "LOG LEVEL: %s", log_level)
 
 
@@ -223,7 +246,8 @@ def run_global_config(global_config, experiment_series_names=''):
     
     # PLAY AROUND WITH VARIOUS KALMAN FILTERS
     # should be commented out...
-    #kalman_playground(data_source.aligned_track_data)
+    #kalman_playground(data_source.aligned_track_data, data_source.normalization_constant)
+    #velocity_plot(data_source.aligned_track_data, 17857, 0.005)#17857
 
     ## Import model config to json tree
     # TODO: Create json schema to check config validity
@@ -231,52 +255,111 @@ def run_global_config(global_config, experiment_series_names=''):
         model_config = json.load(f)
         
     ## Initialize models
-    model_manager = ModelManager(model_config, global_config.get("is_loaded"), 
-                                data_source.longest_track, global_config.get("overwriting_activated"))
+    # model_config, is_loaded, num_time_steps, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.
+    model_manager = ModelManager(model_config = model_config,
+                                 is_loaded = global_config.get("is_loaded"), 
+                                 num_time_steps = data_source.longest_track, 
+                                 n_mlp_features = global_config.get("mlp_input_dim"),
+                                 n_mlp_features_separation_prediction = global_config.get("separation_mlp_input_dim"),
+                                 overwriting_activated = global_config.get("overwriting_activated"),
+                                 x_pred_to = global_config.get("CsvDataSet").get("virtual_nozzle_array_x_position")/data_source.normalization_constant,
+                                 time_normalization = global_config['time_normalization_constant'])
 
-    # Seperate dataset into train and test set
-    # TODO: Ask for these arguments in main run args
+    ## Get tracking training and test dataset
+    # TODO: 
+    #   * Ask for these arguments in main run args
     random_seed = 0
-    test_ratio = 0.1
-    mlp_dataset_train, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
-                                    normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
-                                    random_seed = random_seed)
+    if global_config["tracking"]:
+        mlp_dataset_train, mlp_dataset_eval, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
+                                        normalized=True, 
+                                        evaluation_ratio = global_config.get("evaluation_ratio"), 
+                                        test_ratio= global_config.get("test_ratio"),
+                                        batch_size = global_config.get('batch_size'), 
+                                        random_seed = random_seed)
 
-    seq2seq_dataset_train, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
-                                    normalized=True, test_ratio=test_ratio, batch_size = global_config.get('batch_size'), 
-                                    random_seed = random_seed)
+        seq2seq_dataset_train, seq2seq_dataset_eval, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
+                                        normalized=True, 
+                                        evaluation_ratio = global_config.get("evaluation_ratio"), 
+                                        test_ratio= global_config.get("test_ratio"),
+                                        batch_size = global_config.get('batch_size'), 
+                                        random_seed = random_seed)
     
+    ## Get separation prediction training and test dataset
+    if global_config["separation_prediction"]:
+        mlp_dataset_train_sp, mlp_dataset_eval_sp, mlp_dataset_test_sp = \
+            data_source.get_tf_data_sets_mlp_with_separation_data( 
+                normalized=True, 
+                evaluation_ratio = global_config.get("evaluation_ratio"), 
+                test_ratio= global_config.get("test_ratio"),
+                batch_size=global_config['batch_size'], 
+                random_seed=random_seed,
+                time_normalization=global_config['time_normalization_constant'],
+                n_inp_points = global_config['separation_mlp_input_dim'])
+
+        seq2seq_dataset_train_sp, seq2seq_dataset_eval_sp, seq2seq_dataset_test_sp, num_time_steps = \
+            data_source.get_tf_data_sets_seq2seq_with_separation_data(
+                normalized=True, 
+                evaluation_ratio = global_config.get("evaluation_ratio"), 
+                test_ratio= global_config.get("test_ratio"),
+                batch_size=global_config['batch_size'], 
+                random_seed=random_seed,
+                time_normalization=global_config['time_normalization_constant'])
     ## Train models
     if not global_config["is_loaded"]:
-        model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
-                                   seq2seq_dataset_train = seq2seq_dataset_train,
-                                   seq2seq_dataset_test = seq2seq_dataset_test, 
-                                   mlp_dataset_train = mlp_dataset_train,
-                                   mlp_dataset_test = mlp_dataset_test,
-                                   num_train_epochs = global_config.get("num_train_epochs"),
-                                   evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
-                                   improvement_break_condition = global_config.get("improvement_break_condition"),
-                                   lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
-                                   lr_decay = global_config.get("lr_decay_factor"))
-    if global_config["is_loaded_gating_network"]:
-        model_manager.load_gating_network()
-    else:
-        model_manager.train_gating_network(mlp_conversion_func = data_source.mlp_target_to_track_format,
-                                            seq2seq_dataset_train = seq2seq_dataset_train,
-                                            mlp_dataset_train = mlp_dataset_train)
+        if global_config["tracking"]:
+            model_manager.train_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                    seq2seq_dataset_train = seq2seq_dataset_train,
+                                    seq2seq_dataset_test = seq2seq_dataset_eval, 
+                                    mlp_dataset_train = mlp_dataset_train,
+                                    mlp_dataset_test = mlp_dataset_eval,
+                                    num_train_epochs = global_config.get("num_train_epochs"),
+                                    evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
+                                    improvement_break_condition = global_config.get("improvement_break_condition"),
+                                    lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
+                                    lr_decay = global_config.get("lr_decay_factor"))
+        if global_config["separation_prediction"]:
+            model_manager.train_models_separation_prediction(seq2seq_dataset_train = seq2seq_dataset_train_sp,
+                                    seq2seq_dataset_test = seq2seq_dataset_eval_sp, 
+                                    mlp_dataset_train = mlp_dataset_train_sp,
+                                    mlp_dataset_test = mlp_dataset_eval_sp,
+                                    num_train_epochs = global_config.get("num_train_epochs"),
+                                    evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
+                                    improvement_break_condition = global_config.get("improvement_break_condition"),
+                                    lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
+                                    lr_decay = global_config.get("lr_decay_factor"))
+    ## Train gating network     
+    if global_config["tracking"]:                           
+        if global_config["is_loaded_gating_network"]:
+            model_manager.load_gating_network()
+        else:
+            model_manager.train_gating_network(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                                seq2seq_dataset_train = seq2seq_dataset_train,
+                                                mlp_dataset_train = mlp_dataset_train)
+    if global_config["separation_prediction"]:
+        stop=0
+        # TODO: Implement separation prediction gating network
 
     ## Test models
     # TODO:
     #   * Test with an evaluation set instead of test set.
-    if global_config.get('execute_evaluation'):
-        model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
-                                  result_dir = global_config['result_path'],
-                                  seq2seq_dataset_test = seq2seq_dataset_test, 
-                                  mlp_dataset_test = mlp_dataset_test,
-                                  normalization_constant = data_source.normalization_constant,
-                                  evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
-                                  no_show = global_config['no_show'])
-
+    if global_config["tracking"]:
+        if global_config.get('execute_evaluation'):
+            model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
+                                    result_dir = global_config['result_path'],
+                                    seq2seq_dataset_test = seq2seq_dataset_eval, 
+                                    mlp_dataset_test = mlp_dataset_eval,
+                                    normalization_constant = data_source.normalization_constant,
+                                    evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
+                                    no_show = global_config['no_show'])
+    if global_config["separation_prediction"]:
+        if global_config.get('execute_evaluation'):
+            model_manager.test_models_separation_prediction(result_dir = global_config['result_path'],
+                                    seq2seq_dataset_test = seq2seq_dataset_eval_sp, 
+                                    mlp_dataset_test = mlp_dataset_eval_sp,
+                                    normalization_constant = data_source.normalization_constant,
+                                    time_normalization_constant=global_config['time_normalization_constant'],
+                                    no_show = global_config['no_show'])
+    ## Execute MTT
     if global_config.get('execute_multi_target_tracking'):
         # Check if result folder exists and create it if not.
         save_path = os.path.dirname(global_config['result_path'])

@@ -119,6 +119,83 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     mse_df.to_csv(result_dir + ('mse_box_values_mlp_mask.csv' if is_mlp_mask else 'mse_box_values.csv'), index=False)
     mae_df.to_csv(result_dir + ('mae_box_values_mlp_mask.csv' if is_mlp_mask else 'mae_box_values.csv'), index=False)
 
+def create_boxplot_evaluation_separation_prediction(target, predictions, masks, expert_names, result_dir, 
+                              normalization_constant = 1, time_normalization_constant = 22, no_show = False):
+    """Create boxplots for the separation prediction.
+
+    Create 2 boxplots:
+        spatial error: The first predicted value is the y_nozzle position. 
+        temporal error: The second value is the time from the last prediction to the nozzle array.
+    
+    Save the data to the result dir.
+
+    Args:
+        target (np.array):      Target values
+        predictions (np.array): Predicted values
+        masks (np.array):       Masks for every expert
+        expert_names (list):    Names (String) of each expert
+        result_dir (String):    Directory to save the created plot data to
+        normalization_constant (double): Value for denormalization the y_nozzle value
+        time_normalization_constant (double): Value for denormalization the dt_nozzle value
+        no_show (Boolean):      Do not show the figures. The figures will still be saved.
+    """
+    assert(len(expert_names) == predictions.shape[0])
+    # Calculate errors
+    errors = predictions - np.repeat(target[np.newaxis,:,0:2], predictions.shape[0], axis=0)
+    # denormalize the errors
+    spatial_errors = errors[:,:,0] * normalization_constant
+    temporal_errors = errors[:,:,1] * time_normalization_constant
+    
+    # Create box values for every expert
+    spatial_box_values = {}; temporal_box_values = {}
+    spatial_boxplot_inputs = []; temporal_boxplot_inputs = []
+    for i in range(spatial_errors.shape[0]):
+        # Spatial error
+        spatial_error = spatial_errors[i, np.where(masks[i])]
+        spatial_box_values[expert_names[i]] = get_box_values(spatial_error)
+        spatial_boxplot_inputs.append(spatial_error[0])
+        # Temporal error
+        temporal_error = temporal_errors[i, np.where(masks[i])]
+        temporal_box_values[expert_names[i]] = get_box_values(temporal_error)
+        temporal_boxplot_inputs.append(temporal_error[0])
+
+    # Show temporal plot
+    plt.figure()
+    plt.boxplot(temporal_boxplot_inputs, sym='', labels=expert_names)
+    plt.ylabel("Temporal deviation [frames]")
+    if normalization_constant >= 100:
+        plt.ylim([-2, 2])
+    else:
+        plt.ylim([-4, 4])
+    plt.grid(b=True, which='major', axis='y', linestyle='--')
+    plt.xticks(rotation=60)
+    plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 
+    if not no_show:
+        plt.show()
+    # Show spatial plot
+    plt.figure()
+    if normalization_constant >= 100:
+        plt.boxplot(spatial_boxplot_inputs, sym='', labels=expert_names)
+        plt.ylabel("Spatial deviation [px]")
+        plt.ylim([-50, 50])
+    else:
+        for i in range(len(spatial_boxplot_inputs)):
+            spatial_boxplot_inputs[i] = spatial_boxplot_inputs[i]*1000
+        plt.boxplot(spatial_boxplot_inputs, sym='', labels=expert_names)
+        plt.ylabel("Spatial deviation [mm]")
+        plt.ylim([-2, 2])
+    plt.grid(b=True, which='major', axis='y', linestyle='--')
+    plt.xticks(rotation=60)
+    plt.savefig(result_dir + 'spatial_error_box_plot.pdf') 
+    if not no_show:
+        plt.show()
+
+    # Save data to csv via pandas
+    mse_df = pd.DataFrame(spatial_box_values)
+    mae_df = pd.DataFrame(temporal_box_values)
+    mse_df.to_csv(result_dir + 'spatial_error_box_values.csv', index=False)
+    mae_df.to_csv(result_dir + 'temporal_error_box_values.csv', index=False)
+
 def create_diversity_evaluation(target, predictions, masks, expert_names, result_dir, is_mlp_mask=False):
     """Create the data for diversity measurement comparison.
 

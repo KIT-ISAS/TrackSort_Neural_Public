@@ -6,7 +6,12 @@ Todo:
 """
 
 import numpy as np
+import pickle
+import logging
+
+from os import path
 from abc import ABC, abstractmethod
+
 from expert import Expert, Expert_Type
 
 class KF_Model(Expert):
@@ -25,14 +30,20 @@ class KF_Model(Expert):
 
     __metaclass__ = Expert
 
-    def __init__(self, name, F, C_w, H, C_v, default_state_options):
+    def __init__(self, name, model_path, F, C_w, H, C_v, default_state_options):
         """Initialize a new Kalman filter with given matrices."""
         self.F = F
         self.C_w = C_w
         self.H = H
         self.C_v = C_v
         self.default_state_options = default_state_options
-        super().__init__(Expert_Type.KF, name)
+        # This variable can be filled in training to perform some of the temporal predictions.
+        # This variable will be saved and loaded.
+        self.temporal_variable = 0
+        # This variable can be filled in training to perform some of the spatial predictions.
+        # This variable will be saved and loaded.
+        self.spatial_variable = 0
+        super().__init__(Expert_Type.KF, name, model_path)
 
     def predict(self, current_state):
         """Execute the prediction step of the Kalman filter.
@@ -76,6 +87,7 @@ class KF_Model(Expert):
         else:
             current_state.first = False
 
+    @abstractmethod
     def predict_batch(self, inp):
         """Predict a batch of input data for testing.
 
@@ -86,7 +98,53 @@ class KF_Model(Expert):
             prediction (np.array): Predicted positions for training instances
         """
         pass
+
+    @abstractmethod
+    def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
+        """Perform separation prediction on a batch of input data.
+
+        Args:
+            inp (tf.Tensor):                A batch of input tracks
+            separation_mask (tf.Tensor):    Indicating the last time step of the track
+            is_training (Boolean):          Only perform default prediction style in training.
+            target (tf.Tensor):             The target is needed for training in some cases.
+
+        Returns
+            prediction (np.array): Predicted x, y, y_nozzel and dt_nozzle
+        """
+        pass
+
+    @abstractmethod
+    def train_batch(self, inp, target):
+        """Train the cv model on a batch of data."""
+        pass
+
+    @abstractmethod    
+    def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask, no_train_mode=False):
+        """Train the cv model for separation prediction on a batch of data.
+
+        The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
+
+        Args:
+            inp (tf.Tensor):            Batch of track measurements
+            target (tf.Tensor):         Batch of track target measurements
+            tracking_mask (tf.Tensor):  Batch of tracking masks
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+            no_train_mode (Boolean):    Option to disable training of spatial and temporal variable
+
+        Returns:
+            prediction
+            spatial_loss
+            temporal_loss
+            spatial_mae
+            temporal_mae
+        """ 
+        pass
     
+    def test_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask):
+        """Call train_batch_separation_prediction in no train mode."""
+        return self.train_batch_separation_prediction(inp, target, tracking_mask, separation_mask, True)
+
     @abstractmethod
     def get_zero_state(self, batch_size):
         """Return a list of dummy states of correct size for the corresponding model.
@@ -102,18 +160,17 @@ class KF_Model(Expert):
         pass
 
     def load_model(self):
-        """Load KF model.
-
-        Loading or saving not implemented for KF yet.
-        """
-        pass
+        """Load parameters for KF model."""
+        if path.exists(self.model_path):
+            with open(self.model_path, 'rb') as f:
+                self.spatial_prediction, self.spatial_variable, self.temporal_prediction, self.temporal_variable = pickle.load(f)
+        else:
+            logging.warning("Model file for Kalman filter CV model '{}' does not exist at {}.".format(self.name, self.model_path))
 
     def save_model(self):
-        """Save KF model.
-
-        Loading or saving not implemented for KF yet.
-        """
-        pass
+        """Save parameters for KF model."""
+        with open(self.model_path, 'wb') as f:
+            pickle.dump([self.spatial_prediction, self.spatial_variable, self.temporal_prediction, self.temporal_variable], f)
 
 class KF_State(ABC):
     """The Kalman filter state saves information about the state and covariance matrix of a particle.

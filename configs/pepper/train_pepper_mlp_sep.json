@@ -1,0 +1,42 @@
+{
+  "batch_size": 64,
+  "experts": {
+    "MLP": {
+      "type": "MLP",
+      "model_path": "models/pepper/MLP_separator_no_l1.h5",
+      "is_separator": true,
+      "options": {
+        "base_learning_rate": 0.005,
+        "model_structure": {
+          "layers": [16, 16, 16, 16],
+          "activation": "leakly_relu",
+          "l1_regularization": 5e-8,
+          "l2_regularization": 0
+        }
+      }
+    }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "matching_algorithm": "global",
+      "delta_start_end_phase":0.025,
+      "no_change_dist":0.005,
+      "new_track_at_beginning_dist":0.005,
+      "new_track_middle_dist":0.02,
+      "track_disappear_at_end_dist":0.005,
+      "track_disappear_at_middle_dist":0.02
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}

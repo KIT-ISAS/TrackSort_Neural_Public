@@ -1,0 +1,95 @@
+{
+  "batch_size": 64,
+  "experts": {
+    "DQ_CVBC_CV": {
+      "type": "KF",
+      "sub_type": "DQ",
+      "is_separator": true,
+      "model_path": "models/DEM_spheres/DQ_CVBC_CV.pkl",
+      "model_options": {
+        "dt": 1,
+        "temporal_separator": "CVBC",
+        "spatial_separator": "CV"
+      }
+    },
+    "KF_DQ_CA_CA": {
+      "type": "KF",
+      "sub_type": "DQ",
+      "is_separator": true,
+      "model_path": "models/DEM_spheres/DQ_CA_CA.pkl",
+      "model_options": {
+        "dt": 1,
+        "temporal_separator": "CA",
+        "spatial_separator": "CA"
+      }
+    },
+    "DQ_CALV_CADSC": {
+      "type": "KF",
+      "sub_type": "DQ",
+      "is_separator": true,
+      "model_path": "models/DEM_spheres/DQ_CALV_CADSC.pkl",
+      "model_options": {
+        "dt": 1,
+        "temporal_separator": "LV",
+        "spatial_separator": "DSC",
+        "belt_velocity": 1.5
+      }
+    },
+    "DQ_IA_CV": {
+      "type": "KF",
+      "sub_type": "DQ",
+      "is_separator": true,
+      "model_path": "models/DEM_spheres/DQ_IA_CV.pkl",
+      "model_options": {
+        "dt": 1,
+        "temporal_separator": "IA",
+        "spatial_separator": "CV"
+      }
+    },
+    "DQ_IA_CA": {
+      "type": "KF",
+      "sub_type": "DQ",
+      "is_separator": true,
+      "model_path": "models/DEM_spheres/DQ_IA_CA.pkl",
+      "model_options": {
+        "dt": 1,
+        "temporal_separator": "IA",
+        "spatial_separator": "CA"
+      }
+    },
+    "DQ_IA_Ratio": {
+      "type": "KF",
+      "sub_type": "DQ",
+      "is_separator": true,
+      "model_path": "models/DEM_spheres/DQ_IA_Ratio.pkl",
+      "model_options": {
+        "dt": 1,
+        "temporal_separator": "IA",
+        "spatial_separator": "ratio"
+      }
+    }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/DEM_cuboids/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "matching_algorithm": "global",
+      "delta_start_end_phase":0.025,
+      "no_change_dist":0.005,
+      "new_track_at_beginning_dist":0.005,
+      "new_track_middle_dist":0.02,
+      "track_disappear_at_end_dist":0.005,
+      "track_disappear_at_middle_dist":0.02
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}
