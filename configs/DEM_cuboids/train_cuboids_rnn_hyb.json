@@ -4,7 +4,6 @@
     "LSTM": {
       "type": "RNN",
       "is_separator": true,
-      "only_last_timestep_additional_loss": true,
       "model_path": "models/DEM_cuboids/LSTM_1024_16_separation.h5",
       "options": {
         "clear_state": true,

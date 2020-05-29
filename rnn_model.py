@@ -106,14 +106,13 @@ def rnn_model_factory(
     return model, hash_
 
 
-def train_step_separation_prediction_generator(model, optimizer, nan_value=0, only_last_timestep_additional_loss=True):
+def train_step_separation_prediction_generator(model, optimizer, nan_value=0):
     """Generate the train step function for the separation prediction.
 
     Args:
         model (tf.keras.Model):         The trainable tensorflow model
         optimizer (tf.keras.Optimizer): The optimizer (e.g. ADAM) 
         nan_value (any):                The padding value
-        only_last_timestep_additional_loss (Boolean): Only take the last time step with a measurement for the separation predction loss.
     """
 
     @tf.function
@@ -387,14 +386,13 @@ class RNN_Model(Expert):
         new_state = get_state(self.rnn_model)
         return prediction, new_state
 
-    def create_model(self, batch_size, num_time_steps, only_last_timestep_additional_loss = True):
+    def create_model(self, batch_size, num_time_steps):
         """Create a new RNN model.
 
         Args:
             batch_size (int):            The batch size of the data
             num_time_steps (int):        The number of timesteps in the longest track
             time_normalization (double): The normalization constant for the separation time. Only needed for separation prediction.
-            only_last_timestep_additional_loss (Boolean): Only validate the separation prediction performance in the last measurement time step.
         """
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=batch_size, num_time_steps=num_time_steps, 
                                                            output_dim=self._label_dim, **self.model_structure)
@@ -405,8 +403,7 @@ class RNN_Model(Expert):
         if self.is_next_step:
             self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer, self.loss_object)
         else:
-            self.train_step_fn = train_step_separation_prediction_generator(model = self.rnn_model, optimizer = self.optimizer,
-                                                                            only_last_timestep_additional_loss=only_last_timestep_additional_loss)
+            self.train_step_fn = train_step_separation_prediction_generator(model = self.rnn_model, optimizer = self.optimizer)
 
     def load_model(self):
         """Load a RNN model from its model path."""
