@@ -121,7 +121,7 @@ class ModelManager(object):
                     seq2seq_dataset_train = None, seq2seq_dataset_test = None,
                     mlp_dataset_train = None, mlp_dataset_test = None,
                     num_train_epochs = 1000, evaluate_every_n_epochs = 20,
-                    improvement_break_condition = 0.001, lr_decay_after_epochs = 100, lr_decay = 0.1):
+                    improvement_break_condition = -100):
         """Train all experts for tracking only.
 
         The training information of each model should be provided in the configuration json.
@@ -133,8 +133,6 @@ class ModelManager(object):
             num_train_epochs (int):         Number of epochs for training
             evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
             improvement_break_condition (double): Break training if test loss on every expert does not improve by more than this value.
-            lr_decay_after_epochs (int):    Decrease the learning rate of certain models after x epochs
-            lr_decay (double):              Learning rate decrease (multiplicative). Choose values < 1 to increase accuracy.
         """
         train_losses = []
         
@@ -171,13 +169,6 @@ class ModelManager(object):
 
 
         for epoch in range(num_train_epochs):
-            start_time = time.time()
-
-            # learning rate decay after x epochs
-            if (epoch + 1) % lr_decay_after_epochs == 0:
-                logging.info("Decreasing learning rate...")
-                self.expert_manager.change_learning_rate(lr_decay)
-            
             seq2seq_iter = iter(seq2seq_dataset_train)
             mlp_iter = iter(mlp_dataset_train)
 
@@ -452,7 +443,7 @@ class ModelManager(object):
                     seq2seq_dataset_train = None, seq2seq_dataset_test = None,
                     mlp_dataset_train = None, mlp_dataset_test = None,
                     num_train_epochs = 1000, evaluate_every_n_epochs = 20,
-                    improvement_break_condition = -100, lr_decay_after_epochs = 100, lr_decay = 0.1):
+                    improvement_break_condition = -100):
         """Train all experts for separation prediction.
 
         The target is to predict the y-nozzle position and time at the nozzle array.
@@ -470,16 +461,7 @@ class ModelManager(object):
             num_train_epochs (int):         Number of epochs for training
             evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
             improvement_break_condition (double): Break training if test loss on every expert does not improve by more than this value.
-            lr_decay_after_epochs (int):    Decrease the learning rate of certain models after x epochs
-            lr_decay (double):              Learning rate decrease (multiplicative). Choose values < 1 to increase accuracy.
         """
-        train_losses = []
-        
-        # Define a loss function: MSE
-        loss_object = tf.keras.losses.MeanSquaredError()
-        mae_object = tf.keras.losses.MeanAbsoluteError()
-        # Mask value
-        mask_value = 0.0
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         # Create a tensorboard folder and writer for every expert
         expert_names = self.expert_manager.get_separation_expert_names()
@@ -519,15 +501,8 @@ class ModelManager(object):
             spatial_test_maes.append(tf.keras.metrics.Mean('temporal_test_mae', dtype=tf.float32))
             temporal_test_maes.append(tf.keras.metrics.Mean('spatial_test_mae', dtype=tf.float32))
 
-
+        # Execute training
         for epoch in range(num_train_epochs):
-            start_time = time.time()
-
-            # learning rate decay after x epochs
-            if (epoch + 1) % lr_decay_after_epochs == 0:
-                logging.info("Decreasing learning rate...")
-                self.expert_manager.change_learning_rate(lr_decay)
-            
             seq2seq_iter = iter(seq2seq_dataset_train)
             mlp_iter = iter(mlp_dataset_train)
 
@@ -535,7 +510,14 @@ class ModelManager(object):
                 (mlp_inp, mlp_target, mlp_mask) = next(mlp_iter)
                 # Train experts on a batch
                 predictions, spatial_losses, temporal_losses, spatial_maes, temporal_maes = \
-                    self.expert_manager.train_batch_separation_prediction(seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask, mlp_inp, mlp_target, mlp_mask)
+                    self.expert_manager.train_batch_separation_prediction(
+                        seq2seq_inp = seq2seq_inp, 
+                        seq2seq_target = seq2seq_target, 
+                        seq2seq_tracking_mask = seq2seq_tracking_mask, 
+                        seq2seq_separation_mask = seq2seq_separation_mask,
+                        mlp_inp = mlp_inp, 
+                        mlp_target = mlp_target, 
+                        mlp_mask=mlp_mask)
                 # Create a mask for end of tracks and for beginning of tracks (MLP)
                 #masks = self.expert_manager.get_masks_separation_prediction(mask_value, seq2seq_target, mlp_target)
                 # Calculate loss for all models

@@ -27,8 +27,9 @@ class MLP_Model(Expert):
     Activation: leaky relu
     optimizer: ADAM
     Basislernrate: 0.005
-    LR_Decay: 0.5
-    LR_Decay_after_t: 150
+    decay_steps=200,
+    decay_rate=0.96,
+    staircase=True
     Batch size = 500
     Epochs = 3000
     Layers = [16, 16, 16]
@@ -47,10 +48,10 @@ class MLP_Model(Expert):
         """
         self.is_next_step = is_next_step
         self.model_structure = mlp_config.get("model_structure")
-        if "base_learning_rate" in mlp_config:
-            self.base_learning_rate = mlp_config.get("base_learning_rate")
-        else:
-            self.base_learning_rate = 0.005
+        self.base_learning_rate = mlp_config.get("base_learning_rate") if "base_learning_rate" in mlp_config else 0.005
+        self.decay_steps = mlp_config.get("decay_steps") if "decay_steps" in mlp_config else 200
+        self.decay_rate = mlp_config.get("decay_rate") if "decay_rate" in mlp_config else 0.96
+        
         if is_next_step:
             self._label_dim = 2
         else:
@@ -66,24 +67,41 @@ class MLP_Model(Expert):
         self.mlp_model = mlp_model_factory(input_dim=n_features, output_dim=self._label_dim, **self.model_structure)
         self.input_dim = n_features
         logging.info(self.mlp_model.summary())
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
-        self.loss_object = tf.keras.losses.MeanSquaredError()
-        if self.is_next_step:
-            self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
-        else:
-            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
-
+        self.setup_model()
+        
     def load_model(self):
         """Load a MLP model from its model path."""
         self.mlp_model = tf.keras.models.load_model(self.model_path)
-        self.input_dim = self.mlp_model.input_shape[1]
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
+        try:
+            self.input_dim = self.mlp_model.input_shape[1]
+        except:
+            self.input_dim = 14
+            logging.warning("Input size was unknown. Most likely you tried to import your custom model which did not define the input shape in the first layer. Shame on you.")
+        self.setup_model()
+        logging.info(self.mlp_model.summary())
+
+    def setup_model(self):
+        """Setup the model.
+
+        Call this function from create_model and load_model.
+
+        Define:
+            * learning rate schedule
+            * optimizer
+            * loss function
+            * train_step_fn
+        """
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            self.base_learning_rate,
+            decay_steps=self.decay_steps,
+            decay_rate=self.decay_rate,
+            staircase=True)
+        self.optimizer = tf.keras.optimizers.Adam(lr_schedule)
         self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
             self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
         else:
             self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
-        logging.info(self.mlp_model.summary())
 
     def train_batch(self, inp, target):
         """Train the MLP model on a batch of data.
@@ -143,20 +161,6 @@ class MLP_Model(Expert):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         self.mlp_model.save(self.model_path)
-
-    def change_learning_rate(self, lr_change=1):
-        """Change the learning rate of the model optimizer.
-
-        This can be used to lower the learning rate after n time steps to increase the accuracy.
-        The change is implemented multiplicative. Set lr_change > 1 to increase and < 1 to decrease the lr.
-
-        Args:
-            lr_change (double): Change in learning rate (factorial)
-        """
-        old_lr = K.get_value(self.optimizer.lr)
-        new_lr = old_lr * lr_change
-        logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-        K.set_value(self.optimizer.lr, new_lr)
 
     def get_zero_state(self, batch_size):
         """Return batch of empty lists."""
@@ -234,7 +238,6 @@ def mlp_model_factory(input_dim=10, output_dim=2, layers=[16, 16, 16], activatio
     # Add output layer
     model.add(tf.keras.layers.Dense(output_dim, activation='linear', 
                 kernel_regularizer=regularization, bias_regularizer=regularization))
-
     return model
 
 def train_step_generator(model, optimizer, loss_object):
@@ -279,6 +282,7 @@ def train_step_generator_separation_prediction(model, optimizer, loss_object):
     Returns
         function which can be called to train the given model with the given optimizer
     """
+    stop=0
     @tf.function
     def train_step(inp, target, mask, training=True):
         with tf.GradientTape() as tape:

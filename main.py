@@ -20,6 +20,7 @@ from data_manager import FakeDataSet, CsvDataSet
 from evaluation_functions import calculate_error_first_and_second_kind
 from kalman_playground import kalman_playground
 from velocity_plot import velocity_plot
+from sep_mlp_tests import *
 # Test
 from cv_model import *
 from ca_model import *
@@ -304,6 +305,9 @@ def run_global_config(global_config, experiment_series_names=''):
                 batch_size=global_config['batch_size'], 
                 random_seed=random_seed,
                 time_normalization=global_config['time_normalization_constant'])
+    # Testing reasons
+    #test_separation_mlp_advanced_training(data_source)
+    #test_separation_mlp(data_source)
     ## Train models
     if not global_config["is_loaded"]:
         if global_config["tracking"]:
@@ -314,9 +318,7 @@ def run_global_config(global_config, experiment_series_names=''):
                                     mlp_dataset_test = mlp_dataset_eval,
                                     num_train_epochs = global_config.get("num_train_epochs"),
                                     evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
-                                    improvement_break_condition = global_config.get("improvement_break_condition"),
-                                    lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
-                                    lr_decay = global_config.get("lr_decay_factor"))
+                                    improvement_break_condition = global_config.get("improvement_break_condition"))
         if global_config["separation_prediction"]:
             model_manager.train_models_separation_prediction(seq2seq_dataset_train = seq2seq_dataset_train_sp,
                                     seq2seq_dataset_test = seq2seq_dataset_eval_sp, 
@@ -324,9 +326,7 @@ def run_global_config(global_config, experiment_series_names=''):
                                     mlp_dataset_test = mlp_dataset_eval_sp,
                                     num_train_epochs = global_config.get("num_train_epochs"),
                                     evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
-                                    improvement_break_condition = global_config.get("improvement_break_condition"),
-                                    lr_decay_after_epochs = global_config.get("lr_decay_after_epochs"),
-                                    lr_decay = global_config.get("lr_decay_factor"))
+                                    improvement_break_condition = global_config.get("improvement_break_condition"))
     ## Train gating network     
     if global_config["tracking"]:                           
         if global_config["is_loaded_gating_network"]:

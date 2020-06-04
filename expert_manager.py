@@ -303,19 +303,6 @@ class Expert_Manager(object):
                 masks.append(mlp_mask)
         return masks
 
-    def change_learning_rate(self, lr_change=1):
-        """Change the learning rate of the certain models.
-
-        Only change the learning rate of RNN models (right now).
-        This can be used to lower the learning rate after n time steps to increase the accuracy.
-        The change is implemented multiplicative. Set lr_change > 1 to increase and < 1 to decrease the lr.
-
-        Args:
-            lr_change (double): Change in learning rate (factorial)
-        """
-        for expert in self.experts:
-            expert.change_learning_rate(lr_change)
-
     def test_batch(self, mlp_conversion_func, seq2seq_inp = None, mlp_inp = None):
         """Run predictions for all experts on a batch of test data.
 

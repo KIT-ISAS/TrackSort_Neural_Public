@@ -365,6 +365,9 @@ class RNN_Model(Expert):
     def __init__(self, is_next_step, name, model_path, rnn_config = {}):
         self.model_structure = rnn_config.get("model_structure")
         self.clear_state = rnn_config.get("clear_state")
+        self.base_learning_rate = rnn_config.get("base_learning_rate") if "base_learning_rate" in rnn_config else 0.005
+        self.decay_steps = rnn_config.get("decay_steps") if "decay_steps" in rnn_config else 200
+        self.decay_rate = rnn_config.get("decay_rate") if "decay_rate" in rnn_config else 0.96
         self._label_dim = 2 if is_next_step else 4
         self.is_next_step = is_next_step
         super().__init__(Expert_Type.RNN, name, model_path)
@@ -397,19 +400,31 @@ class RNN_Model(Expert):
         self.rnn_model, self.model_hash = rnn_model_factory(batch_size=batch_size, num_time_steps=num_time_steps, 
                                                            output_dim=self._label_dim, **self.model_structure)
         logging.info(self.rnn_model.summary())
-        self.rnn_model.reset_states()
-        self.optimizer = tf.keras.optimizers.Adam()
-        self.loss_object = tf.keras.losses.MeanSquaredError()
-        if self.is_next_step:
-            self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer, self.loss_object)
-        else:
-            self.train_step_fn = train_step_separation_prediction_generator(model = self.rnn_model, optimizer = self.optimizer)
+        self.setup_model()
 
     def load_model(self):
         """Load a RNN model from its model path."""
         self.rnn_model = tf.keras.models.load_model(self.model_path)
         logging.info(self.rnn_model.summary())
-        self.optimizer = tf.keras.optimizers.Adam()
+        self.setup_model()
+
+    def setup_model(self):
+        """Setup the model.
+
+        Call this function from create_model and load_model.
+
+        Define:
+            * learning rate schedule
+            * optimizer
+            * loss function
+            * train_step_fn
+        """
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            self.base_learning_rate,
+            decay_steps=self.decay_steps,
+            decay_rate=self.decay_rate,
+            staircase=True)
+        self.optimizer = tf.keras.optimizers.Adam(lr_schedule)
         self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
             self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer, self.loss_object)
