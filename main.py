@@ -68,9 +68,6 @@ parser.add_argument('--num_timesteps', type=int, default=350,
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
 parser.add_argument('--improvement_break_condition', type=float, default=-100, 
                     help='Break training if test loss on every expert does not improve by more than this value.')
-parser.add_argument('--lr_decay_after_epochs', type=int, default=150, help='When to decrease the lr by lr_decay_factor')
-parser.add_argument('--lr_decay_factor', type=float, default=0.1, help='When learning rate should be decreased, '
-                                                                       'multiply with this')
 parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
 parser.add_argument('--birth_rate_mean', type=float, default=5.0,
                     help='The birth_rate_mean value, that is used by the DataManager')
@@ -172,8 +169,6 @@ global_config = {
     'num_train_epochs': args.num_train_epochs,
     'evaluate_every_n_epochs': args.evaluate_every_n_epochs,
     'improvement_break_condition': args.improvement_break_condition,
-    'lr_decay_after_epochs': args.lr_decay_after_epochs,
-    'lr_decay_factor': args.lr_decay_factor,
 
     'state_overwriting_started': False,
     'overwriting_activated': args.overwriting_activated,
