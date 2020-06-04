@@ -4,3 +4,4 @@ pandas
 sklearn
 pydocstyle
 moviepy
+tfp-nightly

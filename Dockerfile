@@ -3,7 +3,7 @@
 # Licensed under the MIT License. See https://go.microsoft.com/fwlink/?linkid=2090316 for license information.
 #-------------------------------------------------------------------------------------------------------------
 
-FROM tensorflow/tensorflow:latest-gpu-py3
+FROM tensorflow/tensorflow:nightly-gpu-py3
 
 RUN echo "1"
 
