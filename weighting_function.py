@@ -30,3 +30,26 @@ def weighting_function(predictions, weights, position_variances = np.array([])):
     # prediction = prediction_1 * weight_1 + prediction_2 * weight_2 + ... + prediction_n * weight_n
     total_predictions = np.sum(predictions * np.repeat(np.expand_dims(weights, -1), 2, axis=-1), axis=0)
     return total_predictions       
+
+def weighting_function_separation(predictions, weights, position_variances = np.array([])):
+    """Generate single prediction with position and variance from all experts and corresponding weights.
+
+    For the separation the prediction in temporal and spatial dimension can be weighted differently.
+
+    Args:
+        predictions (np.array):         A np array of predictions from multiple experts, shape = [n_expert, batch_size, 2]
+        weights (np.array):             The weights for each expert and instance, shape = [n_expert, batch_size, 2]
+        position_variances (np.array):  Some experts output position variances. 
+                                        When the entry of an expert is an empty list, the prediction has no known variance. 
+
+    Returns
+        (prediction array, variance array)
+    """
+    assert(predictions.shape[0] == weights.shape[0])
+    if position_variances.size > 0:
+        assert(weights.shape[0] == position_variances.shape[0])
+        
+    # Expand weights in the last dimension by repeating to generate the same weights for x and y.
+    # prediction = prediction_1 * weight_1 + prediction_2 * weight_2 + ... + prediction_n * weight_n
+    total_predictions = np.sum(predictions * weights, axis=0)
+    return total_predictions

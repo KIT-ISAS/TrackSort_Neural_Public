@@ -453,7 +453,11 @@ class Expert_Manager(object):
 
     def get_n_experts(self):
         """Return n_experts."""
-        return self.n_experts
+        return len(self.experts)
+
+    def get_n_experts_separation(self):
+        """Return n_experts."""
+        return len(self.separation_experts)
 
     def get_expert_names(self):
         """Return list of names."""
@@ -466,6 +470,10 @@ class Expert_Manager(object):
     def get_expert_types(self):
         """Return a list of expert types."""
         return [expert.type for expert in self.experts]
+
+    def get_separation_expert_types(self):
+        """Return a list of expert types."""
+        return [expert.type for expert in self.separation_experts]
 
     def is_type_in_experts(self, expert_type):
         """Check if at least one expert is of given type.

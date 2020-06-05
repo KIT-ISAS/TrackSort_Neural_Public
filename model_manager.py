@@ -18,8 +18,9 @@ from tensorflow.keras import backend as K
 
 from expert_manager import Expert_Manager
 from expert import Expert_Type
-from weighting_function import weighting_function
+from weighting_function import *
 from ensemble import *
+from ensemble_separation import *
 from mixture_of_experts import *
 from evaluation_functions import *
 
@@ -75,7 +76,14 @@ class ModelManager(object):
                                              x_pred_to = x_pred_to, 
                                              time_normalization = time_normalization)
         # The gating network that calculates all weights
-        self.create_gating_network(model_config.get('gating'))
+        if "gating" in model_config:
+            self.create_gating_network(model_config.get('gating'))
+        else:
+            logging.warning("No gating network information in model config.")
+        if "gating_separation" in model_config:
+            self.create_gating_network(model_config.get('gating_separation'), True)
+        else:
+            logging.warning("No separation gating network information in model config.")
         self.overwriting_activated = overwriting_activated
         self.batch_size = model_config.get('batch_size')
         self.num_time_steps = num_time_steps
@@ -95,19 +103,22 @@ class ModelManager(object):
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     """ METHODS FOR TRACKING MODELS """
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
-    def create_gating_network(self, gating_config):
+    def create_gating_network(self, gating_config, is_separation=False):
         """Create the gating network.
 
         Creates a gating network according to the given config
 
         Args:
-            gating_config (dict): Includes information about type and options of the gating network
-
+            gating_config (dict):   Includes information about type and options of the gating network
+            is_separation (Boolean):Should we create the NextStep or Separation Gating Network? 
         """
         gating_type = gating_config.get("type")
         model_path = gating_config.get('model_path')
         if gating_type == "Simple_Ensemble":
-            self.gating_network = Simple_Ensemble(self.expert_manager.n_experts)
+            if is_separation:
+                self.gating_network_separation = Simple_Ensemble_Separation(self.expert_manager.get_n_experts_separation())
+            else:
+                self.gating_network = Simple_Ensemble(self.expert_manager.get_n_experts())
         elif gating_type == "Covariance_Weighting":
             self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
         elif gating_type == "SMAPE_Weighting":
@@ -439,6 +450,35 @@ class ModelManager(object):
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     """ METHODS FOR SEPARATION PREDICTION MODELS """
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
+    def train_gating_network_separation(self, seq2seq_dataset_train = None, mlp_dataset_train = None):
+        """Train the gating network for separation.
+
+        The individual training information of the gating network should be provided in the configuration json.
+        The training is highly dependent on the gating structure,
+        so the actual training itself should be done by the gating network.
+
+        Args:
+            **_dataset_train (Tf.Dataset):        All training samples in the correct format for various models
+        """
+        # Create predictions for all training batches and save prediction and target values to one list.
+        # Create predictions for all testing batches and save prediction and target values to one list.
+        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
+            seq2seq_dataset=seq2seq_dataset_train,
+            mlp_dataset = mlp_dataset_train,
+            create_weighted_output = False)
+        # Call training of gating network
+        self.gating_network_separation.train_network(target = all_targets, 
+                                          predictions = all_predictions, 
+                                          masks = all_masks,
+                                          input_data = all_inputs,
+                                          expert_types = self.expert_manager.get_separation_expert_types())
+        # Save gating network
+        self.gating_network_separation.save_model()
+
+    def load_gating_network_separation(self):
+        """Load the gating network for separation from path defined in config file."""
+        self.gating_network_separation.load_model()
+
     def train_models_separation_prediction(self, 
                     seq2seq_dataset_train = None, seq2seq_dataset_test = None,
                     mlp_dataset_train = None, mlp_dataset_test = None,
@@ -621,7 +661,7 @@ class ModelManager(object):
         expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
             seq2seq_dataset=seq2seq_dataset_test,
             mlp_dataset = mlp_dataset_test,
-            create_weighted_output = False)
+            create_weighted_output = True)
 
         # Check if result folder exists and create it if not.
         save_path = os.path.dirname(result_dir)
@@ -711,26 +751,20 @@ class ModelManager(object):
                 # If seq2seq
                 if np_prediction.ndim == 3:
                     np_prediction = np_prediction[np.where(masks[i].numpy())][:,2:]
-                np_masks.append(mlp_mask.numpy())
+                    np_masks.append(np.ones(mlp_mask.shape))
+                else:
+                    np_masks.append(mlp_mask.numpy())
+                
                 np_predictions.append(np_prediction)
-                stop=0
+
             # Get weighting of experts
             if create_weighted_output:
-                """
-                weights = self.gating_network.get_masked_weights(np.array(masks),
-                                                                 seq2seq_inp.numpy(),
-                                                                 np.array(predictions),
-                                                                 seq2seq_target.numpy(),
-                                                                 None)
+                weights = self.gating_network_separation.get_masked_weights(np_masks, np_predictions, mlp_inp)
                 # Evaluation purposes  
-                total_prediction = weighting_function(np.array(predictions), weights)
-                predictions.append(total_prediction)
-                # Create a total mask to addd to list
-                total_mask = K.all(K.equal(seq2seq_target, k_mask_value), axis=-1)
-                total_mask = 1 - K.cast(total_mask, tf.float64)
-                masks.append(total_mask)
-                """
-                logging.error("Gating network for separation prediction not implemented yet.")
+                total_prediction = weighting_function_separation(np.array(np_predictions), weights)
+                np_predictions.append(total_prediction)
+                # Create a total mask to add to list
+                masks.append(np_masks.append(np.ones(mlp_mask.shape)))
             else:
                 weights = np.zeros([len(predictions), predictions[0].shape[0]])
            
@@ -750,7 +784,7 @@ class ModelManager(object):
         # Create expert name list
         expert_names = self.expert_manager.get_separation_expert_names()
         if create_weighted_output:
-            expert_names.append(self.gating_network.get_name())
+            expert_names.append(self.gating_network_separation.get_name())
         # Return all the stuff
         return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights
 
