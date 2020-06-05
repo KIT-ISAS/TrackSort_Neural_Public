@@ -219,7 +219,7 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
             smape_mlp = np.zeros(n_experts)
             inc_factor = []
         smape = np.zeros(n_experts)
-        # Calculate covariance between all experts
+        # Calculate SMAPE of all experts
         for i in range(n_experts):
             # Calculate error of expert i
             masked_prediction = np.ma.array(predictions[i], mask=masks[i])

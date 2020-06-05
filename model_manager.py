@@ -120,9 +120,15 @@ class ModelManager(object):
             else:
                 self.gating_network = Simple_Ensemble(self.expert_manager.get_n_experts())
         elif gating_type == "Covariance_Weighting":
-            self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
+            if is_separation:
+                self.gating_network_separation = Covariance_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), model_path)
+            else:
+                self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
         elif gating_type == "SMAPE_Weighting":
-            self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
+            if is_separation:
+                self.gating_network_separation = SMAPE_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), model_path)
+            else:
+                self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
         elif gating_type == "Mixture_of_Experts":
             self.gating_network = MixtureOfExperts(self.expert_manager.n_experts, model_path, gating_config.get('options'))
         else:
@@ -759,7 +765,7 @@ class ModelManager(object):
 
             # Get weighting of experts
             if create_weighted_output:
-                weights = self.gating_network_separation.get_masked_weights(np_masks, np_predictions, mlp_inp)
+                weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), np.array(np_predictions), mlp_inp)
                 # Evaluation purposes  
                 total_prediction = weighting_function_separation(np.array(np_predictions), weights)
                 np_predictions.append(total_prediction)
