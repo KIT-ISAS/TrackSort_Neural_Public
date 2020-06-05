@@ -336,10 +336,20 @@
     }
   },
   "gating_separation": {
-    "type": "SMAPE_Weighting",
-    "model_path": "models/pepper/smape_gating_sep.pkl",
+    "type": "Mixture_of_Experts",
+    "model_path": "models/pepper/me_gating_sep.pkl",
     "options": {
-
+      "batch_size": 64,
+      "n_epochs": 1000,
+      "base_learning_rate": 0.005,
+      "decay_steps": 200,
+      "decay_rate": 0.96,
+      "evaluate_every_n_epochs": 20,
+      "model_structure": {
+        "features": ["pos"],
+        "layers": [16, 16, 16, 16],
+        "activation": "leakly_relu"
+      }
     }
   },
   "data_association": {

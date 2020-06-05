@@ -15,15 +15,16 @@ from tensorflow.keras import backend as K
 from gating_network import GatingNetwork
 from expert import Expert_Type
 
-class MixtureOfExperts(GatingNetwork):
+class MixtureOfExpertsSeparation(GatingNetwork):
     """This gating network learns the weights of experts with a MLP approach.
 
     The inputs to the network are:
-        Current x and y position
-        Current idx of position in track
+        Last n x and y positions
+        (Current idx of position in track) not implemented yet
 
     The outputs of the networks are:
-        One weight for each expert between 0 and 1. The weights sum to 1.
+        Two weights for each expert between 0 and 1. The weights sum to 1.
+        One weight for the temporal prediction, one for spatial prediction.
 
     Attributes:
         n_experts (int):    Number of experts
@@ -32,7 +33,7 @@ class MixtureOfExperts(GatingNetwork):
     __metaclass__ = GatingNetwork
 
     def __init__(self, n_experts, model_path, network_options = {}):
-        """Initialize a mixture of experts gating network.
+        """Initialize a mixture of experts gating network for separation prediction.
         
         Args:
             n_experts (int):        Number of experts
@@ -43,33 +44,32 @@ class MixtureOfExperts(GatingNetwork):
         self.model_structure = network_options.get("model_structure")
         # Training parameters
         self.base_learning_rate = 0.005 if not "base_learning_rate" in network_options else network_options.get("base_learning_rate")
-        self.batch_size = 1000 if not "batch_size" in network_options else network_options.get("batch_size")
+        self.batch_size = 64 if not "batch_size" in network_options else network_options.get("batch_size")
         self.n_epochs = 1000 if not "n_epochs" in network_options else network_options.get("n_epochs")
-        self.lr_decay_after_epochs = 100 if not "lr_decay_after_epochs" in network_options else network_options.get("lr_decay_after_epochs")
-        self.lr_decay_factor = 0.5 if not "lr_decay_factor" in network_options else network_options.get("lr_decay_factor")
+        self.decay_steps = 200 if not "decay_steps" in network_options else network_options.get("decay_steps")
+        self.decay_rate = 0.96 if not "decay_rate" in network_options else network_options.get("decay_rate")
+        self.n_inp_points = 7 if not "n_inp_points" in network_options else network_options.get("n_inp_points")
         self.evaluate_every_n_epochs = 20 if not "evaluate_every_n_epochs" in network_options else network_options.get("evaluate_every_n_epochs")
 
         # Set the input dimension based on the features
         input_dim = 0
         for feature in self.model_structure.get("features"):
             if feature=="pos":
-                input_dim = input_dim + 2
+                input_dim = input_dim + 2 * self.n_inp_points
             elif feature=="id":
-                input_dim = input_dim + 1
-            elif feature=="prev_pred_err":
-                input_dim = input_dim + n_experts
+                logging.warning("Feature id is not implemented yet.")
             else:
                 logging.warning("Feature {} is unknown. Won't include it in ME gating.".format(feature))
         # Check if there is at least one input to the network
         assert(input_dim > 0)
         self.input_dim = input_dim
         # Output dimensions
-        self._label_dim = n_experts
+        self.n_experts = n_experts
         super().__init__(n_experts, "ME weighting", model_path)
 
     def create_model(self):
         """Create a new MLP ME model based on the model structure defined in the config file."""
-        self.mlp_model = me_mlp_model_factory(input_dim=self.input_dim, output_dim=self._label_dim, **self.model_structure)
+        self.mlp_model = me_mlp_model_factory(input_dim=self.input_dim, n_experts=self.n_experts, **self.model_structure)
         
         logging.info(self.mlp_model.summary())
 
@@ -86,22 +86,33 @@ class MixtureOfExperts(GatingNetwork):
         self.input_dim = self.mlp_model.input_shape[1]
         logging.info(self.mlp_model.summary())
 
-    def train_network(self, target, predictions, masks, input_data, expert_types, **kwargs):
+    def train_network(self, inputs, target, predictions, masks, inputs_eval, target_eval, predictions_eval, masks_eval, **kwargs):
         """Train the mixture of expert network.
         
         Create the network architecture.
         Transform the data to fit the network architecture.
 
         Args:
-            targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
-            predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
-            masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks, track_length]
-            expert_types (list):    List of expert types
+            inputs (np.array):          All MLP inputs
+            targets (np.array):         All target values of the given dataset, shape: [n_tracks, 2]
+            predictions (np.array):     All predictions for all experts, shape: [n_experts, n_tracks, 2]
+            masks (np.array):           Masks for each expert, shape: [n_experts, n_tracks]
         """
         ## Create Model
         self.create_model()
-        optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
+        # Define Learning rate reduction
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            self.base_learning_rate,
+            decay_steps=self.decay_steps,
+            decay_rate=self.decay_rate,
+            staircase=True)
+        # Define Adam
+        optimizer = tf.keras.optimizers.Adam(lr_schedule)
+        # Define train step fuction
         train_step_fn = train_step_generator(self.mlp_model, optimizer)
+        # Create a mask for ME network
+        mlp_mask = np.all(1-(inputs==0), axis=1)
+
 
         ## Create Dataset
         # Transform the data to the desired data format
@@ -394,17 +405,16 @@ class MixtureOfExperts(GatingNetwork):
 
 """Model creation and training functionality"""
 
-def me_mlp_model_factory(input_dim, output_dim, prediciton_input_dim=2, features=["pos"], layers=[16, 16, 16], activation='leakly_relu'):
+def me_mlp_model_factory(input_dim, n_experts, prediciton_input_dim=2, features=["pos"], layers=[16, 16, 16], activation='leakly_relu'):
     """Create a new keras MLP model
 
     Args:
         input_dim (int):            The number of inputs to the model
-        output_dim (int):           The number of outputs of the model = number of experts --> number of weights
-        prediciton_input_dim (int): Should be 2 for x and y position.
+        n_experts (int):            The number of experts
+        prediciton_input_dim (int): Should be 2 for spatial and temporal position.
         features (list):            List of String. Features for MLP. Possibilities:
                                         "pos":  x and y position of current measurement.
                                         "id":   Current track id - Number of measurements in track
-                                        "prev_pred_err": Previous prediction error of all experts
         layers (list):              List of int. Number of nodes and layers
         activation (String):        Activation function for layers
     
@@ -430,10 +440,12 @@ def me_mlp_model_factory(input_dim, output_dim, prediciton_input_dim=2, features
         else:
             logging.warning("Activation function {} not implemented yet :(".format(activation))
         c+=1
-    # Output layer = Dense layer with softmax activation
-    weights = tf.keras.layers.Dense(output_dim, name='weights')(x)
-    weights = tf.keras.layers.Softmax()(weights)
-    model = tf.keras.Model(inputs=inputs, outputs=weights)
+    # Output layers = 2 Dense layers with seperate softmax activation functions
+    spatial_weights = tf.keras.layers.Dense(n_experts, name='spatial_weights')(x)
+    spatial_weights = tf.keras.layers.Softmax()(spatial_weights)
+    temporal_weights = tf.keras.layers.Dense(n_experts, name='temporal_weights')(x)
+    temporal_weights = tf.keras.layers.Softmax()(temporal_weights)
+    model = tf.keras.Model(inputs=inputs, outputs=[spatial_weights, temporal_weights])
     return model
 
 def train_step_generator(model, optimizer):
@@ -452,7 +464,9 @@ def train_step_generator(model, optimizer):
     def train_step(inp, target, expert_predictions, mask):
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
+            # get [n_experts spatial weights, n_experts temporal weights] from MLP
             weights = model(inp, training=True) 
+            # Mask the weights
             masked_weights = mask_weights(weights, mask)
             loss = weighted_sum_mse_loss(masked_weights, expert_predictions, target)
 
@@ -466,35 +480,33 @@ def train_step_generator(model, optimizer):
 def mask_weights(weights, mask):
     """Mask the tf weights vector.
 
-    A weight vector of form:
-    0.4 0.2 0.4
-    0.4 0.3 0.3
-    ...
-
-    With mask of form:
-    True False True
-    True True True
-    ...
-
-    Results in:
-    0.5 0.0 0.5
-    0.4 0.3 0.3
-    ...
-
     Args:
-        weights (tf.Tensor): The outputs of the MLP network, shape: [n_output, n_experts]
-        mask (tf.Tensor):    The mask for all experts, shape: [n_output, n_experts]
+        weights (list):   The outputs of the MLP network, shape: [[batch_size, n_experts], [batch_size, n_experts]]
+        mask (tf.Tensor): The mask for all experts, shape:       [batch_size, n_experts]
 
     Returns:
-        masked_weights (tf.Tensor): Same shape as weights
+        masked_weights (tf.Tensor):  Weights for spatial and temporal prediction, shape: [batch_size, n_experts, 2]
     """
-    masked_weights = tf.multiply(weights, mask)
-    masked_weights, _ = tf.linalg.normalize(masked_weights, ord=1, axis=1)
+    masked_weights_spatial = tf.multiply(weights[0], mask)
+    masked_weights_spatial, _ = tf.linalg.normalize(masked_weights_spatial, ord=1, axis=1)
+    masked_weights_temporal = tf.multiply(weights[1], mask)
+    masked_weights_temporal, _ = tf.linalg.normalize(masked_weights_spatial, ord=1, axis=1)
+    masked_weights = tf.concat([tf.expand_dims(masked_weights_spatial, axis = -1), tf.expand_dims(masked_weights_temporal, axis = -1)], axis = -1)
     return masked_weights
 
 def weighted_sum_mse_loss(weights, expert_predictions, target):
-    """Return MSE for weighted expert predictions."""
-    return tf.reduce_sum(tf.pow(target-tf.einsum('ijk,ij->ik', expert_predictions, weights),2),axis=1)
+    """Return MSE for weighted expert predictions.
+
+    Args:
+        expert_predictions (tf.Tensor): The expert predictions, shape: [batch_size, n_experts, 2]
+        weights (tf.Tensor):            The outputs of the MLP network, shape: [batch_size, n_experts, 2]
+        target (tf.Tensor):             The target, shape: [batch_size, 2]
+
+    Returns:
+        loss (float64)
+    """
+    weighted_prediction = tf.einsum('ijk,ij->ik', expert_predictions, weights)
+    return tf.reduce_sum(tf.pow(target-weighted_prediction,2))/(2*target.shape[0])
 
 def weighted_sum_mae_loss(weights, expert_predictions, target):
     """Return MAE for weighted expert predictions."""

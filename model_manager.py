@@ -22,6 +22,7 @@ from weighting_function import *
 from ensemble import *
 from ensemble_separation import *
 from mixture_of_experts import *
+from mixture_of_experts_separation import *
 from evaluation_functions import *
 
 #tf.keras.backend.set_floatx('float64')
@@ -123,14 +124,17 @@ class ModelManager(object):
             if is_separation:
                 self.gating_network_separation = Covariance_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), model_path)
             else:
-                self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
+                self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.get_n_experts(), model_path)
         elif gating_type == "SMAPE_Weighting":
             if is_separation:
                 self.gating_network_separation = SMAPE_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), model_path)
             else:
-                self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.n_experts, model_path)
+                self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.get_n_experts(), model_path)
         elif gating_type == "Mixture_of_Experts":
-            self.gating_network = MixtureOfExperts(self.expert_manager.n_experts, model_path, gating_config.get('options'))
+            if is_separation:
+                self.gating_network_separation = MixtureOfExpertsSeparation(self.expert_manager.get_n_experts_separation(), model_path, gating_config.get('options'))
+            else:
+                self.gating_network = MixtureOfExperts(self.expert_manager.get_n_experts(), model_path, gating_config.get('options'))
         else:
             raise Exception("Unknown gating type '" + gating_type + "'!")
 
@@ -456,7 +460,8 @@ class ModelManager(object):
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     """ METHODS FOR SEPARATION PREDICTION MODELS """
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
-    def train_gating_network_separation(self, seq2seq_dataset_train = None, mlp_dataset_train = None):
+    def train_gating_network_separation(self, seq2seq_dataset_train = None, mlp_dataset_train = None,
+                                        seq2seq_dataset_eval = None, mlp_dataset_eval = None):
         """Train the gating network for separation.
 
         The individual training information of the gating network should be provided in the configuration json.
@@ -464,20 +469,32 @@ class ModelManager(object):
         so the actual training itself should be done by the gating network.
 
         Args:
-            **_dataset_train (Tf.Dataset):        All training samples in the correct format for various models
+            **_dataset_train (Tf.Dataset):       All training samples in the correct format for various models
+            **_dataset_eval (Tf.Dataset):        All evaluation samples in the correct format for various models
         """
         # Create predictions for all training batches and save prediction and target values to one list.
+        expert_names, all_inputs_train, all_targets_train, all_predictions_train, all_masks_train, _ = \
+            self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
+                seq2seq_dataset=seq2seq_dataset_train,
+                mlp_dataset = mlp_dataset_train,
+                create_weighted_output = False)
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
-            seq2seq_dataset=seq2seq_dataset_train,
-            mlp_dataset = mlp_dataset_train,
-            create_weighted_output = False)
+        expert_names, all_inputs_eval, all_targets_eval, all_predictions_eval, all_masks_eval, _ = \
+            self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
+                seq2seq_dataset=seq2seq_dataset_eval,
+                mlp_dataset = mlp_dataset_eval,
+                create_weighted_output = False)
         # Call training of gating network
-        self.gating_network_separation.train_network(target = all_targets, 
-                                          predictions = all_predictions, 
-                                          masks = all_masks,
-                                          input_data = all_inputs,
-                                          expert_types = self.expert_manager.get_separation_expert_types())
+        self.gating_network_separation.train_network(
+                                          inputs = all_inputs_train,
+                                          target = all_targets_train, 
+                                          predictions = all_predictions_train, 
+                                          masks = all_masks_train,
+                                          inputs_eval = all_inputs_eval,
+                                          target_eval = all_targets_eval, 
+                                          predictions_eval = all_predictions_eval, 
+                                          masks_eval = all_masks_eval,
+                                          )
         # Save gating network
         self.gating_network_separation.save_model()
 
@@ -664,7 +681,7 @@ class ModelManager(object):
             no_show (Boolean):                  Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
+        expert_names, _, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
             seq2seq_dataset=seq2seq_dataset_test,
             mlp_dataset = mlp_dataset_test,
             create_weighted_output = True)
@@ -731,7 +748,7 @@ class ModelManager(object):
 
         Returns:
             expert_names (list):        List of expert names
-            all_inputs (np.array):      All input values of the given dataset, shape: [n_tracks, track_length, 2]
+            all_inputs (np.array):      All MLP input values of the given dataset, shape: [n_tracks, 2*mlp_inp_points]
             all_targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
             all_predictions (np.array): All predictions for all experts, shape: [n_experts (+1), n_tracks, track_length, 2]
             all_masks (np.array):       Masks for each expert, shape: [n_experts (+1), n_tracks, track_length]
@@ -776,13 +793,13 @@ class ModelManager(object):
            
             # Add everything to the lists
             if all_targets.shape[0]==0:
-                all_inputs = seq2seq_inp.numpy()
+                all_inputs = mlp_inp.numpy()
                 all_targets = mlp_target.numpy()
                 all_predictions = np.array(np_predictions)
                 all_masks = np.array(np_masks)
                 all_weights = weights
             else:
-                all_inputs = np.concatenate((all_inputs, seq2seq_inp.numpy()),axis=0)
+                all_inputs = np.concatenate((all_inputs, mlp_inp.numpy()),axis=0)
                 all_targets = np.concatenate((all_targets, mlp_target.numpy()),axis=0)
                 all_predictions = np.concatenate((all_predictions, np.array(np_predictions)), axis=1)
                 all_masks = np.concatenate((all_masks, np.array(np_masks)), axis=1)
