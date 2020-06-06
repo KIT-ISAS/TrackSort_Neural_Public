@@ -335,7 +335,9 @@ def run_global_config(global_config, experiment_series_names=''):
             model_manager.load_gating_network_separation()
         else:
             model_manager.train_gating_network_separation(seq2seq_dataset_train = seq2seq_dataset_train_sp,
-                                                          mlp_dataset_train = mlp_dataset_train_sp)
+                                                          mlp_dataset_train = mlp_dataset_train_sp,
+                                                          seq2seq_dataset_eval = seq2seq_dataset_eval_sp, 
+                                                          mlp_dataset_eval = mlp_dataset_eval_sp)
 
     ## Test models
     # TODO:

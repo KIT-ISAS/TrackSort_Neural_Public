@@ -782,7 +782,7 @@ class ModelManager(object):
 
             # Get weighting of experts
             if create_weighted_output:
-                weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), np.array(np_predictions), mlp_inp)
+                weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), mlp_inp)
                 # Evaluation purposes  
                 total_prediction = weighting_function_separation(np.array(np_predictions), weights)
                 np_predictions.append(total_prediction)

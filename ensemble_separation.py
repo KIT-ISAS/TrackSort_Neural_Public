@@ -34,16 +34,7 @@ class Simple_Ensemble_Separation(GatingNetwork):
         The weights sum to 1.
         All Weights are > 0 if the expert is non masked at an instance.
 
-        If the mask value at an instance is 0, the experts weight is 0.
-
-        example mask arry:
-        [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]]
-        --> Expert 6 is only active at position 0.
+        If the mask value at an instance is 0, the experts weight is 0
         
         Returns:
             np.array with weights of shape [mask.shape, 2] -> 2 standing for the two dimensions spatial and temporal

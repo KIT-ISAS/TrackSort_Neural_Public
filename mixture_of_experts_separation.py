@@ -111,197 +111,79 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         # Define train step fuction
         train_step_fn = train_step_generator(self.mlp_model, optimizer)
         # Create a mask for ME network
-        mlp_mask = np.all(1-(inputs==0), axis=1)
-
-
-        ## Create Dataset
-        # Transform the data to the desired data format
-        inputs_model, targets_model, predictions_model, mask_model = self.transform_data(input_data, target, predictions, masks, self.model_structure.get("features"), self.input_dim)
-        # Remove masked values from dataset
-        inputs_model = inputs_model[np.sum(mask_model, axis=1)!=0]
-        targets_model = targets_model[np.sum(mask_model, axis=1)!=0]
-        predictions_model = predictions_model[np.sum(mask_model, axis=1)!=0]
-        mask_model = mask_model[np.sum(mask_model, axis=1)!=0]
-        # Create dataset
-        dataset_input = tf.data.Dataset.from_tensor_slices((inputs_model, predictions_model, mask_model))
-        dataset_target = tf.data.Dataset.from_tensor_slices((targets_model))
-        dataset = tf.data.Dataset.zip((dataset_input, dataset_target))
-        # Seperate dataset in train and test
-        train_size = int(0.9 * inputs_model.shape[0])
-        train_dataset = dataset.take(train_size)
-        test_dataset = dataset.skip(train_size)
-        # Batch both datasets
-        train_dataset = train_dataset.batch(self.batch_size)
-        test_dataset = test_dataset.batch(self.batch_size)
+        mlp_mask = np.all(inputs>0, axis=1)
+        mlp_mask_eval = np.all(inputs_eval>0, axis=1)
+        assert(inputs.shape[0]==target.shape[0])
+        assert(inputs_eval.shape[0]==target_eval.shape[0])
+        assert(predictions.shape[0]==self.n_experts)
+        n_inputs = inputs.shape[1]
+        n_target = 2
+        n_experts = self.n_experts
+        # Combine Input, target, predictions and masks to one numpy array
+        train_data = np.concatenate((inputs, target[:,0:2], np.swapaxes(predictions, 0, 1)[:,:,0], np.swapaxes(predictions, 0, 1)[:,:,1], np.swapaxes(masks, 0, 1), mlp_mask[:,np.newaxis]), axis=-1)
+        eval_data = np.concatenate((inputs_eval, target_eval[:,0:2], np.swapaxes(predictions_eval, 0, 1)[:,:,0], np.swapaxes(predictions_eval, 0, 1)[:,:,1], np.swapaxes(masks_eval, 0, 1), mlp_mask_eval[:,np.newaxis]), axis=-1)
+        # Create TF Dataset
+        raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
+        raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_data)
+        minibatches_train = raw_train_dataset.batch(self.batch_size, drop_remainder=True)
+        minibatches_eval = raw_eval_dataset.batch(self.batch_size, drop_remainder=True)
+        def split_input_target_separation(chunk):
+            # split the tensor
+            input_seq = chunk[:, :n_inputs]
+            target_seq = chunk[:, n_inputs:n_inputs+n_target],
+            spatial_predictions = chunk[:, n_inputs+n_target:n_inputs+n_target+n_experts]
+            temporal_predictions = chunk[:, n_inputs+n_target+n_experts:n_inputs+n_target+2*n_experts]
+            expert_mask = chunk[:, n_inputs+n_target+2*n_experts:-1]
+            mlp_mask = chunk[:, -1:]
+            return input_seq, target_seq, spatial_predictions, temporal_predictions, expert_mask, mlp_mask
+        dataset_train = minibatches_train.map(split_input_target_separation)
+        dataset_eval = minibatches_eval.map(split_input_target_separation)
         
         ## Values for training logging in tensorboard
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         train_log_dir = 'logs/gradient_tape/' + current_time + '_train_me_gating' + '/train'
-        test_log_dir = 'logs/gradient_tape/' + current_time + '_train_me_gating' + '/test'
+        eval_log_dir = 'logs/gradient_tape/' + current_time + '_train_me_gating' + '/test'
         train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-        test_summary_writer = tf.summary.create_file_writer(test_log_dir)
+        eval_summary_writer = tf.summary.create_file_writer(eval_log_dir)
         train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
-        train_mae = tf.keras.metrics.Mean('train_mae', dtype=tf.float32)
-        test_loss = tf.keras.metrics.Mean('test_loss', dtype=tf.float32)
-        test_mae = tf.keras.metrics.Mean('test_mae', dtype=tf.float32)
+        eval_loss = tf.keras.metrics.Mean('eval_loss', dtype=tf.float32)
 
         ## Training
         for epoch in range(self.n_epochs):
-            # Learning rate decay
-            if (epoch + 1) % self.lr_decay_after_epochs == 0:
-                old_lr = K.get_value(optimizer.lr)
-                new_lr = old_lr * self.lr_decay_factor
-                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-                K.set_value(optimizer.lr, new_lr)
             # Iterate over the batches of the train dataset.
-            train_iter = iter(train_dataset)
-            for ((train_inputs, train_expert_predictions, train_mask), train_targets) in train_iter:
-                # Predict weights for experts
-                weights, loss = train_step_fn(train_inputs, train_targets, train_expert_predictions, train_mask)
-                masked_weights = mask_weights(weights, train_mask)
-                # Evaluate mae
-                mae = weighted_sum_mae_loss(masked_weights, train_expert_predictions, train_targets)
-                train_loss(loss); train_mae(mae)
+            train_iter = iter(dataset_train)
+            for (train_inputs, train_target, train_spatial_predictions, train_temporal_predictions, train_masks, mlp_mask) in train_iter:
+                # Predict weights for experts 
+                train_expert_predictions = tf.concat([tf.expand_dims(train_spatial_predictions, axis = -1), tf.expand_dims(train_temporal_predictions, axis = -1)], axis = -1)
+                weights, loss = train_step_fn(train_inputs, train_target, train_expert_predictions, train_masks, mlp_mask)
+                train_loss(loss)
             # Write training results
             with train_summary_writer.as_default():
                 tf.summary.scalar('loss', train_loss.result(), step=epoch)
-                tf.summary.scalar('mae', train_mae.result(), step=epoch)
             # Console output
-            template = 'Epoch {}, Train Loss: {}, Train MAE: {}'
-            logging.info(template.format(epoch+1,
-                            train_loss.result().numpy(),
-                            train_mae.result().numpy()))
+            template = 'Epoch {}, Train Loss: {}'
+            logging.info(template.format(epoch+1, train_loss.result().numpy()))
             # Reset metrics every epoch
-            train_loss.reset_states(); train_mae.reset_states()
+            train_loss.reset_states(); 
 
             # Run trained models on the test set every n epochs
             if (epoch + 1) % self.evaluate_every_n_epochs == 0 \
                     or (epoch + 1) == self.n_epochs:
-                # Iterate over the batches of the test dataset.
-                test_iter = iter(test_dataset)
-                for ((test_inputs, test_expert_predictions, test_mask), test_targets) in test_iter:
-                    # Predict weights for experts
-                    weights = self.mlp_model(test_inputs)
-                    masked_weights = mask_weights(weights, test_mask)
-                    loss = weighted_sum_mse_loss(masked_weights, test_expert_predictions, test_targets)
-                    # Evaluate mae
-                    mae = weighted_sum_mae_loss(masked_weights, test_expert_predictions, test_targets)
-                    test_loss(loss); test_mae(mae)
-                # Write testing results
-                with test_summary_writer.as_default():
-                    tf.summary.scalar('loss', test_loss.result(), step=epoch)
-                    tf.summary.scalar('mae', test_mae.result(), step=epoch)
+                # Iterate over the batches of the eval dataset.
+                eval_iter = iter(dataset_eval)
+                for (eval_inputs, eval_target, eval_spatial_predictions, eval_temporal_predictions, eval_masks, eval_mlp_mask) in eval_iter:
+                    # Predict weights for experts 
+                    eval_expert_predictions = tf.concat([tf.expand_dims(eval_spatial_predictions, axis = -1), tf.expand_dims(eval_temporal_predictions, axis = -1)], axis = -1)
+                    weights, loss = train_step_fn(eval_inputs, eval_target, eval_expert_predictions, eval_masks, eval_mlp_mask, training=False)
+                    eval_loss(loss)
+                # Write evaluation results
+                with eval_summary_writer.as_default():
+                    tf.summary.scalar('loss', eval_loss.result(), step=epoch)
                 # Console output
-                template = 'Epoch {}, Test Loss: {}, Test MAE: {}'
-                logging.info(template.format(epoch+1,
-                                test_loss.result().numpy(),
-                                test_mae.result().numpy()))
+                template = 'Epoch {}, eval Loss: {}'
+                logging.info(template.format(epoch+1, eval_loss.result().numpy()))
                 # Reset metrics every epoch
-                test_loss.reset_states(); test_mae.reset_states()
-
-        
-    def transform_data(self, input_data, target_data, predictions_data, masks, features, input_dim):
-        """Transform the given data to match the input and output data of the MLP.
-
-        Args:
-            input_data (np.array):      The current input to the experts, shape: [n_tracks, track_length, 2]
-            target_data (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
-            predictions_data (np.array):All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
-            masks (np.array):           Mask to mask total prediction, shape: [n_experts, n_tracks, track_length]
-            features (list[String]):    Features to create. Possibilities:
-                                            "pos":  x and y position of current measurement.
-                                            "id":   Current track id - Number of measurements in track
-                                            "prev_pred_err": Previous prediction error of all experts
-            input_dim (int):            Input dimension for MLP (could be calculated from features)
-
-        Returns: 
-            inputs (np.array):      Inputs to the MLP based on features, shape: [n_tracks * track_length, input_dim]
-            targets (np.array):     Target values, shape: [n_tracks * track_length, 2]
-            predictions (np.array): Predictions of the experts as input to the MLP, shape: [n_tracks * track_length, n_experts, 2]
-            mask (np.array):        Mask to mask total prediction, shape: [n_tracks * track_length]
-        """
-        n_tracks = input_data.shape[0]
-        track_length = input_data.shape[1]
-        output_size = n_tracks*track_length
-        n_experts = predictions_data.shape[0]
-        # Generate input
-        inputs_out = np.zeros([output_size, input_dim])
-        targets_out = np.zeros([output_size, 2])
-        predictions_out = np.zeros([output_size, n_experts, 2])
-        mask_out = np.zeros([output_size, n_experts])
-        for i in range(n_tracks):
-            input_pos = 0
-            for feature in features:
-                if feature=="pos":
-                    inputs_out[i*track_length:(i+1)*track_length, input_pos:input_pos+2] = input_data[i]
-                    input_pos += 2
-                elif feature=="id":
-                    inputs_out[i*track_length:(i+1)*track_length, input_pos] = np.arange(0, track_length)
-                    input_pos += 1
-                elif feature=="prev_pred_err":
-                    for e in range(n_experts):
-                        err = np.sum(np.power(target_data[i]-predictions_data[e,i,:,:], 2), axis=-1)
-                        # Add a time lag to the error
-                        err[1:]=err[:-1]
-                        # Default value for first error position -> This is tricky.
-                        err[0]=1
-                        inputs_out[i*track_length:(i+1)*track_length, input_pos] = err
-                        input_pos += 1
-                else:
-                    logging.warning("Feature {} is unknown. Won't include it in ME gating.".format(feature))
-            
-            targets_out[i*track_length:(i+1)*track_length] = target_data[i]
-            predictions_out[i*track_length:(i+1)*track_length] = np.swapaxes(predictions_data[:,i,:,:],0, 1)
-            mask_out[i*track_length:(i+1)*track_length] = np.swapaxes(masks[:,i,:],0, 1)
-        return inputs_out, targets_out, predictions_out, mask_out
-
-    def create_input_data(self, input_data, features, input_dim, track_predictions=None, track_target=None, track_ids=None):
-        """Create input data from track format.
-
-        Args:
-            input_data (np.array):          The current input to the experts, shape: [n_tracks, track_length, 2]
-                                             OR shape: [n_tracks, 2] if predicting a single time step
-            features (list[String]):        Features to create. Possibilities:
-                                                "pos":  x and y position of current measurement.
-                                                "id":   Current track id - Number of measurements in track
-                                                "prev_pred_err": Previous prediction error of all experts
-            input_dim (int):                Input dimension to neural network
-            track_predictions (np.array):   Optional track predictions for experts if you chose to use the prev_pred_err feature, shape: [n_experts, n_tracks, track_length, 2]
-            track_target (np.array):        Optional track target if you chose to use the prev_pred_err feature, shape: [n_tracks, track_length, 2]
-            track_ids (np.array):           Switch to multi-target tracking mode if this value is not None.
-                                            In this mode, we only get one instance of a track. 
-                                            Therefore the track length is 1 and the track_length dimension in the track_input is omitted.
-                                            The track ids hold the position of the instance in its track.
-                                            Shape: [n_tracks]
-        Returns: 
-            inputs (np.array):      Inputs to the MLP, shape: [n_tracks * track_length, 3]
-        """
-        n_tracks = input_data.shape[0]
-        # In case of live multi-target tracking, the track length is always 1.
-        track_length = input_data.shape[1] if track_ids is None else 1
-        output_size = n_tracks*track_length
-        inputs_out = np.zeros([output_size, input_dim])
-        for i in range(n_tracks):
-            input_pos = 0
-            for feature in features:
-                if feature=="pos":
-                    inputs_out[i*track_length:(i+1)*track_length, input_pos:input_pos+2] = input_data[i]
-                    input_pos += 2
-                elif feature=="id":
-                    inputs_out[i*track_length:(i+1)*track_length, input_pos] = np.arange(0, track_length) if track_ids is None else track_ids[i]
-                    input_pos += 1
-                elif feature=="prev_pred_err":
-                    for e in range(track_predictions.shape[0]):
-                        err = np.sum(np.power(track_target[i]-track_predictions[e,i,:,:], 2), axis=-1)
-                        # Add a time lag to the error
-                        err[1:]=err[:-1]
-                        # Default value for first error position -> This is tricky.
-                        err[0]=1
-                        inputs_out[i*track_length:(i+1)*track_length, input_pos] = err
-                        input_pos += 1
-                else:
-                    logging.warning("Feature {} is unknown. Won't include it in ME gating.".format(feature))
-        return inputs_out
+                eval_loss.reset_states()
 
     def create_mask_data(self, mask):
         """Create masks from track format.
@@ -326,25 +208,6 @@ class MixtureOfExpertsSeparation(GatingNetwork):
             mask_out = np.swapaxes(mask,0, 1)
         return mask_out
 
-    def convert_weights_to_tracks(self, weights, track_length):
-        """Create input data from track format.
-
-        Asserts weights.shape[0] % track_length == 0
-
-        Args:
-            weights (np.array): The predicted weights, shape: [n_tracks * track_length, n_experts]
-
-        Returns: 
-            track_weights (np.array): The predicted weights in track format, shape: [n_experts, n_tracks, track_length]
-        """
-        assert(weights.shape[0] % track_length == 0)
-        if track_length > 1:
-            track_weights = np.reshape(weights, [int(weights.shape[0] / track_length), track_length, self.n_experts])
-            track_weights = np.swapaxes(track_weights, 0, 2).swapaxes(1, 2)
-        else:
-            track_weights = np.swapaxes(weights, 0, 1)
-        return track_weights
-
     def get_weights(self, batch_size):
         """Return a weight vector.
         
@@ -356,51 +219,28 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         """
         pass
 
-    def get_masked_weights(self, mask, track_input, track_predictions=None, track_target=None, track_ids=None):
+    def get_masked_weights(self, masks, inputs):
         """Return an equal weights vector for all non masked experts.
         
         The weights sum to 1.
         All Weights are > 0 if the expert is non masked at an instance.
 
         If the mask value at an instance is 0, the experts weight is 0.
-
-        example mask arry:
-        [[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
-        [1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]]
-        --> Expert 6 is only active at position 0.
         
         Args:
-            mask (np.array): Mask array with shape [n_experts, n_tracks, track_length]
-            track_input (np.array): Data input in track format, shape: [n_tracks, track_length, 2]
-            track_predictions (np.array): Optional track predictions for experts if you chose to use the prev_pred_err feature
-            track_target (np.array): Optional track target if you chose to use the prev_pred_err feature
-            track_ids (np.array):   Switch to multi-target tracking mode if this value is not None.
-                                    In this mode, we only get one instance of a track. 
-                                    Therefore the track length is 1 and the track_length dimension in the track_input is omitted.
-                                    The track ids hold the position of the instance in its track.
-                                    Shape: [n_tracks]
+            masks (np.array):  Mask array with shape [n_experts, n_tracks]
+            inputs (np.array): Data input in MLP separation format, shape: [n_tracks, 2*n_mlp_inp]
 
         Returns:
-            np.array with weights of shape mask.shape
+            np.array with weights of shape [mask.shape, 2] -> 2 standing for the two dimensions spatial and temporal
         """
-        net_input = self.create_input_data(input_data=track_input, 
-                                           features=self.model_structure.get("features"),
-                                           input_dim=self.input_dim, 
-                                           track_predictions=track_predictions, 
-                                           track_target=track_target, 
-                                           track_ids=track_ids)
-            
-        weights = self.mlp_model(net_input)
-        masks = self.create_mask_data(mask)
-        masked_weights = mask_weights(weights, masks)
+        weights = self.mlp_model(inputs, training = False)
+        weights = np.array(weights)
+        ignore = np.all(inputs==0, axis=1)
+        weights[:, ignore] = 1/self.n_experts
+        masked_weights = mask_weights(weights, np.swapaxes(masks,0,1))
         masked_weights = masked_weights.numpy()
-        track_length = track_input.shape[1] if track_ids is None else 1
-        track_weights = self.convert_weights_to_tracks(masked_weights, track_length)
-        return track_weights
+        return np.swapaxes(masked_weights, 0, 1)
 
 
 """Model creation and training functionality"""
@@ -461,17 +301,17 @@ def train_step_generator(model, optimizer):
         function which can be called to train the given model with the given optimizer
     """
     @tf.function
-    def train_step(inp, target, expert_predictions, mask):
+    def train_step(inp, target, expert_predictions, mask, mlp_mask, training=True):
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
             # get [n_experts spatial weights, n_experts temporal weights] from MLP
-            weights = model(inp, training=True) 
+            weights = model(inp, training=training) 
             # Mask the weights
             masked_weights = mask_weights(weights, mask)
-            loss = weighted_sum_mse_loss(masked_weights, expert_predictions, target)
-
-        grads = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+            loss = weighted_sum_mse_loss(masked_weights, expert_predictions, target, mlp_mask)
+        if training:
+            grads = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
         return weights, loss
 
@@ -494,20 +334,17 @@ def mask_weights(weights, mask):
     masked_weights = tf.concat([tf.expand_dims(masked_weights_spatial, axis = -1), tf.expand_dims(masked_weights_temporal, axis = -1)], axis = -1)
     return masked_weights
 
-def weighted_sum_mse_loss(weights, expert_predictions, target):
+def weighted_sum_mse_loss(weights, expert_predictions, target, mask):
     """Return MSE for weighted expert predictions.
 
     Args:
         expert_predictions (tf.Tensor): The expert predictions, shape: [batch_size, n_experts, 2]
         weights (tf.Tensor):            The outputs of the MLP network, shape: [batch_size, n_experts, 2]
         target (tf.Tensor):             The target, shape: [batch_size, 2]
-
+        mask (tf.Tensor):               Mask entries that are valid, shape: [batch_size,]
     Returns:
         loss (float64)
     """
-    weighted_prediction = tf.einsum('ijk,ij->ik', expert_predictions, weights)
-    return tf.reduce_sum(tf.pow(target-weighted_prediction,2))/(2*target.shape[0])
-
-def weighted_sum_mae_loss(weights, expert_predictions, target):
-    """Return MAE for weighted expert predictions."""
-    return tf.reduce_sum(tf.abs(target-tf.einsum('ijk,ij->ik', expert_predictions, weights)),axis=1)
+    weighted_prediction = tf.einsum('ijk,ijk->ik', expert_predictions, weights)
+    double_mask = tf.repeat(tf.expand_dims(mask, axis = -1), 2, axis = -1)
+    return tf.reduce_sum(tf.pow(target-weighted_prediction,2)*double_mask)/tf.reduce_sum(double_mask)
