@@ -339,15 +339,15 @@
     "type": "Mixture_of_Experts",
     "model_path": "models/pepper/me_gating_sep.pkl",
     "options": {
-      "batch_size": 64,
+      "batch_size": 128,
       "n_epochs": 1000,
       "base_learning_rate": 0.005,
-      "decay_steps": 2000,
+      "decay_steps": 1000,
       "decay_rate": 0.96,
       "evaluate_every_n_epochs": 20,
       "model_structure": {
         "features": ["pos"],
-        "layers": [16, 16, 16, 16],
+        "layers": [16, 16, 16],
         "activation": "leakly_relu"
       }
     }
