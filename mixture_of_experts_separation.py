@@ -281,9 +281,13 @@ def me_mlp_model_factory(input_dim, n_experts, prediciton_input_dim=2, features=
             logging.warning("Activation function {} not implemented yet :(".format(activation))
         c+=1
     # Output layers = 2 Dense layers with seperate softmax activation functions
-    spatial_weights = tf.keras.layers.Dense(n_experts, name='spatial_weights')(x)
+    x_spatial = tf.keras.layers.Dense(32, kernel_initializer='he_normal', name='dense_spatial_{}'.format(c))(x)
+    x_spatial = tf.keras.layers.LeakyReLU(alpha=0.01)(x_spatial)
+    x_temporal = tf.keras.layers.Dense(32, kernel_initializer='he_normal', name='dense_temporal_{}'.format(c))(x)
+    x_temporal = tf.keras.layers.LeakyReLU(alpha=0.01)(x_temporal)
+    spatial_weights = tf.keras.layers.Dense(n_experts, name='spatial_weights')(x_spatial)
     spatial_weights = tf.keras.layers.Softmax()(spatial_weights)
-    temporal_weights = tf.keras.layers.Dense(n_experts, name='temporal_weights')(x)
+    temporal_weights = tf.keras.layers.Dense(n_experts, name='temporal_weights')(x_temporal)
     temporal_weights = tf.keras.layers.Softmax()(temporal_weights)
     model = tf.keras.Model(inputs=inputs, outputs=[spatial_weights, temporal_weights])
     return model
@@ -330,7 +334,7 @@ def mask_weights(weights, mask):
     masked_weights_spatial = tf.multiply(weights[0], mask)
     masked_weights_spatial, _ = tf.linalg.normalize(masked_weights_spatial, ord=1, axis=1)
     masked_weights_temporal = tf.multiply(weights[1], mask)
-    masked_weights_temporal, _ = tf.linalg.normalize(masked_weights_spatial, ord=1, axis=1)
+    masked_weights_temporal, _ = tf.linalg.normalize(masked_weights_temporal, ord=1, axis=1)
     masked_weights = tf.concat([tf.expand_dims(masked_weights_spatial, axis = -1), tf.expand_dims(masked_weights_temporal, axis = -1)], axis = -1)
     return masked_weights
 
