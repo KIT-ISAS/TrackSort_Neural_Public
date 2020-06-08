@@ -217,7 +217,7 @@ def create_diversity_evaluation(target, predictions, masks, expert_names, result
     rmse_values = []
     error_values = np.ma.zeros(mae_values.shape)
     for i in range(n_experts):
-        rmse_value = np.sqrt(mse_values[i].mean(axis=1).mean(axis=0))
+        rmse_value = np.sqrt(np.mean(mse_values[i]))
         # Determine when the forecaster made an error.
         # Error := abs(y_prediction - y_target) > rmse
         error_values[i] = mae_values[i]>rmse_value
@@ -366,6 +366,29 @@ def create_weight_pos_evaluation(weights, expert_names, result_dir, no_show = Fa
     weights_df = pd.DataFrame(weights_dict)
     weights_df.to_csv(result_dir + "mean_weights_track_pos.csv", index=False)
     
+def create_mean_weight_evaluation(weights, masks, expert_names, result_dir, no_show):
+    """Create a plot that shows the mean weight for each expert.
+
+    Args:
+        weights (np.array):  Weights for each track for each expert. Shape: [n_experts, n_tracks]
+        masks (np.array):    Indicate where the expert was valid. Shape: [n_experts, n_tracks]
+        expert_names (list): List of expert names (Strings)
+        result_dir (String): Directory to save the results
+        no_show (Boolean):   Disable figure pop-up
+    """
+    weights = np.ma.array(weights, mask=1-masks)
+    mean_weights = np.ma.mean(weights, axis=1)
+    result_dict = {}
+    for i, expert in enumerate(expert_names):
+        result_dict[expert] = [mean_weights[i]]
+    plt.bar(range(len(expert_names)), mean_weights, tick_label=expert_names)
+    plt.xticks(rotation=45)
+    plt.savefig(result_dir + 'mean_weights_plot.pdf')
+    if not no_show:
+        plt.show()
+    # Save data to csv via pandas
+    weights_df = pd.DataFrame(result_dict)
+    weights_df.to_csv(result_dir + "mean_weights.csv", index=False)
 
 def get_box_values(data):
     """Obtain all box plot values from a set of numpy data.
@@ -398,15 +421,22 @@ def calculate_mse_mae(target, predictions, masks):
     mse_list = []
     mae_list = []
     # Duplicate mask to be valid for x_target and y_target and invert mask to fit numpy mask format
-    masks = 1 - np.stack([masks, masks], axis=-1)
+    if len(predictions.shape) == 3: 
+        # TODO: Validate this changed code on single target tracking
+        masks = np.repeat(masks[..., np.newaxis], predictions.shape[2], axis=-1)
+    masks = 1-masks
     # For each expert
     for i in range(predictions.shape[0]):
         # Mask expert prediction
         masked_prediction = np.ma.array(predictions[i], mask=masks[i])
         # Mask target for specific expert
         masked_target = np.ma.array(target, mask=masks[i])
-        masked_mse_pos = ((masked_target - masked_prediction)**2).mean(axis=2)
-        masked_mae_pos = np.ma.abs(masked_target - masked_prediction).mean(axis=2)
+        if len(masked_prediction.shape)==3:
+            masked_mse_pos = ((masked_target - masked_prediction)**2).mean(axis=2)
+            masked_mae_pos = np.ma.abs(masked_target - masked_prediction).mean(axis=2)
+        else:
+            masked_mse_pos = (masked_target - masked_prediction)**2
+            masked_mae_pos = np.ma.abs(masked_target - masked_prediction)
         # Calculate mean mse error
         #mse_expert = masked_mse_pos.mean(axis=1).mean(axis=0)
         mse_list.append(masked_mse_pos)
@@ -432,20 +462,26 @@ def calculate_correlation_coefficient(target, prediction_1, prediction_2, mask_1
         Correlation coefficient (double)
     """
     # Calculate errors
-    mask_1 = 1 - np.stack([mask_1, mask_1], axis=-1)
+    if len(prediction_1.shape)>1: mask_1 = np.repeat(mask_1[...,np.newaxis], prediction_1.shape[-1], axis=-1)
+    mask_1 = 1 - mask_1
     masked_prediction = np.ma.array(prediction_1, mask=mask_1)
     masked_target = np.ma.array(target, mask=mask_1)
     error_1 = masked_target - masked_prediction
-    mask_2 = 1 - np.stack([mask_2, mask_2], axis=-1)
+    if len(prediction_2.shape)>1: mask_2 = np.repeat(mask_2[...,np.newaxis], prediction_2.shape[-1], axis=-1)
+    mask_2 = 1 - mask_2
     masked_prediction = np.ma.array(prediction_2, mask=mask_2)
     masked_target = np.ma.array(target, mask=mask_2)
     error_2 = masked_target - masked_prediction
-    # Calculate correlation in x direction
-    rho_x = np.ma.sum(np.ma.multiply(error_1[:,:,0], error_2[:,:,0])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,0],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,0],2))))
-    # Calculate correlation in y direction
-    rho_y = np.ma.sum(np.ma.multiply(error_1[:,:,1], error_2[:,:,1])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,1],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,1],2))))
-    # Calculate correlation - normalization to 1
-    rho = np.sqrt(1/2 * (rho_x**2 + rho_y**2))
+    if len(prediction_1.shape)>1: 
+        # Calculate correlation in x direction
+        rho_x = np.ma.sum(np.ma.multiply(error_1[:,:,0], error_2[:,:,0])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,0],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,0],2))))
+        # Calculate correlation in y direction
+        rho_y = np.ma.sum(np.ma.multiply(error_1[:,:,1], error_2[:,:,1])) / (np.sqrt(np.ma.sum(np.ma.power(error_1[:,:,1],2)))*np.sqrt(np.ma.sum(np.ma.power(error_2[:,:,1],2))))
+        # Calculate correlation - normalization to 1
+        rho = np.sqrt(1/2 * (rho_x**2 + rho_y**2))
+    else:
+        # Calculate correlation in single direction
+        rho = np.ma.sum(np.ma.multiply(error_1, error_2)) / (np.sqrt(np.ma.sum(np.ma.power(error_1,2)))*np.sqrt(np.ma.sum(np.ma.power(error_2,2))))
     return rho    
 
 def find_worst_predictions(target, predictions, mask_value):
