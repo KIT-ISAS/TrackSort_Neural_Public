@@ -330,6 +330,13 @@
 
     }
   },
+  "gating_separation": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating_sep.pkl",
+    "options": {
+
+    }
+  },
   "data_association": {
     "association_config": {
       "matching_algorithm": "global",
