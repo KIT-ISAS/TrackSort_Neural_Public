@@ -690,35 +690,29 @@ class ModelManager(object):
         save_path = os.path.dirname(result_dir)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-
-        """
-        # Error regions plot
-        create_error_region_evaluation(target=all_targets, 
-                                    predictions=all_predictions, 
-                                    masks=all_masks, 
-                                    expert_names = expert_names,
-                                    result_dir=result_dir,
-                                    is_normalized=normalization_constant!=1,
-                                    normalization_constant = normalization_constant,
-                                    rastering = [15, 10],
-                                    no_show = no_show)
-
+        spatial_result_path = result_dir + "spatial_evaluations/"
+        save_path = os.path.dirname(spatial_result_path)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        temporal_result_path = result_dir + "temporal_evaluations/"
+        save_path = os.path.dirname(temporal_result_path)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        
         # Diversity measurement evaluations
-        create_diversity_evaluation(target=all_targets, 
-                                    predictions=all_predictions, 
+        create_diversity_evaluation(target=all_targets[:,0], 
+                                    predictions=all_predictions[:,:,0], 
                                     masks=all_masks, 
                                     expert_names = expert_names,
-                                    result_dir=result_dir,
+                                    result_dir=spatial_result_path,
                                     is_mlp_mask=False)
-        # It makes sense to run both evaluations if there is one MLP model in the expert set
-        if self.expert_manager.is_type_in_experts(expert_type=Expert_Type.MLP):
-            create_diversity_evaluation(target=all_targets, 
-                                        predictions=all_predictions, 
-                                        masks=all_mlp_maks, 
-                                        expert_names = expert_names,
-                                        result_dir=result_dir,
-                                        is_mlp_mask=True)
-        """
+        create_diversity_evaluation(target=all_targets[:,1], 
+                                    predictions=all_predictions[:,:,1], 
+                                    masks=all_masks, 
+                                    expert_names = expert_names,
+                                    result_dir=temporal_result_path,
+                                    is_mlp_mask=False)
+        
         # MSE and MSA box plots
         create_boxplot_evaluation_separation_prediction(target=all_targets, 
                                 predictions=all_predictions, 
@@ -729,10 +723,8 @@ class ModelManager(object):
                                 result_dir=result_dir,
                                 no_show = no_show)
         # Weight plot
-        #create_weight_pos_evaluation(weights=all_weights, expert_names = expert_names[:-1], result_dir=result_dir, no_show = no_show)
-        """
-        find_worst_predictions(np_targets, np_predictions, self.mask_value)
-        """
+        create_mean_weight_evaluation(all_weights[:,:,0], all_masks[:-1], expert_names[:-1], spatial_result_path, no_show)
+        create_mean_weight_evaluation(all_weights[:,:,1], all_masks[:-1], expert_names[:-1], temporal_result_path, no_show)
 
     def get_full_input_target_prediction_mask_from_dataset_separation_prediction(self,
                     seq2seq_dataset, mlp_dataset, create_weighted_output = False):
