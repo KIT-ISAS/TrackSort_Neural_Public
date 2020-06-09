@@ -196,6 +196,61 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     mse_df.to_csv(result_dir + 'spatial_error_box_values.csv', index=False)
     mae_df.to_csv(result_dir + 'temporal_error_box_values.csv', index=False)
 
+def create_spatial_outlier_evaluation(seq2seq_inputs, target, predictions, masks, expert_names, result_dir, 
+                                      virtual_belt_edge, virtual_nozzle_array, normalization_constant = 1, 
+                                      n_errors = 10, no_show = False):
+    """Create an evaluation of the biggest outliers in spatial dimension.
+
+    Args:
+        seq2seq_inputs (np.array):      Input data in seq2seq format, shape = [n_tracks, track_length, 2] 
+        target (np.array):              Target values, shape = [n_tracks]
+        predictions (np.array):         Predicted values. The last entry should be the gating network prediction!, shape = [n_experts, n_tracks]
+        masks (np.array):               Masks for every expert, shape = [n_experts, n_tracks]
+        expert_names (list):            Names (String) of each expert
+        result_dir (String):            Directory to save the created plot data to
+        virtual_belt_edge (double):     x-Position of virtual belt edge
+        virtual_nozzle_array (double):  x-Position of virtual nozzle array
+        normalization_constant (double):        Value for denormalization the y_nozzle value
+        time_normalization_constant (double):   Value for denormalization the dt_nozzle value
+        n_errors (int):                         Number of errors to plot
+        no_show (Boolean):                      Do not show the figures. The figures will still be saved.
+    """
+    n_experts = predictions.shape[0]
+    assert(len(expert_names) == n_experts)
+    # Calculate errors
+    errors = predictions - np.repeat(target[np.newaxis,:], predictions.shape[0], axis=0)
+    # denormalize the errors
+    spatial_errors = errors[-1] * normalization_constant
+    # Find max absolute errors
+    abs_errors = np.abs(spatial_errors)
+    sorted_idx = np.argsort(abs_errors)
+    sorted_idx = sorted_idx[-n_errors:]
+    # Denormalize predictions and input points
+    seq2seq_inputs = seq2seq_inputs*normalization_constant
+    predictions = predictions*normalization_constant
+    target = target*normalization_constant
+    for idx in sorted_idx:
+        input_points = seq2seq_inputs[idx,np.all(seq2seq_inputs[idx]>0, axis=1)]
+        plt.figure() 
+        plt.xlim([0, normalization_constant])
+        all_y_pos = np.concatenate([input_points[:,1], predictions[:, idx], [target[idx]]])
+        plt.ylim([np.min(all_y_pos)-10, np.max(all_y_pos)+10])
+        # Draw virtual belt edge and nozzle array
+        plt.plot([virtual_belt_edge, virtual_belt_edge],[0, normalization_constant], 'k--')
+        plt.plot([virtual_nozzle_array, virtual_nozzle_array],[0, normalization_constant], 'k--')
+        # Draw input points 
+        plt.scatter(input_points[:,0],input_points[:,1], c='black')
+        for i in range(n_experts-1):
+            plt.scatter(virtual_nozzle_array, predictions[i, idx], label=expert_names[i])
+        plt.scatter(virtual_nozzle_array, predictions[-1, idx], label=expert_names[-1])
+        plt.scatter(virtual_nozzle_array, target[idx], label="Target")
+        plt.legend()
+        if not no_show:
+            plt.show()
+        stop=0
+
+    stop=0
+
 def create_diversity_evaluation(target, predictions, masks, expert_names, result_dir, is_mlp_mask=False):
     """Create the data for diversity measurement comparison.
 

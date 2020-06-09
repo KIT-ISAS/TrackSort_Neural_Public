@@ -358,6 +358,8 @@ def run_global_config(global_config, experiment_series_names=''):
                                     mlp_dataset_test = mlp_dataset_eval_sp,
                                     normalization_constant = data_source.normalization_constant,
                                     time_normalization_constant=global_config['time_normalization_constant'],
+                                    virtual_belt_edge = global_config['virtual_belt_edge_x_position'],
+                                    virtual_nozzle_array = global_config['virtual_nozzle_array_x_position'],
                                     no_show = global_config['no_show'])
     ## Execute MTT
     if global_config.get('execute_multi_target_tracking'):

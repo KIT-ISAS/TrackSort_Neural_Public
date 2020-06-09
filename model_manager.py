@@ -473,13 +473,13 @@ class ModelManager(object):
             **_dataset_eval (Tf.Dataset):        All evaluation samples in the correct format for various models
         """
         # Create predictions for all training batches and save prediction and target values to one list.
-        expert_names, all_inputs_train, all_targets_train, all_predictions_train, all_masks_train, _ = \
+        expert_names, all_inputs_train,_, all_targets_train, all_predictions_train, all_masks_train, _ = \
             self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
                 seq2seq_dataset=seq2seq_dataset_train,
                 mlp_dataset = mlp_dataset_train,
                 create_weighted_output = False)
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, all_inputs_eval, all_targets_eval, all_predictions_eval, all_masks_eval, _ = \
+        expert_names, all_inputs_eval,_, all_targets_eval, all_predictions_eval, all_masks_eval, _ = \
             self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
                 seq2seq_dataset=seq2seq_dataset_eval,
                 mlp_dataset = mlp_dataset_eval,
@@ -670,6 +670,7 @@ class ModelManager(object):
     def test_models_separation_prediction(self, result_dir,
                     seq2seq_dataset_test = None, mlp_dataset_test = None,
                     normalization_constant = 1, time_normalization_constant = 22,
+                    virtual_belt_edge = 800, virtual_nozzle_array = 1550, 
                     no_show = False):
         """Test model performance on test dataset and create evaluations.
 
@@ -678,10 +679,12 @@ class ModelManager(object):
             **_dataset_test (tf.Tensor):        Batches of test data
             normalization_constant (double):    Belt size in pixel
             time_normalization_constant (double): Time normalization
+            virtual_belt_edge (double):         x-Position of virtual belt edge
+            virtual_nozzle_array (double):      x-Position of virtual nozzle array
             no_show (Boolean):                  Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, _, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
+        expert_names, all_inputs, all_s2s_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
             seq2seq_dataset=seq2seq_dataset_test,
             mlp_dataset = mlp_dataset_test,
             create_weighted_output = True)
@@ -698,7 +701,6 @@ class ModelManager(object):
         save_path = os.path.dirname(temporal_result_path)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        
         # Diversity measurement evaluations
         create_diversity_evaluation(target=all_targets[:,0], 
                                     predictions=all_predictions[:,:,0], 
@@ -725,7 +727,21 @@ class ModelManager(object):
         # Weight plot
         create_mean_weight_evaluation(all_weights[:,:,0], all_masks[:-1], expert_names[:-1], spatial_result_path, no_show)
         create_mean_weight_evaluation(all_weights[:,:,1], all_masks[:-1], expert_names[:-1], temporal_result_path, no_show)
-
+        
+        # Outlier evaluation
+        create_spatial_outlier_evaluation(
+                                seq2seq_inputs = all_s2s_inputs,
+                                target=all_targets[:,0], 
+                                predictions=all_predictions[:,:,0], 
+                                masks=all_masks, 
+                                expert_names = expert_names, 
+                                normalization_constant=normalization_constant, 
+                                result_dir=spatial_result_path,
+                                virtual_belt_edge=virtual_belt_edge, 
+                                virtual_nozzle_array=virtual_nozzle_array, 
+                                n_errors = 10,
+                                no_show = no_show)
+        
     def get_full_input_target_prediction_mask_from_dataset_separation_prediction(self,
                     seq2seq_dataset, mlp_dataset, create_weighted_output = False):
         """Create separation predictions for all models on the given dataset.
@@ -749,7 +765,7 @@ class ModelManager(object):
         """
         seq2seq_iter = iter(seq2seq_dataset)
         mlp_iter = iter(mlp_dataset)
-        all_inputs = np.array([]); all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_weights = np.array([])
+        all_mlp_inputs = np.array([]); all_s2s_inputs = np.array([]); all_targets = np.array([]); all_predictions = np.array([]); all_masks = np.array([]); all_weights = np.array([])
         for (seq2seq_inp, seq2seq_target, seq2seq_tracking_mask, seq2seq_separation_mask) in seq2seq_iter:
             (mlp_inp, mlp_target, mlp_mask) = next(mlp_iter)
             # Test experts on a batch
@@ -785,13 +801,15 @@ class ModelManager(object):
            
             # Add everything to the lists
             if all_targets.shape[0]==0:
-                all_inputs = mlp_inp.numpy()
+                all_mlp_inputs = mlp_inp.numpy()
+                all_s2s_inputs = seq2seq_inp.numpy()
                 all_targets = mlp_target.numpy()
                 all_predictions = np.array(np_predictions)
                 all_masks = np.array(np_masks)
                 all_weights = weights
             else:
-                all_inputs = np.concatenate((all_inputs, mlp_inp.numpy()),axis=0)
+                all_mlp_inputs = np.concatenate((all_mlp_inputs, mlp_inp.numpy()),axis=0)
+                all_s2s_inputs = np.concatenate((all_s2s_inputs, seq2seq_inp.numpy()),axis=0)
                 all_targets = np.concatenate((all_targets, mlp_target.numpy()),axis=0)
                 all_predictions = np.concatenate((all_predictions, np.array(np_predictions)), axis=1)
                 all_masks = np.concatenate((all_masks, np.array(np_masks)), axis=1)
@@ -801,7 +819,7 @@ class ModelManager(object):
         if create_weighted_output:
             expert_names.append(self.gating_network_separation.get_name())
         # Return all the stuff
-        return expert_names, all_inputs, all_targets, all_predictions, all_masks, all_weights
+        return expert_names, all_mlp_inputs, all_s2s_inputs, all_targets, all_predictions, all_masks, all_weights
 
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     """ METHODS FOR MULTI TARGET TRACKING """
