@@ -701,6 +701,7 @@ class ModelManager(object):
         save_path = os.path.dirname(temporal_result_path)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
+        
         # Diversity measurement evaluations
         create_diversity_evaluation(target=all_targets[:,0], 
                                     predictions=all_predictions[:,:,0], 
