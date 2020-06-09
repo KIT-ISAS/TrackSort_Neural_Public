@@ -266,28 +266,44 @@ def me_mlp_model_factory(input_dim, n_experts, prediciton_input_dim=2, features=
 
     # Add hidden layers
     is_first = True
+    is_doubled = False
     c=0
     for n_Neurons in layers:
         # Add layer
         if is_first:
-            x = tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', name='dense_{}'.format(c))(inputs)
+            input_layer = inputs
             is_first=False
         else:
-            x = tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', name='dense_{}'.format(c))(x)
-        # Add activation function to layer
-        if activation == 'leakly_relu':
-            x = tf.keras.layers.LeakyReLU(alpha=0.01)(x)
+            input_layer = x
+        if isinstance(n_Neurons, list):
+            # We allow a split of the network in two for the spatial and temporal branch
+            assert(len(n_Neurons)==2, "Only a split in 2 branches is allowed.")
+            input_layer = x_spatial if is_doubled else input_layer
+            x_spatial = tf.keras.layers.Dense(n_Neurons[0], kernel_initializer='he_normal', name='dense_spatial_{}'.format(c))(input_layer)
+            input_layer = x_temporal if is_doubled else input_layer
+            x_temporal = tf.keras.layers.Dense(n_Neurons[1], kernel_initializer='he_normal', name='dense_temporal_{}'.format(c))(input_layer)
+            # Add activation function to layer
+            if activation == 'leakly_relu':
+                x_spatial = tf.keras.layers.LeakyReLU(alpha=0.01)(x_spatial)
+                x_temporal = tf.keras.layers.LeakyReLU(alpha=0.01)(x_temporal)
+            else:
+                logging.warning("Activation function {} not implemented yet :(".format(activation))
+            is_doubled=True
         else:
-            logging.warning("Activation function {} not implemented yet :(".format(activation))
+            assert(is_doubled==False, "Once you split the branches, you shall not go back. (It would be possible but I was too lazy to implement it.)")
+            x = tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', name='dense_{}'.format(c))(input_layer)
+            # Add activation function to layer
+            if activation == 'leakly_relu':
+                x = tf.keras.layers.LeakyReLU(alpha=0.01)(x)
+            else:
+                logging.warning("Activation function {} not implemented yet :(".format(activation))
         c+=1
     # Output layers = 2 Dense layers with seperate softmax activation functions
-    x_spatial = tf.keras.layers.Dense(32, kernel_initializer='he_normal', name='dense_spatial_{}'.format(c))(x)
-    x_spatial = tf.keras.layers.LeakyReLU(alpha=0.01)(x_spatial)
-    x_temporal = tf.keras.layers.Dense(32, kernel_initializer='he_normal', name='dense_temporal_{}'.format(c))(x)
-    x_temporal = tf.keras.layers.LeakyReLU(alpha=0.01)(x_temporal)
-    spatial_weights = tf.keras.layers.Dense(n_experts, name='spatial_weights')(x_spatial)
+    input_layer = x_spatial if is_doubled else x
+    spatial_weights = tf.keras.layers.Dense(n_experts, name='spatial_weights')(input_layer)
     spatial_weights = tf.keras.layers.Softmax()(spatial_weights)
-    temporal_weights = tf.keras.layers.Dense(n_experts, name='temporal_weights')(x_temporal)
+    input_layer = x_temporal if is_doubled else x
+    temporal_weights = tf.keras.layers.Dense(n_experts, name='temporal_weights')(input_layer)
     temporal_weights = tf.keras.layers.Softmax()(temporal_weights)
     model = tf.keras.Model(inputs=inputs, outputs=[spatial_weights, temporal_weights])
     return model
