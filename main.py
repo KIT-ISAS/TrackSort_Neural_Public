@@ -62,7 +62,7 @@ parser.add_argument('--config_path', default="configs/default_config.json",
                     help='Path to config file including information about experts, gating network and weighting function.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--evaluation_ratio', type=float, default=0.15, help='The ratio of data used for evaluation.')
-parser.add_argument('--test_ratio', type=float, default=0.15, help='The ratio of data used for the final unbiased test.')
+parser.add_argument('--test_ratio', type=float, default=0.1, help='The ratio of data used for the final unbiased test.')
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')

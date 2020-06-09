@@ -379,8 +379,7 @@ class AbstractDataSet(ABC):
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
         
         # Create ids for train and test tracks with optional random seed
-        t_e_ids, test_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
-        train_ids, eval_ids = train_test_split(t_e_ids, test_size=evaluation_ratio, random_state=random_seed)
+        train_ids, eval_ids, test_ids = train_eval_test_split(np.arange(tracks.shape[0]), evaluation_ratio, test_ratio, random_seed)
         
         train_tracks = tracks[train_ids]
         eval_tracks = tracks[eval_ids]
@@ -442,9 +441,8 @@ class AbstractDataSet(ABC):
             mlp_data = self.normalize_data(mlp_data)
         
         # Create ids for train, evaluation and test tracks with optional random seed
-        t_e_track_ids, test_track_ids = train_test_split(np.arange(tracks.shape[0]), test_size=test_ratio, random_state=random_seed)
-        train_track_ids, eval_track_ids = train_test_split(t_e_track_ids, test_size=evaluation_ratio, random_state=random_seed)
-        
+        train_track_ids, eval_track_ids, test_track_ids = train_eval_test_split(np.arange(tracks.shape[0]), evaluation_ratio, test_ratio, random_seed)
+
         # Get the mlp data ids of the track ids
         train_ids = []
         eval_ids = []
@@ -576,8 +574,7 @@ class AbstractDataSet(ABC):
 
         tracks = np.concatenate((tracks, tracking_mask[:,:,np.newaxis], separation_mask[:,:,np.newaxis]), axis=-1)
 
-        t_e_tracks, test_tracks = train_test_split(tracks, test_size=test_ratio, random_state=random_seed)
-        train_tracks, eval_tracks = train_test_split(t_e_tracks, test_size=evaluation_ratio, random_state=random_seed)
+        train_tracks, eval_tracks, test_tracks =  train_eval_test_split(tracks, evaluation_ratio, test_ratio, random_seed)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
         raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_tracks)
@@ -679,8 +676,7 @@ class AbstractDataSet(ABC):
             # normalize velocity prediction
             mlp_data[:, -2] /= self.normalization_constant
 
-        t_e_data, test_data = train_test_split(mlp_data, test_size=test_ratio, random_state=random_seed)
-        train_data, eval_data = train_test_split(t_e_data, test_size=evaluation_ratio, random_state=random_seed)
+        train_data, eval_data, test_data =  train_eval_test_split(mlp_data, evaluation_ratio, test_ratio, random_seed)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
         raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_data)
@@ -1061,6 +1057,30 @@ class AbstractDataSet(ABC):
 
         return aligned_tracks
 
+def train_eval_test_split(dataset, eval_ratio, test_ratio, random_seed=None):
+    """Split a numpy array into a train, evaluation and test set.
+
+    The split will be done along axis 0.
+
+    Args:
+        dataset (np.array):         Data
+        eval_ratio (double):         A double between 0 and 1. 
+        test_ratio (double):         A double between 0 and 1. 
+        random_seed (int or None):  If int: Fixed random seed for random generator. 
+                                    If None: Numbers will be random every time.
+
+    Returns:
+        dataset_train, dataset_eval, dataset_test
+    """
+    assert(eval_ratio + test_ratio < 1)
+    assert(eval_ratio>0 and eval_ratio<1)
+    assert(test_ratio>0 and test_ratio<1)
+    # First split the dataset into training and rest
+    rest_ratio = eval_ratio + test_ratio
+    dataset_train, dataset_rest = train_test_split(dataset, test_size=rest_ratio, random_state=random_seed)
+    split_test_ratio = test_ratio/rest_ratio
+    dataset_eval, dataset_test = train_test_split(dataset_rest, test_size=split_test_ratio, random_state=random_seed)
+    return dataset_train, dataset_eval, dataset_test
 
 class FakeDataSet(AbstractDataSet):
     def __init__(self, mlp_input_dim=5, timesteps=350, number_trajectories=512,
