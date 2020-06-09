@@ -305,16 +305,16 @@
         "accel_var_y": 18000
       }
     },
-    "KF_CA_CA_DSC": {
+    "KF_CA_CVBC_DSC": {
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_CA_DSC.pkl",
+      "model_path": "models/pepper/KF_sep_CA_CVBC_DSC.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
         "s_v": 3.6E-7,
-        "temporal_separator": "CA",
+        "temporal_separator": "CVBC",
         "spatial_separator": "DSC"
       },
       "state_options": {
@@ -337,7 +337,7 @@
   },
   "gating_separation": {
     "type": "Mixture_of_Experts",
-    "model_path": "models/pepper/me_gating_sep.h5",
+    "model_path": "models/pepper/me_gating_sep.pkl",
     "options": {
       "batch_size": 128,
       "n_epochs": 1000,
@@ -347,7 +347,7 @@
       "evaluate_every_n_epochs": 20,
       "model_structure": {
         "features": ["pos"],
-        "layers": [16, [16, 8], [16, 8]],
+        "layers": [16, 16, 16],
         "activation": "leakly_relu"
       }
     }

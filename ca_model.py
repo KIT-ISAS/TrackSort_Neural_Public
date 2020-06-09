@@ -265,7 +265,7 @@ class CA_Model(KF_Model):
                             if ~is_training:
                                 t_sign_change = 1/self.dt * (0-v_last[1,0])/a_last[1,0]
                                 # If the paticle y velocity would hit a sign change before the nozzle array
-                                if t_sign_change < dt_pred:
+                                if t_sign_change < dt_pred and t_sign_change > 0:
                                     # Y position is fix after t sign change
                                     y_pred = pos_last[1,0] + v_last[1,0] * t_sign_change * self.dt + 1/2 * (t_sign_change * self.dt)**2 * a_last[1,0]
                         elif self.spatial_prediction == CA_Spatial_Separation_Type.CV:

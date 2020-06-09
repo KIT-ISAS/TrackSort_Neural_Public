@@ -653,6 +653,7 @@ class AbstractDataSet(ABC):
         missing_track_counter = 0
         for i in range(n_tracks):
             n_measurements = self.get_last_timestep_of_track(track_data[i])
+            # Set the input
             if n_measurements >= n_inp_points:
                 # Set input = [x1, x2, ..., y_1, y2, ...]
                 c=0
@@ -660,15 +661,14 @@ class AbstractDataSet(ABC):
                     mlp_data[i,c] = track_data[i, index, 0]
                     mlp_data[i,c+n_inp_points] = track_data[i, index, 1]
                     c += 1
-                # Set target [y_nozzle, dt_nozzle]
-                mlp_data[i, -4] = spatial_labels[i, 1]
-                mlp_data[i, -3] = temporal_labels[i]
-                mlp_data[i, -2] = y_velocity_labels[i]
                 mlp_data[i, -1] = 1
             else:
                 missing_track_counter += 1
                 mlp_data[i, -1] = 0
-
+            # Set the target [y_nozzle, dt_nozzle]
+            mlp_data[i, -4] = spatial_labels[i, 1]
+            mlp_data[i, -3] = temporal_labels[i]
+            mlp_data[i, -2] = y_velocity_labels[i]
         logging.info("Skipping {} tracks in the MLP separation prediction because their length was < {}".format(missing_track_counter, n_inp_points))
 
         if normalized:
