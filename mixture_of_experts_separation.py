@@ -234,10 +234,31 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         Returns:
             np.array with weights of shape [mask.shape, 2] -> 2 standing for the two dimensions spatial and temporal
         """
+        n_experts = masks.shape[0]
         weights = self.mlp_model(inputs, training = False)
         weights = np.array(weights)
+        # Handle the cases where there are less than n measurements
         ignore = np.all(inputs==0, axis=1)
-        weights[:, ignore] = 1/self.n_experts
+        if sum(ignore) > 0:
+            # Find best expert for non ignore cases
+            best_expert_spatial = np.argmax(np.mean(weights[0, ~ignore], axis=0))
+            best_expert_temporal = np.argmax(np.mean(weights[1, ~ignore], axis=0))
+            # If the best expert is masked out where there are less than n measurements, we need to use SE weighting
+            if np.any(masks[best_expert_spatial, ignore] == 0):
+                default_spatial = 1/n_experts * np.ones(n_experts)
+            else:
+                # Otherwise we can use the best expert
+                default_spatial = np.zeros(n_experts)
+                default_spatial[best_expert_spatial] = 1
+            # Temporal
+            if np.any(masks[best_expert_temporal, ignore] == 0):
+                default_temporal = 1/n_experts * np.ones(n_experts)
+            else:
+                default_temporal = np.zeros(n_experts)
+                default_temporal[best_expert_temporal] = 1
+            # Replace incorrect positions
+            weights[0, ignore, :] = default_spatial
+            weights[1, ignore, :] = default_temporal
         masked_weights = mask_weights(weights, np.swapaxes(masks,0,1))
         masked_weights = masked_weights.numpy()
         return np.swapaxes(masked_weights, 0, 1)
