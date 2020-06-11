@@ -1,5 +1,5 @@
 {
-  "batch_size": 64,
+  "batch_size": 128,
   "experts": {
     "MLP": {
       "type": "MLP",
@@ -7,6 +7,8 @@
       "is_separator": true,
       "options": {
         "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "layers": [16, 16, 16, 16],
           "activation": "leakly_relu",
@@ -19,6 +21,13 @@
   "gating": {
     "type": "Simple_Ensemble",
     "model_path": "models/DEM_cylinder/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "gating_separation": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating_sep.pkl",
     "options": {
 
     }

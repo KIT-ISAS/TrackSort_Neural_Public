@@ -163,10 +163,7 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     plt.figure()
     plt.boxplot(temporal_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("Temporal deviation [frames]")
-    if normalization_constant >= 100:
-        plt.ylim([-1, 1])
-    else:
-        plt.ylim([-4, 4])
+    plt.ylim([-1, 1])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
     plt.xticks(rotation=60)
     plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 
