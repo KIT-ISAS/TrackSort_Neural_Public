@@ -1,5 +1,5 @@
 {
-  "batch_size": 64,
+  "batch_size": 128,
   "experts": {
     "LSTM": {
       "type": "RNN",
@@ -34,7 +34,7 @@
   },
   "gating_separation": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating_sep.pkl",
+    "model_path": "models/DEM_cylinder/simple_gating_sep.pkl",
     "options": {
 
     }
