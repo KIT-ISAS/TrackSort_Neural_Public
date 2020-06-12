@@ -337,7 +337,7 @@
   },
   "gating_separation": {
     "type": "Mixture_of_Experts",
-    "model_path": "models/pepper/me_gating_sep.pkl",
+    "model_path": "models/pepper/me_gating_sep.h5",
     "options": {
       "batch_size": 128,
       "n_epochs": 1000,
