@@ -1,5 +1,5 @@
 {
-  "batch_size": 64,
+  "batch_size": 128,
   "experts": {
     "LSTM": {
       "type": "RNN",
@@ -7,6 +7,9 @@
       "model_path": "models/DEM_cuboids/LSTM_1024_16_separation.h5",
       "options": {
         "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "num_units_first_rnn": 1024,
           "num_units_second_rnn": 16,
@@ -25,6 +28,13 @@
   "gating": {
     "type": "Simple_Ensemble",
     "model_path": "models/DEM_cuboids/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "gating_separation": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/DEM_cuboids/simple_gating_sep.pkl",
     "options": {
 
     }

@@ -726,8 +726,8 @@ class ModelManager(object):
                                 result_dir=result_dir,
                                 no_show = no_show)
         # Weight plot
-        create_mean_weight_evaluation(all_weights[:,:,0], all_masks[:-1], expert_names[:-1], spatial_result_path, no_show)
         create_mean_weight_evaluation(all_weights[:,:,1], all_masks[:-1], expert_names[:-1], temporal_result_path, no_show)
+        create_mean_weight_evaluation(all_weights[:,:,0], all_masks[:-1], expert_names[:-1], spatial_result_path, no_show)
         
         # Outlier evaluation
         create_spatial_outlier_evaluation(

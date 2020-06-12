@@ -88,7 +88,7 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         mae_boxplot_inputs.append(compressed_mae_values)
 
     # Show plot
-    plt.figure()
+    plt.figure(figsize=(19.20,10.80), dpi=100)
     plt.boxplot(mse_boxplot_inputs, sym='', labels=expert_names)
     if normalization_constant >= 100:
         plt.ylabel("MSE [px^2]")
@@ -98,7 +98,7 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     plt.savefig(result_dir + ('mse_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mse_box_plot.pdf')) 
     if not no_show:
         plt.show()
-    plt.figure()
+    plt.figure(figsize=(19.20,10.80), dpi=100)
     if normalization_constant >= 100:
         plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
         plt.ylabel("MAE [px]")
@@ -139,9 +139,10 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
         time_normalization_constant (double): Value for denormalization the dt_nozzle value
         no_show (Boolean):      Do not show the figures. The figures will still be saved.
     """
-    assert(len(expert_names) == predictions.shape[0])
+    n_experts = predictions.shape[0]
+    assert(len(expert_names) == n_experts)
     # Calculate errors
-    errors = predictions - np.repeat(target[np.newaxis,:,0:2], predictions.shape[0], axis=0)
+    errors = predictions - np.repeat(target[np.newaxis,:,0:2], n_experts, axis=0)
     # denormalize the errors
     spatial_errors = errors[:,:,0] * normalization_constant
     temporal_errors = errors[:,:,1] * time_normalization_constant
@@ -149,28 +150,36 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     # Create box values for every expert
     spatial_box_values = {}; temporal_box_values = {}
     spatial_boxplot_inputs = []; temporal_boxplot_inputs = []
-    for i in range(spatial_errors.shape[0]):
+    spatial_boxplot_parameters = np.zeros([n_experts, 5]); temporal_boxplot_parameters = np.zeros([n_experts, 5])
+    for i in range(n_experts):
         # Spatial error
         spatial_error = spatial_errors[i, np.where(masks[i])]
-        spatial_box_values[expert_names[i]] = get_box_values(spatial_error)
+        spatial_boxplot_parameters[i] = np.array(get_box_values(spatial_error))
         spatial_boxplot_inputs.append(spatial_error[0])
         # Temporal error
         temporal_error = temporal_errors[i, np.where(masks[i])]
-        temporal_box_values[expert_names[i]] = get_box_values(temporal_error)
+        temporal_boxplot_parameters[i] = np.array(get_box_values(temporal_error))
         temporal_boxplot_inputs.append(temporal_error[0])
-
+    if normalization_constant < 100:
+        spatial_boxplot_parameters *= 1000
+    spatial_box_values["labels"]=expert_names; temporal_box_values["labels"]=expert_names
+    spatial_box_values["med"]=spatial_boxplot_parameters[:,0]; temporal_box_values["med"]=temporal_boxplot_parameters[:,0]
+    spatial_box_values["uq"]=spatial_boxplot_parameters[:,1]; temporal_box_values["uq"]=temporal_boxplot_parameters[:,1]
+    spatial_box_values["lq"]=spatial_boxplot_parameters[:,2]; temporal_box_values["lq"]=temporal_boxplot_parameters[:,2]
+    spatial_box_values["uw"]=spatial_boxplot_parameters[:,3]; temporal_box_values["uw"]=temporal_boxplot_parameters[:,3]
+    spatial_box_values["lw"]=spatial_boxplot_parameters[:,4]; temporal_box_values["lw"]=temporal_boxplot_parameters[:,4]
     # Show temporal plot
-    plt.figure()
+    fig = plt.figure(figsize=(19.20,10.80), dpi=100)
     plt.boxplot(temporal_boxplot_inputs, sym='', labels=expert_names)
     plt.ylabel("Temporal deviation [frames]")
     plt.ylim([-1, 1])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
-    plt.xticks(rotation=60)
+    fig.autofmt_xdate(rotation=60)
     plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 
     if not no_show:
         plt.show()
     # Show spatial plot
-    plt.figure()
+    fig = plt.figure(figsize=(19.20,10.80), dpi=100)
     if normalization_constant >= 100:
         plt.boxplot(spatial_boxplot_inputs, sym='', labels=expert_names)
         plt.ylabel("Spatial deviation [px]")
@@ -180,9 +189,9 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
             spatial_boxplot_inputs[i] = spatial_boxplot_inputs[i]*1000
         plt.boxplot(spatial_boxplot_inputs, sym='', labels=expert_names)
         plt.ylabel("Spatial deviation [mm]")
-        plt.ylim([-2, 2])
+        plt.ylim([-2.8, 2.8])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
-    plt.xticks(rotation=60)
+    fig.autofmt_xdate(rotation=60)
     plt.savefig(result_dir + 'spatial_error_box_plot.pdf') 
     if not no_show:
         plt.show()
@@ -228,7 +237,7 @@ def create_spatial_outlier_evaluation(seq2seq_inputs, target, predictions, masks
     target = target*normalization_constant
     for idx in sorted_idx:
         input_points = seq2seq_inputs[idx,np.all(seq2seq_inputs[idx]>0, axis=1)]
-        plt.figure() 
+        plt.figure(figsize=(19.20,10.80), dpi=100) 
         plt.xlim([0, normalization_constant])
         all_y_pos = np.concatenate([input_points[:,1], predictions[:, idx], [target[idx]]])
         plt.ylim([np.min(all_y_pos)-10, np.max(all_y_pos)+10])
@@ -362,7 +371,7 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
                 if count_error_map[y, x] < 10:
                     median_error_map[y, x] = np.nan
         # Plot error map
-        plt.figure()
+        plt.figure(figsize=(19.20,10.80), dpi=100)
         if normalization_constant >= 100:
             plt.pcolor(median_error_map, cmap="Reds", vmin=0, vmax=3)
         else:
@@ -403,7 +412,7 @@ def create_weight_pos_evaluation(weights, expert_names, result_dir, no_show = Fa
     weights_dict = dict()
     weights_dict['TrackPos'] = x
     # Show plot
-    plt.figure()
+    plt.figure(figsize=(19.20,10.80), dpi=100)
     for i in range(mean_weights_per_ts.shape[0]):
         plt.plot(x, mean_weights_per_ts[i], label=expert_names[i])
         weights_dict[expert_names[i]]=mean_weights_per_ts[i]
@@ -433,8 +442,9 @@ def create_mean_weight_evaluation(weights, masks, expert_names, result_dir, no_s
     result_dict = {}
     for i, expert in enumerate(expert_names):
         result_dict[expert] = [mean_weights[i]]
+    fig = plt.figure(figsize=(19.20,10.80), dpi=100)
     plt.bar(range(len(expert_names)), mean_weights, tick_label=expert_names)
-    plt.xticks(rotation=45)
+    fig.autofmt_xdate(rotation=60)
     plt.savefig(result_dir + 'mean_weights_plot.pdf')
     if not no_show:
         plt.show()
@@ -568,7 +578,7 @@ def find_worst_predictions(target, predictions, mask_value):
         greater_zero_pos = pos[greater_zero_pos_pos]
         greater_zero_track = track[greater_zero_pos_pos]
         stop=0
-        
+        plt.figure(figsize=(19.20,10.80), dpi=100)
         # Plot all non zero errors with whole track
         track_id = -1
         for j in range(greater_zero_pos.shape[0]):

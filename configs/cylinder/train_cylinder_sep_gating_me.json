@@ -1,6 +1,45 @@
 {
   "batch_size": 128,
   "experts": {
+    "MLP": {
+      "type": "MLP",
+      "model_path": "models/cylinder/MLP_separator.h5",
+      "is_separator": true,
+      "options": {
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
+        "model_structure": {
+          "layers": [16, 16, 16, 16],
+          "activation": "leakly_relu",
+          "l1_regularization": 5e-8,
+          "l2_regularization": 0
+        }
+      }
+    },
+    "LSTM": {
+      "type": "RNN",
+      "is_separator": true,
+      "model_path": "models/cylinder/LSTM_1024_16_separation.h5",
+      "options": {
+        "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
+        "model_structure": {
+          "num_units_first_rnn": 1024,
+          "num_units_second_rnn": 16,
+          "num_units_third_rnn": 0,
+          "num_units_fourth_rnn": 0,
+          "num_units_first_dense": 0,
+          "num_units_second_dense": 0,
+          "num_units_third_dense": 0,
+          "num_units_fourth_dense": 0,
+          "rnn_model_name": "lstm",
+          "use_batchnorm_on_dense": true
+        }
+      }
+    },
     "KF_CV_CV_CV": {
       "type": "KF",
       "sub_type": "CV",
@@ -477,6 +516,23 @@
     "model_path": "models/cylinder/simple_gating.pkl",
     "options": {
 
+    }
+  },
+  "gating_separation": {
+    "type": "Mixture_of_Experts",
+    "model_path": "models/cylinder/me_gating_sep.h5",
+    "options": {
+      "batch_size": 128,
+      "n_epochs": 1000,
+      "base_learning_rate": 0.005,
+      "decay_steps": 1000,
+      "decay_rate": 0.96,
+      "evaluate_every_n_epochs": 20,
+      "model_structure": {
+        "features": ["pos"],
+        "layers": [16, [16, 8], [16, 8]],
+        "activation": "leakly_relu"
+      }
     }
   },
   "data_association": {

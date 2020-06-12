@@ -1,23 +1,62 @@
 {
-  "batch_size": 64,
+  "batch_size": 128,
   "experts": {
+    "MLP": {
+      "type": "MLP",
+      "model_path": "models/DEM_cuboids/MLP_separator.h5",
+      "is_separator": true,
+      "options": {
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
+        "model_structure": {
+          "layers": [16, 16, 16, 16],
+          "activation": "leakly_relu",
+          "l1_regularization": 5e-8,
+          "l2_regularization": 0
+        }
+      }
+    },
+    "LSTM": {
+      "type": "RNN",
+      "is_separator": true,
+      "model_path": "models/DEM_cuboids/LSTM_1024_16_separation.h5",
+      "options": {
+        "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
+        "model_structure": {
+          "num_units_first_rnn": 1024,
+          "num_units_second_rnn": 16,
+          "num_units_third_rnn": 0,
+          "num_units_fourth_rnn": 0,
+          "num_units_first_dense": 0,
+          "num_units_second_dense": 0,
+          "num_units_third_dense": 0,
+          "num_units_fourth_dense": 0,
+          "rnn_model_name": "lstm",
+          "use_batchnorm_on_dense": true
+        }
+      }
+    },
     "KF_CV_CV_CV": {
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CV_CV_CV.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
         "temporal_separator": "default",
         "spatial_separator": "default"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
       }
     },
     "KF_CV_CVBC_CV": {
@@ -26,17 +65,17 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
         "temporal_separator": "BC",
         "spatial_separator": "default"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
       }
     },
     "KF_CV_IA_CV": {
@@ -45,17 +84,17 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CV_IA_CV.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
         "temporal_separator": "IA",
         "spatial_separator": "default"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
       }
     },
     "KF_CV_CV_Ratio": {
@@ -64,17 +103,17 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CV_CV_Ratio.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
         "temporal_separator": "default",
         "spatial_separator": "ratio"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
       }
     },
     "KF_CV_CVBC_Ratio": {
@@ -83,17 +122,17 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CV_CVBC_Ratio.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
         "temporal_separator": "BC",
         "spatial_separator": "ratio"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
       }
     },
     "KF_CV_IA_Ratio": {
@@ -102,17 +141,17 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CV_IA_Ratio.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
         "temporal_separator": "IA",
         "spatial_separator": "ratio"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
       }
     },
     "KF_CA_CA_CA": {
@@ -121,20 +160,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_CA.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CA",
         "spatial_separator": "CA"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CVBC_CA": {
@@ -143,20 +182,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_CA.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CVBC",
         "spatial_separator": "CA"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_IA_CA": {
@@ -165,20 +204,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_CA.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "IA",
         "spatial_separator": "CA"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_LV_CA": {
@@ -187,21 +226,21 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_CA.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "LV",
         "spatial_separator": "CA",
         "belt_velocity": 0.0115
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CA_CV": {
@@ -210,20 +249,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_CV.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CA",
         "spatial_separator": "CV"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CVBC_CV": {
@@ -232,20 +271,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_CV.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CVBC",
         "spatial_separator": "CV"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_IA_CV": {
@@ -254,20 +293,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_CV.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "IA",
         "spatial_separator": "CV"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_LV_CV": {
@@ -276,21 +315,21 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_CV.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "LV",
         "spatial_separator": "CV",
         "belt_velocity": 0.0115
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CA_Ratio": {
@@ -299,20 +338,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_Ratio.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CA",
         "spatial_separator": "ratio"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CVBC_Ratio": {
@@ -321,20 +360,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_Ratio.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CVBC",
         "spatial_separator": "ratio"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_IA_Ratio": {
@@ -343,20 +382,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_Ratio.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "IA",
         "spatial_separator": "ratio"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_LV_Ratio": {
@@ -365,21 +404,21 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_Ratio.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "LV",
         "spatial_separator": "ratio",
         "belt_velocity": 0.0115
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CA_DSC": {
@@ -388,20 +427,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CA_DSC.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CA",
         "spatial_separator": "DSC"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_CVBC_DSC": {
@@ -410,20 +449,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_CVBC_DSC.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "CVBC",
         "spatial_separator": "DSC"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_IA_DSC": {
@@ -432,20 +471,20 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_IA_DSC.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "IA",
         "spatial_separator": "DSC"
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     },
     "KF_CA_LV_DSC": {
@@ -454,21 +493,21 @@
       "is_separator": true,
       "model_path": "models/DEM_cuboids/KF_sep_CA_LV_DSC.pkl",
       "model_options": {
-        "dt": 1,
-        "s_w": 1E20,
-        "s_v": 1E-20,
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
         "temporal_separator": "LV",
         "spatial_separator": "DSC",
         "belt_velocity": 0.0115
       },
       "state_options": {
-        "velocity_guess": 0.01,
-        "velo_var_x": 0.002,
-        "velo_var_y": 0.005,
-        "pos_var": 1E-20,
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
         "accel_guess": 0.0,
-        "accel_var_x": 0.0002,
-        "accel_var_y": 0.0005
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
       }
     }
   },
@@ -477,6 +516,23 @@
     "model_path": "models/DEM_cuboids/simple_gating.pkl",
     "options": {
 
+    }
+  },
+  "gating_separation": {
+    "type": "Mixture_of_Experts",
+    "model_path": "models/DEM_cuboids/me_gating_sep.h5",
+    "options": {
+      "batch_size": 128,
+      "n_epochs": 1000,
+      "base_learning_rate": 0.005,
+      "decay_steps": 1000,
+      "decay_rate": 0.96,
+      "evaluate_every_n_epochs": 20,
+      "model_structure": {
+        "features": ["pos"],
+        "layers": [16, [16, 8], [16, 8]],
+        "activation": "leakly_relu"
+      }
     }
   },
   "data_association": {
