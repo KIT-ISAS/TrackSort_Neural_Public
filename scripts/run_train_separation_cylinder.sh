@@ -37,7 +37,7 @@ cd ..
   --dataset_dir 'data/Zylinder/trackSortResultZylinder/*_trackHistory_NothingDeleted.csv' \
   --separation_mlp_input_dim 7 \
   --batch_size 128 \
-  --num_train_epochs 400 \
+  --num_train_epochs 1000 \
   --evaluation_ratio 0.15 \
   --test_ratio 0.10 \
   --evaluate_every_n_epochs 20 \
