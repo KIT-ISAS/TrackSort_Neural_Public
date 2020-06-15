@@ -1,7 +1,7 @@
 {
   "batch_size": 64,
   "experts": {
-    "LSTM_1024_16": {
+    "LSTM": {
       "type": "RNN",
       "model_path": "models/pepper/LSTM_1024_16.h5",
       "options": {
@@ -20,7 +20,7 @@
         }
       }
     },
-    "MLP_16_16_16": {
+    "MLP": {
       "type": "MLP",
       "model_path": "models/pepper/MLP_16_16_16.h5",
       "options": {
@@ -31,8 +31,9 @@
         }
       }
     },
-    "KF_CA_sw18E3": {
+    "KF CA": {
       "type": "KF",
+      "model_path": "models/pepper/KF_sep_CA_CA_CA.pkl",
       "sub_type": "CA",
       "model_options": {
         "dt": 0.005,

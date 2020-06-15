@@ -483,9 +483,9 @@ def calculate_mse_mae(target, predictions, masks):
     mse_list = []
     mae_list = []
     # Duplicate mask to be valid for x_target and y_target and invert mask to fit numpy mask format
-    if len(predictions.shape) == 3: 
+    if len(predictions.shape) >= 3: 
         # TODO: Validate this changed code on single target tracking
-        masks = np.repeat(masks[..., np.newaxis], predictions.shape[2], axis=-1)
+        masks = np.repeat(masks[..., np.newaxis], predictions.shape[-1], axis=-1)
     masks = 1-masks
     # For each expert
     for i in range(predictions.shape[0]):
@@ -493,9 +493,9 @@ def calculate_mse_mae(target, predictions, masks):
         masked_prediction = np.ma.array(predictions[i], mask=masks[i])
         # Mask target for specific expert
         masked_target = np.ma.array(target, mask=masks[i])
-        if len(masked_prediction.shape)==3:
-            masked_mse_pos = ((masked_target - masked_prediction)**2).mean(axis=2)
-            masked_mae_pos = np.ma.abs(masked_target - masked_prediction).mean(axis=2)
+        if len(masked_prediction.shape)>=3:
+            masked_mse_pos = ((masked_target - masked_prediction)**2).mean(axis=-1)
+            masked_mae_pos = np.ma.abs(masked_target - masked_prediction).mean(axis=-1)
         else:
             masked_mse_pos = (masked_target - masked_prediction)**2
             masked_mae_pos = np.ma.abs(masked_target - masked_prediction)
@@ -593,4 +593,3 @@ def find_worst_predictions(target, predictions, mask_value):
         plt.show()
         stop=0
         #mse.append(mse_expert)
-    

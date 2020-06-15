@@ -1,22 +1,27 @@
 {
   "batch_size": 64,
   "experts": {
-    "MLP_16_16_16": {
+    "MLP": {
       "type": "MLP",
       "model_path": "models/DEM_cylinder/MLP_16_16_16.h5",
       "options": {
-        "base_learning_rate": 0.0025,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "layers": [16, 16, 16],
           "activation": "leakly_relu"
         }
       }
     },
-    "LSTM_1024_16": {
+    "LSTM": {
       "type": "RNN",
       "model_path": "models/DEM_cylinder/LSTM_1024_16.h5",
       "options": {
         "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "num_units_first_rnn": 1024,
           "num_units_second_rnn": 16,
@@ -31,7 +36,7 @@
         }
       }
     },
-    "KF_CA_sw18E3": {
+    "KF CA": {
       "type": "KF",
       "sub_type": "CA",
       "model_options": {

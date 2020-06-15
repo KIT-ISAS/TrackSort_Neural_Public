@@ -342,7 +342,6 @@ def run_global_config(global_config, experiment_series_names=''):
 
     ## Test models
     # Set the plotting options
-    
     params = {'legend.fontsize': 'x-large',
             'figure.figsize': (19.20, 10.80),
             'axes.labelsize': 'x-large',
@@ -350,6 +349,7 @@ def run_global_config(global_config, experiment_series_names=''):
             'xtick.labelsize':'x-large',
             'ytick.labelsize':'x-large'}
     pylab.rcParams.update(params)
+    
     if global_config["tracking"]:
         if global_config.get('execute_evaluation'):
             model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,

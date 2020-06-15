@@ -1,11 +1,14 @@
 {
   "batch_size": 64,
   "experts": {
-    "LSTM_1024_16": {
+    "LSTM": {
       "type": "RNN",
       "model_path": "models/DEM_cylinder/LSTM_1024_16.h5",
       "options": {
         "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "num_units_first_rnn": 1024,
           "num_units_second_rnn": 16,
