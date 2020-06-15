@@ -11,6 +11,7 @@ import logging
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.pylab as pylab
 
 from moviepy.editor import ImageSequenceClip
 from track_manager import TrackManager
@@ -340,8 +341,15 @@ def run_global_config(global_config, experiment_series_names=''):
                                                           mlp_dataset_eval = mlp_dataset_eval_sp)
 
     ## Test models
-    # TODO:
-    #   * Test with an evaluation set instead of test set.
+    # Set the plotting options
+    
+    params = {'legend.fontsize': 'x-large',
+            'figure.figsize': (19.20, 10.80),
+            'axes.labelsize': 'x-large',
+            'axes.titlesize':'x-large',
+            'xtick.labelsize':'x-large',
+            'ytick.labelsize':'x-large'}
+    pylab.rcParams.update(params)
     if global_config["tracking"]:
         if global_config.get('execute_evaluation'):
             model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
