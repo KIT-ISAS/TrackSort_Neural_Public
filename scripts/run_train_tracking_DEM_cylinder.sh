@@ -29,7 +29,7 @@ cd ..
   --rotate_columns True \
   --normalization_constant 1.0 \
   --additive_noise_stddev 1.12e-4 \
-  --num_train_epochs 3000 \
+  --num_train_epochs 700 \
   --batch_size 64 \
   --evaluate_every_n_epochs 20 \
   --result_path results/DEM_cylinder/ \
