@@ -250,12 +250,12 @@ def train_step_generator(model, optimizer, loss_object, nan_value=0):
     mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
     
     @tf.function
-    def train_step(inp, target):
+    def train_step(inp, target, training=True):
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
-            predictions = model(inp) # TODO: MUSS HIER NICHT , training=True STEHEN?
+            predictions = model(inp, training=training)
 
-            mask = K.all(K.equal(inp, mask_value), axis=-1)
+            mask = K.all(K.equal(target, mask_value), axis=-1)
             mask = 1 - K.cast(mask, tf.float64)
             mask = K.cast(mask, tf.float64)
 
@@ -265,10 +265,9 @@ def train_step_generator(model, optimizer, loss_object, nan_value=0):
             # take average w.r.t. the number of unmasked entries
             #mse = K.sum(mse) / K.sum(mask)
             #mae = K.sum(mae) / K.sum(mask)
-
-        grads = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
+        if training:
+            grads = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
         return predictions
 
     return train_step
@@ -482,7 +481,7 @@ class RNN_Model(Expert):
         """Predict a batch of input data."""
         if self.clear_state:
             self.rnn_model.reset_states()
-        return self.rnn_model(inp)
+        return self.rnn_model(inp, training=False)
 
     def save_model(self):
         """Save the model to its model path."""
