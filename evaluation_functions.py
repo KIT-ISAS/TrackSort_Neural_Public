@@ -72,21 +72,29 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         is_mlp_mask (Boolean):  Is this evaluation with mlp masks or standard?
         no_show (Boolean):      Do not show the figures. The figures will still be saved.
     """
-    assert(len(expert_names) == predictions.shape[0])
+    n_experts = predictions.shape[0]
+    assert(len(expert_names) == n_experts)
     # Get mse and mae values
     mse_values, mae_values = calculate_mse_mae(target, predictions, masks)
     # Create box values for every expert
     mse_box_values = {}; mae_box_values = {}
     mse_boxplot_inputs = []
     mae_boxplot_inputs = []
-    for i in range(mse_values.shape[0]):
+    mse_boxplot_parameters = np.zeros([n_experts, 5]); mae_boxplot_parameters = np.zeros([n_experts, 5])
+    for i in range(n_experts):
         compressed_mse_values = normalization_constant**2 * np.ma.reshape(mse_values[i],(mse_values.shape[1]*mse_values.shape[2])).compressed()
-        mse_box_values[expert_names[i]] = get_box_values(compressed_mse_values)
-        compressed_mae_values = normalization_constant * np.ma.reshape(mae_values[i],(mae_values.shape[1]*mae_values.shape[2])).compressed()
-        mae_box_values[expert_names[i]] = get_box_values(compressed_mae_values)
         mse_boxplot_inputs.append(compressed_mse_values)
+        mse_boxplot_parameters[i] = np.array(get_box_values(compressed_mse_values))
+        compressed_mae_values = normalization_constant * np.ma.reshape(mae_values[i],(mae_values.shape[1]*mae_values.shape[2])).compressed()
         mae_boxplot_inputs.append(compressed_mae_values)
+        mae_boxplot_parameters[i] = np.array(get_box_values(compressed_mae_values))
 
+    mse_box_values["labels"]=expert_names; mae_box_values["labels"]=expert_names
+    mse_box_values["med"]=mse_boxplot_parameters[:,0]; mae_box_values["med"]=mae_boxplot_parameters[:,0]
+    mse_box_values["uq"]=mse_boxplot_parameters[:,1]; mae_box_values["uq"]=mae_boxplot_parameters[:,1]
+    mse_box_values["lq"]=mse_boxplot_parameters[:,2]; mae_box_values["lq"]=mae_boxplot_parameters[:,2]
+    mse_box_values["uw"]=mse_boxplot_parameters[:,3]; mae_box_values["uw"]=mae_boxplot_parameters[:,3]
+    mse_box_values["lw"]=mse_boxplot_parameters[:,4]; mae_box_values["lw"]=mae_boxplot_parameters[:,4]
     # Show plot
     plt.figure(figsize=(19.20,10.80), dpi=100)
     plt.boxplot(mse_boxplot_inputs, sym='', labels=expert_names)
@@ -105,7 +113,7 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
         plt.ylim([0, 5])
     else:
         mm_mae_boxplot_inputs = np.array(mae_boxplot_inputs)*1000
-        plt.boxplot(mm_mae_boxplot_inputs, sym='', labels=expert_names)
+        plt.boxplot(mm_mae_boxplot_inputs.T, sym='', labels=expert_names)
         plt.ylabel("MAE [mm]")
         plt.ylim([0, 1])
     plt.grid(b=True, which='major', axis='y', linestyle='--')
@@ -358,8 +366,8 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
         median_error_map = np.zeros([rastering[1],rastering[0]])
         count_error_map = np.zeros([rastering[1],rastering[0]])
         # Get raster field for every prediction
-        idx = np.ma.floor(masked_prediction[:,:,0] * rastering[0])
-        idy = np.ma.floor(masked_prediction[:,:,1] * rastering[1])
+        idx = np.ma.floor(masked_target[:,:,0] * rastering[0])
+        idy = np.ma.floor(masked_target[:,:,1] * rastering[1])
         # Place each error to its raster field
         for x in range(rastering[0]):
             for y in range(rastering[1]):

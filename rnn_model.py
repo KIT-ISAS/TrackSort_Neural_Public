@@ -378,6 +378,8 @@ class RNN_Model(Expert):
     # expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
     def predict(self, current_input, state):
         current_input = np.expand_dims(current_input, axis=1)
+        # TEST BUGFIX
+        current_input[current_input==0]=-1
         set_state(self.rnn_model, state)
         prediction = self.rnn_model(current_input)
 

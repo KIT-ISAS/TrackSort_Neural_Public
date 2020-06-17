@@ -7,7 +7,7 @@
       "is_separator": true,
       "options": {
         "base_learning_rate": 0.005,
-        "decay_steps":200,
+        "decay_steps":500,
         "decay_rate":0.96,
         "model_structure": {
           "layers": [16, 16, 16, 16],
@@ -523,9 +523,9 @@
     "model_path": "models/DEM_cylinder/me_gating_sep.h5",
     "options": {
       "batch_size": 128,
-      "n_epochs": 1000,
+      "n_epochs": 3000,
       "base_learning_rate": 0.005,
-      "decay_steps": 1000,
+      "decay_steps": 500,
       "decay_rate": 0.96,
       "evaluate_every_n_epochs": 20,
       "model_structure": {

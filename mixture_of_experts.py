@@ -43,10 +43,10 @@ class MixtureOfExperts(GatingNetwork):
         self.model_structure = network_options.get("model_structure")
         # Training parameters
         self.base_learning_rate = 0.005 if not "base_learning_rate" in network_options else network_options.get("base_learning_rate")
+        self.decay_steps = 200 if not "decay_steps" in network_options else network_options.get("decay_steps")
+        self.decay_rate = 0.96 if not "decay_rate" in network_options else network_options.get("decay_rate")
         self.batch_size = 1000 if not "batch_size" in network_options else network_options.get("batch_size")
         self.n_epochs = 1000 if not "n_epochs" in network_options else network_options.get("n_epochs")
-        self.lr_decay_after_epochs = 100 if not "lr_decay_after_epochs" in network_options else network_options.get("lr_decay_after_epochs")
-        self.lr_decay_factor = 0.5 if not "lr_decay_factor" in network_options else network_options.get("lr_decay_factor")
         self.evaluate_every_n_epochs = 20 if not "evaluate_every_n_epochs" in network_options else network_options.get("evaluate_every_n_epochs")
 
         # Set the input dimension based on the features
@@ -100,7 +100,13 @@ class MixtureOfExperts(GatingNetwork):
         """
         ## Create Model
         self.create_model()
-        optimizer = tf.keras.optimizers.Adam(learning_rate=self.base_learning_rate)
+        # Define Learning rate reduction
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            self.base_learning_rate,
+            decay_steps=self.decay_steps,
+            decay_rate=self.decay_rate,
+            staircase=True)
+        optimizer = tf.keras.optimizers.Adam(lr_schedule)
         train_step_fn = train_step_generator(self.mlp_model, optimizer)
 
         ## Create Dataset
@@ -136,12 +142,6 @@ class MixtureOfExperts(GatingNetwork):
 
         ## Training
         for epoch in range(self.n_epochs):
-            # Learning rate decay
-            if (epoch + 1) % self.lr_decay_after_epochs == 0:
-                old_lr = K.get_value(optimizer.lr)
-                new_lr = old_lr * self.lr_decay_factor
-                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-                K.set_value(optimizer.lr, new_lr)
             # Iterate over the batches of the train dataset.
             train_iter = iter(train_dataset)
             for ((train_inputs, train_expert_predictions, train_mask), train_targets) in train_iter:
