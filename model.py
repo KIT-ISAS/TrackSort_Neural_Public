@@ -535,26 +535,27 @@ class Model(object):
     def _calibrate(self):
         dataset_train, dataset_test = self.data_source.get_tf_data_sets_seq2seq_data(normalized=True, seed=42)
         data = self._get_evaluation_data(dataset_test)
+        self.calibration_data = data
         N = data['time_step'].shape[0]
 
-        expected_confs = []
-        cdf = []
+        eps = 0.000000001
+        lower = 1.0 - eps*100.
+        expected_confs = np.concatenate([np.arange(0, lower, 0.01), np.arange(lower, 1, eps)])
         counter = []
+        empirical_confs = []
 
-        for expected_confidence in np.arange(0.0, 0.9999, 0.01):
-            expected_1_sigma_distance = chi2.ppf(expected_confidence, df=2)
-
-            count_falls_into = np.count_nonzero(data['standardized_l2'] <= expected_1_sigma_distance)
+        for expected_confidence in expected_confs:
+            expected_critical_value = chi2.ppf(expected_confidence, df=2)
+            count_falls_into = np.count_nonzero(data['squared_mahalanobis'] <= expected_critical_value)
             counter.append(count_falls_into)
-            proportion = count_falls_into / N
-            cdf.append(proportion)
-            expected_confs.append(expected_confidence)
+            empirical_confs.append(count_falls_into / N)
 
         expected_confs = np.array(expected_confs)
-        cdf = np.array(cdf)
+        empirical_confs = np.array(empirical_confs)
+        counter = np.array(counter)
 
         x = expected_confs
-        y = cdf
+        y = empirical_confs
         n = x.shape[0]
 
         ir = IsotonicRegression()
@@ -566,14 +567,12 @@ class Model(object):
         ax.hist(expected_confs, weights=counter, density=False, bins=50, histtype='stepfilled', alpha=0.2)
         ax.set_ylabel("# Predictions in conf. interval")
 
-        ax1.scatter(expected_confs, cdf, c='blue')
+        ax1.scatter(expected_confs, empirical_confs, c='blue')
         ax1.plot(expected_confs, y_pred, c='black')
         plt.title("Calibration Plot")
 
-        ax1.set_xlabel("Expected confidence level")
+        plt.xlabel("Expected confidence level")
         ax1.set_ylabel("Empirical confidence level")
-
-
 
         plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration.pdf'))
         plt.clf()
@@ -584,8 +583,8 @@ class Model(object):
         self._iso_regression_fn.fit_transform(y, x)
         x_pred = self._iso_regression_fn.predict(y)
 
-        plt.scatter(cdf, expected_confs, c='blue')
-        plt.plot(cdf, x_pred, c='black')
+        plt.scatter(empirical_confs, expected_confs, c='blue')
+        plt.plot(empirical_confs, x_pred, c='black')
 
         plt.title("Flipped Calibration plot (standardized euclidean distance)")
         plt.xlabel("Observed confidence level")
@@ -1429,6 +1428,7 @@ class Model(object):
         data['target'] = []
         data['prediction'] = []
         data['prediction_variance'] = []
+        data['squared_mahalanobis'] = []
         data['variance_area'] = []
         data['standardized_l2'] = []
         data['l2'] = []
@@ -1493,6 +1493,9 @@ class Model(object):
                     data['standardized_l2'] += [np.sqrt(np.sum(
                         ((data['target'][-1] - data['prediction'][-1]) ** 2) / data['prediction_variance'][
                             -1]))]
+                    data['squared_mahalanobis'] += [np.sum(
+                        ((data['target'][-1] - data['prediction'][-1]) ** 2) / data['prediction_variance'][
+                            -1])]
                     data['absolute_error'] += [np.abs(data['prediction'][-1] - data['target'][-1])]
                     data['l2'] += [np.sqrt(np.sum(
                         (data['prediction'][-1] - data['target'][-1])**2
@@ -1511,6 +1514,7 @@ class Model(object):
         data['variance_area'] = np.array(data['variance_area'])
         data['measurement'] = np.array(data['measurement'])
         data['standardized_l2'] = np.array(data['standardized_l2'])
+        data['squared_mahalanobis'] = np.array(data['squared_mahalanobis'])
         data['l2'] = np.array(data['l2'])
         data['absolute_error'] = np.array(data['absolute_error'])
         data['time_step'] = np.array(data['time_step'])
@@ -1528,59 +1532,31 @@ class Model(object):
         data = self._get_evaluation_data(dataset)
         N = data['time_step'].shape[0]
 
-        def sigma_to_conf(sigmas):
-            return erf(sigmas/np.sqrt(2))
+        # Calibration Curve
+        expected_confs = np.arange(0, 1, 0.001)
+        empirical_confs = []
+        counter = []
 
-        # evalute data
-        stddevs = []
-        cdf = []
+        for expected_confidence in expected_confs:
+            # critical value
+            expected_critical_value = chi2.ppf(expected_confidence, df=2)
+            # which squared mahalanobis distance is <= than critical value
+            count_falls_into = np.count_nonzero(data['squared_mahalanobis'] <= expected_critical_value)
+            counter.append(count_falls_into)
+            empirical_confs.append(count_falls_into / N)
 
-        for stddev in np.arange(0.0, 10.0, 0.01):
-            count_falls_into = np.count_nonzero(data['standardized_l2'] <= stddev)
-            proportion = count_falls_into / N
-            cdf.append(proportion)
-            stddevs.append(stddev)
+        empirical_confs = np.array(empirical_confs)
 
-        stddevs = sigma_to_conf(np.array(stddevs))
-        cdf = np.array(cdf)
+        fig = plt.figure()
+        plt.scatter(expected_confs, empirical_confs)
+        plt.plot(expected_confs, empirical_confs)
+        # plt.plot((0, 1), (0, 1), color="black", linestyle='dashed')
 
-        plt.scatter(stddevs, cdf)
-        plt.title("Calibration plot (standardized euclidean distance)")
+        plt.title("Calibration plot")
         plt.xlabel("Expected confidence level")
         plt.ylabel("Observed confidence level")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'CDF_{}.pdf'.format(epoch)))
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration_{}.pdf'.format(epoch)))
         plt.clf()
-
-
-
-        #
-        # stddevs = []
-        # cdf = []
-        #
-        # for stddev in np.arange(0.0, 10.0, 0.01):
-        #     mask = np.sqrt(data['prediction_variance'][:, 0]) < stddev
-        #     mask_N = np.count_nonzero(mask)
-        #     if mask_N == 0:
-        #         continue
-        #
-        #     # vari_selected = data['prediction_variance'][:, 0][mask]
-        #     pred_selected = data['prediction'][:, 0][mask]
-        #     meas_selected = data['measurement'][:, 0][mask]
-        #
-        #     delta_x = np.abs(pred_selected - meas_selected)
-        #     count_in = np.count_nonzero(delta_x <= stddev)
-        #     proportion = count_in / mask_N
-        #     cdf.append(proportion)
-        #     stddevs.append(stddev)
-        #
-        # stddevs = sigma_to_conf(np.array(stddevs))
-        # cdf = np.array(cdf)
-        #
-        # plt.scatter(stddevs, cdf)
-        # plt.title("CDF2")
-        # plt.savefig(os.path.join(self.global_config['diagrams_path'],
-        #                                      'CDF2_{}.png'.format(epoch)))
-        # plt.clf()
 
     def plot_correlation(self, dataset, epoch=0, data=None):
         if data is None:

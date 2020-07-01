@@ -164,7 +164,7 @@ ToDo: Explain --run_hyperparameter_search
 Before implementing a functionality in the main code, we have tested and experimented in jupyter
 notebooks. 
 
-The `Notebook/`-folder contains short code samples to_
+The `Notebook/`-folder contains short code samples to
 
 - train a NextStep-RNN
 - Use the ModelManager
@@ -182,6 +182,12 @@ Follow these instructions to run notebooks on the gpu pc at the institute.
 2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
 3. `docker run -it -p 8888:8888 -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
 4. (ssh tunneling on remote machine: `ssh -L 8888:127.0.0.1:8888 proprak7@i81-gpu-server`)
+
+Make the venv available as a kernel:
+
+1. source the venv
+2. `python3 -m pip install ipykernel` 
+3. `python3 -m ipykernel install --name "local-venv" --user`
 
 ## Data store
 

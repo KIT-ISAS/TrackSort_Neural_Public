@@ -8,6 +8,7 @@ import os
 import logging
 
 from matplotlib.patches import Ellipse
+from scipy.stats import chi2
 
 from track_manager import TrackManager
 from data_manager import FakeDataSet, CsvDataSet
@@ -65,33 +66,27 @@ class DataAssociation(object):
         # how many stddevs does the network output? -> this is a constant
         predicted_confidence_level_sigma = 1.0
         # default recalibration:  1 sigma = 1 sigma
-        sigma_new = 1.0
+        r = 1.0
 
         if self.global_config['calibrate']:
             # calibrate the distance threshold
             if self.global_config['distance_confidence'] > 0:
-                # Use confidence interval
-                distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
+                # Recalibrate distance confidence
+                calibrated_confidence = self.track_manager.model_manager.model._apply_isotonic_regression(
                     [self.global_config['distance_confidence']])[0]
+
                 logging.info("Confidence interval recalibrated: {} -> {}".format(
-                    self.global_config['distance_confidence'], distance_conf_sigma))
-                distance_threshold = self.track_manager.model_manager.model.conf_to_sigma(
-                    distance_conf_sigma)
+                    self.global_config['distance_confidence'], calibrated_confidence))
 
-            logging.info("Distance threshold: {}".format(distance_threshold))
+                critical_value_new = chi2.ppf(calibrated_confidence, df=2)
+                distance_threshold = critical_value_new
+                logging.info("Distance threshold: {}".format(distance_threshold))
 
-            # calculate the calibration constant: sigma_new
-            if self.global_config['distance_confidence'] > 0:
-                # use confidence interval
-                distance_conf_sigma = self.track_manager.model_manager.model._apply_isotonic_regression(
-                    [self.global_config['distance_confidence']])[0]
-                sigma_new = self.track_manager.model_manager.model.conf_to_sigma(
-                    distance_conf_sigma, sigma=1.0)
+                # calculate the calibration factor r
+                critical_value_old = chi2.ppf(self.global_config['distance_confidence'], df=2)
+                r = critical_value_new / critical_value_old
+                logging.info("Re-Calibration factor r: {}".format(r))
 
-        #
-        logging.info("Re-Calibration constant (sigma_new): {}".format(sigma_new))
-
-        #
         for time_step in range(self.global_config['num_timesteps']):
             logging.info('step {} / {}'.format(time_step, self.global_config['num_timesteps']))
             self.global_config['current_time_step'] = time_step
@@ -105,11 +100,9 @@ class DataAssociation(object):
 
                 for key in variances.keys():
                     if sum(variances[key]) == 0.0:
-                        logging.error("Variance zero error. Adding 0.001 to avoid division by zero.")
-                        variances[key] += 0.001
-                    stddev = np.sqrt(variances[key])
-                    stddev = (stddev/predicted_confidence_level_sigma) * sigma_new
-                    variances[key] = stddev**2.0
+                        logging.error("Variance zero error. Adding 0.00001 to avoid division by zero.")
+                        variances[key] += 0.00001
+                    variances[key] *= r
 
             prediction_ids = list(predictions.keys())
             prediction_values = list(predictions.values())
@@ -188,16 +181,15 @@ class DataAssociation(object):
 
             # Block matrix: A
             #  ... distance between predictions and measurements
-            #      Either L2 or standardized Euclidean distance
             for prediction_nr, prediction in enumerate(prediction_values):
                 for measurement_nr, measurement in enumerate(measurements):
                     if variances is not None:
-                        # standardized Euclidean distance
+                        # Squared Mahalanobis distance
                         distance_matrix[measurement_nr][prediction_nr] = \
-                            np.sqrt(np.sum(((measurement-prediction)**2) / variances[prediction_ids[prediction_nr]]))
+                            np.sum(((measurement-prediction)**2) / variances[prediction_ids[prediction_nr]])
                     else:
-                        # euclidean distance (=L2 norm)
-                        distance_matrix[measurement_nr][prediction_nr] = np.linalg.norm(measurement - prediction)
+                        # squared euclidean distance (=L2 norm)
+                        distance_matrix[measurement_nr][prediction_nr] = np.linalg.norm(measurement - prediction)**2.0
 
             # Block matrix: B
             # ... measurements to their artificial predictions
@@ -289,7 +281,8 @@ class DataAssociation(object):
                             plt.scatter([prediction[0]], [prediction[1]], c='black', label='track end')
                     #
                     if self.global_config['visualize']:
-                        circle = Ellipse(prediction, distance_threshold*2, distance_threshold*2, color='blue', fill=False, label='artificial track')
+                        circle = Ellipse(prediction, distance_threshold*2, distance_threshold*2,
+                                         color='blue', fill=False, label='artificial track')
                         plt.gcf().gca().add_artist(circle)
 
                     # only for visualization purposes
@@ -308,7 +301,8 @@ class DataAssociation(object):
                     old_measurements[prediction_id] = (measurement, True)
                     #
                     if self.global_config['visualize']:
-                        circle = Ellipse(measurement, distance_threshold*2, distance_threshold*2, color='red', fill=False, label='artificial track')
+                        circle = Ellipse(measurement, distance_threshold*2, distance_threshold*2,
+                                         color='red', fill=False, label='artificial track')
                         plt.gcf().gca().add_artist(circle)
                     #
                     pseudo_prediction = np.array(
