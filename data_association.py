@@ -86,6 +86,10 @@ class DataAssociation(object):
                 critical_value_old = chi2.ppf(self.global_config['distance_confidence'], df=2)
                 r = critical_value_new / critical_value_old
                 logging.info("Re-Calibration factor r: {}".format(r))
+        elif self.global_config['distance_confidence'] > 0:
+            r = 1.
+            distance_threshold = chi2.ppf(self.global_config['distance_confidence'], df=2)
+            logging.info("Distance threshold: {}".format(distance_threshold))
 
         for time_step in range(self.global_config['num_timesteps']):
             logging.info('step {} / {}'.format(time_step, self.global_config['num_timesteps']))
