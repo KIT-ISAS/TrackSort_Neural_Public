@@ -3,8 +3,8 @@ logs
 Pfeffer
 images
 visualizations
-models
-data
+# models
+# data
 .ipynb_checkpoints
 training_checkpoints
 Pfeffer.zip
