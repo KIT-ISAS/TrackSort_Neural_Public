@@ -15,7 +15,7 @@
                     "--virtual_belt_edge_x_position", "800",
                     "--virtual_nozzle_array_x_position", "1550",
                     "--is_loaded", "True",
-                    "--is_loaded_gating_network", "False",
+                    "--is_loaded_gating_network", "True",
                     "--config_path", "configs/pepper_and_cylinder/train_pepper_and_cylinder_sep_gating_me.json",
                     "--dataset_dir=data/pepper_and_cylinder/*_trackHistory_NothingDeleted.csv",
                     "--result_path", "results/pepper_and_cylinder/separation_prediction_me/",
@@ -353,17 +353,17 @@
                     "--execute_multi_target_tracking", "False"]
         },
         {
-            "name": "Test pepper SMAPE weighting",
+            "name": "Test pepper SE weighting",
             "type": "python",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "args": ["--is_loaded", "True",
                     "--is_loaded_gating_network", "True",
-                    "--config_path", "configs/pepper_smape_weighting.json",
+                    "--config_path", "configs/pepper/pepper_se_weighting.json",
                     "--dataset_dir=data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
-                    "--result_path", "results/pepper_all/smape_gating/",
-                    "--evaluate_mlp_mask", "False",
+                    "--result_path", "results/pepper_all/se_gating/",
+                    "--evaluate_mlp_mask", "True",
                     "--execute_evaluation", "True",
                     "--execute_multi_target_tracking", "False"]
         },
@@ -393,7 +393,7 @@
                     "--config_path", "configs/pepper/pepper_me_pos_id_weighting.json",
                     "--dataset_dir=data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv",
                     "--result_path", "results/pepper_all/mixture_of_experts_pos_id/",
-                    "--evaluate_mlp_mask", "False",
+                    "--evaluate_mlp_mask", "True",
                     "--execute_evaluation", "True",
                     "--execute_multi_target_tracking", "False"]
         },
@@ -460,7 +460,7 @@
                     "--batch_size", "64",
                     "--evaluate_every_n_epochs", "20",
                     "--result_path", "results/DEM_cylinder/mixture_of_experts_pos_id/",
-                    "--evaluate_mlp_mask", "False",
+                    "--evaluate_mlp_mask", "True",
                     "--execute_evaluation", "False",
                     "--execute_multi_target_tracking", "True"]
         },

@@ -386,16 +386,18 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
             plt.pcolor(median_error_map*1000, cmap="Reds", vmin=0, vmax=0.5)
         plt.colorbar()
         x_ticks = np.linspace(0, rastering[0], num=5, endpoint=True)
-        x_labels = np.round(x_ticks/rastering[0] * normalization_constant, 2)
+        x_labels = np.round(x_ticks/rastering[0] * normalization_constant, 2)+1
         if normalization_constant >= 100:
             x_labels = np.floor(x_labels)
         plt.xticks(ticks=x_ticks, labels=x_labels)
-        y_ticks = np.linspace(1, rastering[1], num=5, endpoint=True)
+        plt.xlabel("x")
+        y_ticks = np.linspace(0, rastering[1], num=5, endpoint=True)
         y_ticks = y_ticks[::-1]
-        y_labels = np.round(y_ticks/rastering[1] * normalization_constant, 2)
+        y_labels = np.round(y_ticks/rastering[1] * normalization_constant, 2)+1
         if normalization_constant >= 100:
             y_labels = np.floor(y_labels) 
         plt.yticks(ticks=y_ticks, labels=y_labels)
+        plt.ylabel("y")
         title = "Median MAE mapped over belt for expert " + expert_names[i]
         plt.title(title)
         plt.savefig(result_dir + "median_mae_map_{}.pdf".format(expert_names[i].replace(" ", "_")))
@@ -492,7 +494,6 @@ def calculate_mse_mae(target, predictions, masks):
     mae_list = []
     # Duplicate mask to be valid for x_target and y_target and invert mask to fit numpy mask format
     if len(predictions.shape) >= 3: 
-        # TODO: Validate this changed code on single target tracking
         masks = np.repeat(masks[..., np.newaxis], predictions.shape[-1], axis=-1)
     masks = 1-masks
     # For each expert

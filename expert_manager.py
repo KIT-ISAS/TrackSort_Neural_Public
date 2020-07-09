@@ -91,6 +91,7 @@ class Expert_Manager(object):
             if expert.get("model_path") is not None:
                 model_path = expert.get("model_path") 
             else:
+                model_path = "models/fault_model.pkl"
                 logging.error("Model path of expert {} does not exist.".format(expert_name))
             if expert_type == 'RNN':
                 model = RNN_Model(not is_separation, expert_name, model_path, expert.get("options"))
