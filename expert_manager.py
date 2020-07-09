@@ -37,7 +37,9 @@ class Expert_Manager(object):
         n_experts (int):        The number of experts in the expert bank.
     """
     
-    def __init__(self, expert_config, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features=10, n_mlp_features_separation_prediction = 7, x_pred_to = 1550, time_normalization = 22.):
+    def __init__(self, expert_config, is_loaded, model_path="", is_uncertainty_prediction=False, 
+                batch_size=64, num_time_steps=0, n_mlp_features=10, n_mlp_features_separation_prediction = 7, 
+                x_pred_to = 1550, time_normalization = 22.):
         """Initialize an expert manager.
 
         Creates the expert models.
@@ -47,6 +49,7 @@ class Expert_Manager(object):
             expert_config (dict): The configuration dictionary of all experts
             is_loaded (Boolean):  True for loading models, False for creating new models
             model_path (String):  The path of the models if is_loaded is True
+            is_uncertainty_prediction (Boolean):    Also predict the uncertainty of the prediction
             batch_size (int):     The batch size of the data
             num_time_steps (int): The number of timesteps in the longest track
             n_mlp_features (int): The numper of features for MLP tracking
@@ -55,6 +58,7 @@ class Expert_Manager(object):
             time_normalization (double): Time normalization constant (only needed for kf separation prediction)
         """
         self.expert_config = expert_config
+        self.is_uncertainty_prediction = is_uncertainty_prediction
         self.batch_size = batch_size
         # List of list of states -> Each model has its own list of current states (= particles)
         self.current_states = []
@@ -94,13 +98,15 @@ class Expert_Manager(object):
                 model_path = "models/fault_model.pkl"
                 logging.error("Model path of expert {} does not exist.".format(expert_name))
             if expert_type == 'RNN':
-                model = RNN_Model(not is_separation, expert_name, model_path, expert.get("options"))
+                # TODO: implement uncertainty prediction
+                model = RNN_Model(not is_separation, expert_name, model_path, self.is_uncertainty_prediction, expert.get("options"))
                 if is_loaded:
                     model.load_model()
                 else:
                     model.create_model(batch_size=batch_size, 
                                        num_time_steps=num_time_steps)
             elif expert_type == 'KF':
+                # TODO: implement uncertainty prediction
                 # Create Kalman filter model
                 sub_type = expert.get("sub_type")
                 if sub_type == 'CV':
@@ -118,7 +124,7 @@ class Expert_Manager(object):
                 if is_loaded:
                     model.load_model()  
             elif expert_type=='MLP':
-                model = MLP_Model(expert_name, model_path, not is_separation, expert.get("options"))
+                model = MLP_Model(expert_name, model_path, not is_separation, self.is_uncertainty_prediction, expert.get("options"))
                 if is_loaded:
                     model.load_model()
                 else:
@@ -178,8 +184,6 @@ class Expert_Manager(object):
                     seq2seq_tracking_mask = None, seq2seq_separation_mask = None,
                     mlp_inp = None, mlp_target = None, mlp_mask=None):
         """Train one batch for all experts in separation prediction.
-
-        TODO: Consider merging this funftion with train_batch
 
         The training information of each model should be provided in the expert configuration.
         Kalman filters and RNNs need a different data format than MLPs.

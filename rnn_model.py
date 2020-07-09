@@ -106,7 +106,7 @@ def rnn_model_factory(
     return model, hash_
 
 
-def train_step_separation_prediction_generator(model, optimizer, nan_value=0):
+def train_step_separation_prediction_generator(model, optimizer, is_uncertainty_prediction = False, nan_value=0):
     """Generate the train step function for the separation prediction.
 
     Args:
@@ -121,7 +121,10 @@ def train_step_separation_prediction_generator(model, optimizer, nan_value=0):
             target = K.cast(target, tf.float64)
             predictions = model(inp, training=train)
             tracking_loss = get_tracking_loss(predictions, target, tracking_mask)
-            spatial_loss, temporal_loss = get_separation_loss(predictions, target, separation_mask)
+            if is_uncertainty_prediction:
+                spatial_loss, temporal_loss = get_separation_loss_uncertainty(predictions, target, separation_mask)
+            else:
+                spatial_loss, temporal_loss = get_separation_loss(predictions, target, separation_mask)
             spatial_mae, temporal_mae = get_separation_mae(predictions, target, separation_mask)
             total_loss = tracking_loss + spatial_loss + temporal_loss
 
@@ -196,6 +199,29 @@ def get_separation_loss(prediction, target, separation_mask):
      # Temporal loss
     temporal_track_loss = tf.pow(target[:, :, 3]-prediction[:, :, 3], 2) * separation_mask
     temporal_loss = tf.reduce_sum(temporal_track_loss)/tf.reduce_sum(separation_mask)
+    return spatial_loss, temporal_loss
+
+def get_separation_loss_uncertainty(prediction, target, separation_mask):
+    """Calculate the spatial and temporal loss in the separation prediction training.
+
+    temporal_loss = MSE([y_nozzle] prediction<->target)
+    spatial_loss = MSE([dt_nozzle] prediction<->target)
+
+    Args:
+        prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle, s_y, s_t], shape: [batch_size, track_length, 6]
+                                s_y = log(sigma_y^2)
+        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
+        separation_mask from create_separation_masks(...), shape: [batch_size, track_length]
+
+    Returns:
+        spatial_loss, temporal_loss
+    """
+     # Spatial loss
+    spatial_loss = tf.reduce_mean(tf.boolean_mask(0.5 * tf.exp(-prediction[:, :, 4]) * tf.pow(target[:, :, 2]-prediction[:, :, 2], 2) + \
+                                  0.5 * prediction[:, :, 4], separation_mask))
+     # Temporal loss
+    temporal_loss = tf.reduce_mean(tf.boolean_mask(0.5 * tf.exp(-prediction[:, :, 5]) * tf.pow(target[:, :, 3]-prediction[:, :, 3], 2) + \
+                                  0.5 * prediction[:, :, 5], separation_mask))
     return spatial_loss, temporal_loss
 
 def get_separation_mae(prediction, target, separation_mask):
@@ -361,13 +387,17 @@ class RNN_Model(Expert):
 
     __metaclass__ = Expert
 
-    def __init__(self, is_next_step, name, model_path, rnn_config = {}):
+    def __init__(self, is_next_step, name, model_path, is_uncertainty_prediction = False, rnn_config = {}):
         self.model_structure = rnn_config.get("model_structure")
         self.clear_state = rnn_config.get("clear_state")
         self.base_learning_rate = rnn_config.get("base_learning_rate") if "base_learning_rate" in rnn_config else 0.005
         self.decay_steps = rnn_config.get("decay_steps") if "decay_steps" in rnn_config else 200
         self.decay_rate = rnn_config.get("decay_rate") if "decay_rate" in rnn_config else 0.96
+        self.is_uncertainty_prediction = is_uncertainty_prediction
         self._label_dim = 2 if is_next_step else 4
+        if is_uncertainty_prediction and not is_next_step:
+            # TODO: Change this when handling tracking again
+            self._label_dim += 2
         self.is_next_step = is_next_step
         super().__init__(Expert_Type.RNN, name, model_path)
 
@@ -428,9 +458,12 @@ class RNN_Model(Expert):
         self.optimizer = tf.keras.optimizers.Adam(lr_schedule)
         self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
+            # TODO: Implement uncertainty prediction
             self.train_step_fn = train_step_generator(self.rnn_model, self.optimizer, self.loss_object)
         else:
-            self.train_step_fn = train_step_separation_prediction_generator(model = self.rnn_model, optimizer = self.optimizer)
+            self.train_step_fn = train_step_separation_prediction_generator(model = self.rnn_model, 
+                                                                            optimizer = self.optimizer, 
+                                                                            is_uncertainty_prediction=self.is_uncertainty_prediction)
         self.rnn_model.reset_states()
 
     def train_batch(self, inp, target):

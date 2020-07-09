@@ -7,6 +7,8 @@ TODO:
 import logging
 import os
 
+from scipy.stats import chi2
+
 import numpy as np
 import matplotlib
 import pandas as pd
@@ -602,3 +604,52 @@ def find_worst_predictions(target, predictions, mask_value):
         plt.show()
         stop=0
         #mse.append(mse_expert)
+
+def create_chi_squared_evaluation(target, predictions, masks, expert_names, result_dir, 
+                              normalization_constant = 1, time_normalization_constant = 22, no_show = False):
+    """Create an evaluation of the predicted error variances.
+    Args:
+        target (np.array):      Target values
+        predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape (n_experts=1, n_tracks, 4)
+        masks (np.array):       Masks for every expert
+        expert_names (list):    Names (String) of each expert
+        result_dir (String):    Directory to save the created plot data to
+        normalization_constant (double): Value for denormalization the y_nozzle value
+        time_normalization_constant (double): Value for denormalization the dt_nozzle value
+        no_show (Boolean):      Do not show the figures. The figures will still be saved.
+    """
+    # Quantile values
+    quantiles = np.arange(0,1,0.01)
+    # Dictionary for output 
+    cdf_results = {}
+    cdf_results["quantiles"] = quantiles
+    for expert in range(predictions.shape[0]):
+        # (y-y_hat)^2
+        error = (target[:,0:2]-predictions[expert,:,0:2])**2
+        # (y-y_hat)^2/sigma^2
+        chi2_sep = error/np.exp(predictions[expert,:,2:4])
+        chi2_values = np.sum(chi2_sep,axis=1)
+        chi2_values = chi2_values[np.where(masks[expert])]
+        # Inverse cdf of chi2 distribution
+        chi2_quantiles = chi2.ppf(quantiles, 2)
+        # Get the cdf values of chi2_values
+        cdf_values = np.zeros(quantiles.shape)
+        for i in range(chi2_quantiles.shape[0]):
+            cdf_values[i] = np.sum(chi2_values<=chi2_quantiles[i])/chi2_values.shape[0]
+        cdf_results[expert_names[expert]] = cdf_values
+        # Plot
+        plt.figure(figsize=[19.20, 10.80], dpi=100)
+        plt.plot(quantiles, cdf_values)
+        plt.xlabel("Expected confidence level")
+        plt.ylabel("Empirical confidence level")
+        plt.savefig(result_dir + 'chi_squared_analysis_{}.pdf'.format(expert_names[expert]))  
+        if not no_show:
+            plt.show()
+        # Chi squared test
+        total_chi2 = np.sum(chi2_values)
+        N = 2*chi2_values.shape[0]
+        reduced_chi_squared = total_chi2/N
+        logging.info("Reduced chi squared value for expert {} = {}".format(expert_names[expert], reduced_chi_squared)) # Save data to csv via pandas
+    
+    cdf_results_df = pd.DataFrame(cdf_results)
+    cdf_results_df.to_csv(result_dir + 'chi_squared_analysis.csv', index=False)

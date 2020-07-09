@@ -37,7 +37,7 @@ class MLP_Model(Expert):
 
     __metaclass__ = Expert
 
-    def __init__(self, name, model_path, is_next_step=True, mlp_config = {}):
+    def __init__(self, name, model_path, is_next_step=True, is_uncertainty_prediction=False, mlp_config = {}):
         """Initialize the MLP model.
 
         Args:
@@ -47,13 +47,14 @@ class MLP_Model(Expert):
             mlp_config (dict):      Arguments for the mlp_model_factory
         """
         self.is_next_step = is_next_step
+        self.is_uncertainty_prediction = is_uncertainty_prediction
         self.model_structure = mlp_config.get("model_structure")
         self.base_learning_rate = mlp_config.get("base_learning_rate") if "base_learning_rate" in mlp_config else 0.005
         self.decay_steps = mlp_config.get("decay_steps") if "decay_steps" in mlp_config else 200
         self.decay_rate = mlp_config.get("decay_rate") if "decay_rate" in mlp_config else 0.96
         
-        if is_next_step:
-            self._label_dim = 2
+        if is_uncertainty_prediction:
+            self._label_dim = 4
         else:
             self._label_dim = 2
         super().__init__(Expert_Type.MLP, name, model_path)
@@ -99,9 +100,10 @@ class MLP_Model(Expert):
         self.optimizer = tf.keras.optimizers.Adam(lr_schedule)
         self.loss_object = tf.keras.losses.MeanSquaredError()
         if self.is_next_step:
+            # TODO: Implement uncertainty prediction
             self.train_step_fn = train_step_generator(self.mlp_model, self.optimizer, self.loss_object)
         else:
-            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object)
+            self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object, self.is_uncertainty_prediction)
 
     def train_batch(self, inp, target):
         """Train the MLP model on a batch of data.
@@ -268,18 +270,17 @@ def train_step_generator(model, optimizer, loss_object):
 
     return train_step
 
-def train_step_generator_separation_prediction(model, optimizer, loss_object):
+def train_step_generator_separation_prediction(model, optimizer, loss_object, is_uncertainty_prediction):
     """Build a function which returns a computational graph for tensorflow.
 
     This function can be called to train the given model with the given optimizer.
 
-    TODO: Maybe merge this with the tracking training function?
-
     Args:
-        model:      model according to estimator api
-        optimizer:  tf estimator
+        model: model according to estimator api
+        optimizer: tf estimator
+        is_uncertainty_prediction (Boolean): Also predict the uncertainty of the output.
 
-    Returns
+    Returns:
         function which can be called to train the given model with the given optimizer
     """
     stop=0
@@ -288,9 +289,12 @@ def train_step_generator_separation_prediction(model, optimizer, loss_object):
         with tf.GradientTape() as tape:
             #target = K.cast(target, tf.float64)
             predictions = model(inp, training=training, mask=mask)
-            spatial_loss, temporal_loss = get_separation_loss(predictions, target, mask)
+            if is_uncertainty_prediction:
+                spatial_loss, temporal_loss = get_separation_loss_uncertainty(predictions, target, mask)
+            else:
+                spatial_loss, temporal_loss = get_separation_loss(predictions, target, mask)
             spatial_mae, temporal_mae = get_separation_mae(predictions, target, mask)
-            loss = loss_object(tf.gather(target, [0,1], axis=1), predictions, sample_weight=mask)
+            loss = spatial_loss + temporal_loss + tf.add_n(model.losses)
         if training:
             grads = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -317,6 +321,25 @@ def get_separation_loss(prediction, target, mask):
     spatial_loss = tf.reduce_sum(tf.pow(target[:, 0]-prediction[:, 0], 2) * mask)/tf.reduce_sum(mask)
      # Temporal loss
     temporal_loss = tf.reduce_sum(tf.pow(target[:, 1]-prediction[:, 1], 2) * mask)/tf.reduce_sum(mask)
+    return spatial_loss, temporal_loss
+
+def get_separation_loss_uncertainty(prediction, target, mask):
+    """Calculate the spatial and temporal loss in the separation prediction training.
+    temporal_loss = MSE([y_nozzle] prediction<->target)
+    spatial_loss = MSE([dt_nozzle] prediction<->target)
+    Args:
+        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle, sigma_y_nozzle, sigma_dt_nozzle], shape: [batch_size, track_length, 4]
+        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        mask (tf.Tensor):       Indicates which instances are valid
+    Returns:
+        spatial_loss, temporal_loss
+    """
+    # Spatial loss
+    spatial_loss = tf.reduce_mean(tf.boolean_mask(0.5 * tf.exp(-prediction[:,2]) * tf.pow(target[:, 0]-prediction[:, 0], 2) + \
+                                  0.5 * prediction[:,2], mask))
+     # Temporal loss
+    temporal_loss = tf.reduce_mean(tf.boolean_mask(0.5 * tf.exp(-prediction[:,3]) * tf.pow(target[:, 1]-prediction[:, 1], 2) + \
+                                  0.5 * prediction[:,3], mask))
     return spatial_loss, temporal_loss
 
 def get_separation_mae(prediction, target, mask):

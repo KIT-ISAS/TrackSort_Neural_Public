@@ -92,6 +92,8 @@ parser.add_argument('--tracking', type=str2bool, default=True,
                     help='Perform tracking. This is the default mode.')
 parser.add_argument('--separation_prediction', type=str2bool, default=False,
                     help='Perform separation predcition')
+parser.add_argument('--uncertainty_prediction', type=str2bool, default=False,
+                    help='Perform uncertainty predcition')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
 parser.add_argument('--logfile', default='', help='Path to logfile. Leave this out to only log to console.')
 parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
@@ -122,6 +124,7 @@ args = parser.parse_args()
 global_config = {
     'separation_prediction': args.separation_prediction,
     'tracking': args.tracking,
+    'uncertainty_prediction': args.uncertainty_prediction,
     'clear_state': args.clear_state,
     'time_normalization_constant': args.time_normalization_constant,
     'virtual_belt_edge_x_position': args.virtual_belt_edge_x_position,
@@ -255,6 +258,7 @@ def run_global_config(global_config, experiment_series_names=''):
     # model_config, is_loaded, num_time_steps, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.
     model_manager = ModelManager(model_config = model_config,
                                  is_loaded = global_config.get("is_loaded"), 
+                                 is_uncertainty_prediction = global_config.get("uncertainty_prediction"),
                                  num_time_steps = data_source.longest_track, 
                                  n_mlp_features = global_config.get("mlp_input_dim"),
                                  n_mlp_features_separation_prediction = global_config.get("separation_mlp_input_dim"),

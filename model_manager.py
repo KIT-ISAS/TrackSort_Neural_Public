@@ -53,23 +53,28 @@ class ModelManager(object):
         current_free_entries (set): Set of all dead free entries in batches
     """
 
-    def __init__(self, model_config, is_loaded, num_time_steps, n_mlp_features = 5, n_mlp_features_separation_prediction = 7, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.):
+    def __init__(self, model_config, is_loaded, num_time_steps, is_uncertainty_prediction = False, 
+                n_mlp_features = 5, n_mlp_features_separation_prediction = 7, overwriting_activated=True, 
+                x_pred_to = 1550, time_normalization = 22.):
         """Initialize a model manager.
 
         Creates the expert manager and gating network.
         Initializes attributes.
 
         Args:
-            model_config (dict):  The json tree containing all information about the experts, gating network and weighting function
-            num_time_steps (int): The number of timesteps in the longest track
-            overwriting_activated (Boolean): Should expired tracks in batches be overwritten with new tracks
-            x_pred_to (double):   The x position of the nozzle array (only needed for kf separation prediction)
-            time_normalization (double): Time normalization constant (only needed for kf separation prediction)
+            model_config (dict):                    The json tree containing all information about the experts, gating network and weighting function
+            is_loaded (Boolean):                    Load pretrained experts
+            num_time_steps (int):                   The number of timesteps in the longest track
+            is_uncertainty_prediction (Boolean):    Also predict the uncertainty of the prediction
+            overwriting_activated (Boolean):        Should expired tracks in batches be overwritten with new tracks
+            x_pred_to (double):                     The x position of the nozzle array (only needed for kf separation prediction)
+            time_normalization (double):            Time normalization constant (only needed for kf separation prediction)
         """
         # The manager of all the models
         self.expert_manager = Expert_Manager(expert_config = model_config.get('experts'), 
                                              is_loaded = is_loaded, 
                                              model_path = model_config.get('model_path'), 
+                                             is_uncertainty_prediction=is_uncertainty_prediction,
                                              batch_size = model_config.get('batch_size'), 
                                              num_time_steps = num_time_steps, 
                                              n_mlp_features = n_mlp_features,
@@ -88,6 +93,7 @@ class ModelManager(object):
         self.overwriting_activated = overwriting_activated
         self.batch_size = model_config.get('batch_size')
         self.num_time_steps = num_time_steps
+        self.is_uncertainty_prediction = is_uncertainty_prediction
 
         self.current_inputs = {}
         self.current_inputs[-1] = [0.0, 0.0]
@@ -484,6 +490,7 @@ class ModelManager(object):
                 seq2seq_dataset=seq2seq_dataset_eval,
                 mlp_dataset = mlp_dataset_eval,
                 create_weighted_output = False)
+        # TODO: Incorporate uncertainty prediction into gating network
         # Call training of gating network
         self.gating_network_separation.train_network(
                                           inputs = all_inputs_train,
@@ -702,6 +709,16 @@ class ModelManager(object):
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         
+        if self.is_uncertainty_prediction:
+            # Chi squared error evaluation
+            create_chi_squared_evaluation(target=all_targets, 
+                                    predictions=all_predictions, 
+                                    masks=all_masks, 
+                                    expert_names = expert_names, 
+                                    normalization_constant=normalization_constant, 
+                                    time_normalization_constant=time_normalization_constant,
+                                    result_dir=result_dir,
+                                    no_show = no_show)
         # Diversity measurement evaluations
         create_diversity_evaluation(target=all_targets[:,0], 
                                     predictions=all_predictions[:,:,0], 
@@ -718,7 +735,7 @@ class ModelManager(object):
         
         # MSE and MSA box plots
         create_boxplot_evaluation_separation_prediction(target=all_targets, 
-                                predictions=all_predictions, 
+                                predictions=all_predictions[:,:,:2], 
                                 masks=all_masks, 
                                 expert_names = expert_names, 
                                 normalization_constant=normalization_constant, 
@@ -793,7 +810,7 @@ class ModelManager(object):
             if create_weighted_output:
                 weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), mlp_inp)
                 # Evaluation purposes  
-                total_prediction = weighting_function_separation(np.array(np_predictions), weights)
+                total_prediction = weighting_function_separation(np.array(np_predictions), weights, self.is_uncertainty_prediction)
                 np_predictions.append(total_prediction)
                 # Create a total mask to add to list
                 masks.append(np_masks.append(np.ones(mlp_mask.shape)))
