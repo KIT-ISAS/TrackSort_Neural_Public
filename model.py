@@ -538,6 +538,48 @@ class Model(object):
         self.calibration_data = data
         N = data['time_step'].shape[0]
 
+        # ----------------------------------------------------------------------------------
+        # This is just for plotting
+        expected_confs = np.arange(0, 1, 0.01)
+        counter = []
+        empirical_confs = []
+
+        for expected_confidence in expected_confs:
+            expected_critical_value = chi2.ppf(expected_confidence, df=2)
+            count_falls_into = np.count_nonzero(data['squared_mahalanobis'] <= expected_critical_value)
+            counter.append(count_falls_into)
+            empirical_confs.append(count_falls_into / N)
+
+        expected_confs = np.array(expected_confs)
+        empirical_confs = np.array(empirical_confs)
+        counter = np.array(counter)
+
+        x = expected_confs
+        y = empirical_confs
+        n = x.shape[0]
+
+        ir = IsotonicRegression()
+        y_ = ir.fit_transform(x, y)
+        y_pred = ir.predict(x)
+
+        fig, ax = plt.subplots(ncols=1)
+        ax1 = ax.twinx()
+        ax.hist(expected_confs, weights=counter, density=False, bins=50, histtype='stepfilled', alpha=0.2)
+        ax.set_ylabel("# Predictions in conf. interval")
+
+        ax1.scatter(expected_confs, empirical_confs, c='blue')
+        ax1.plot(expected_confs, y_pred, c='black')
+        plt.title("Calibration Plot")
+
+        plt.xlabel("Expected confidence level")
+        ax1.set_ylabel("Empirical confidence level")
+
+        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'Calibration-quickfix.pdf'))
+        plt.clf()
+        # Quick fix is over here
+        # ----------------------------------------------------------------------------------
+
+
         eps = 0.000000001
         lower = 1.0 - eps*100.
         expected_confs = np.concatenate([np.arange(0, lower, 0.01), np.arange(lower, 1, eps)])
