@@ -646,6 +646,7 @@ def create_chi_squared_evaluation(target, predictions, masks, expert_names, resu
         if not no_show:
             plt.show()
         # Chi squared test
+        chi2_yt = np.mean(chi2_sep, axis=0)
         total_chi2 = np.sum(chi2_values)
         N = 2*chi2_values.shape[0]
         reduced_chi_squared = total_chi2/N

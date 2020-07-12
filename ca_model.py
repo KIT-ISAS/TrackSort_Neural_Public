@@ -182,7 +182,7 @@ class CA_Model(KF_Model):
             target_np = None
         n_tracks = np_inp.shape[0]
         track_length = np_inp.shape[1]
-        predictions = np.zeros([n_tracks, track_length, 4])
+        predictions = np.zeros([n_tracks, track_length, 6])
         # For each track in batch
         for i in range(n_tracks):
             ca_state = CA_State(np_inp[i, 0], **self.default_state_options)
@@ -252,16 +252,16 @@ class CA_Model(KF_Model):
                                     x_ca = pos_last[0,0] + v_last[0,0]  * self.dt * t_max_vel + 1/2 * a_last[0,0] * (self.dt * t_max_vel)**2
                                     # CV with v_x = v_belt afterwards
                                     dt_pred = t_max_vel + 1/self.dt * (self.x_pred_to - x_ca)/self.belt_velocity
-                                
+                        dt_s = dt_pred * self.dt
                         ## Then perform spatial prediction
                         if a_last[1,0]==0:
                             a_last[1,0]=1E-20
                         if v_last[1,0]==0:
                             v_last[1,0]=1E-20
                         if self.spatial_prediction == CA_Spatial_Separation_Type.CA:
-                            y_pred = pos_last[1,0] + v_last[1,0] * dt_pred * self.dt + 1/2 * (dt_pred * self.dt)**2 * a_last[1,0]
+                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_last[1,0]
                         elif self.spatial_prediction == CA_Spatial_Separation_Type.DSC:
-                            y_pred = pos_last[1,0] + v_last[1,0] * dt_pred * self.dt + 1/2 * (dt_pred * self.dt)**2 * a_last[1,0]
+                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_last[1,0]
                             if ~is_training:
                                 t_sign_change = 1/self.dt * (0-v_last[1,0])/a_last[1,0]
                                 # If the paticle y velocity would hit a sign change before the nozzle array
@@ -269,9 +269,9 @@ class CA_Model(KF_Model):
                                     # Y position is fix after t sign change
                                     y_pred = pos_last[1,0] + v_last[1,0] * t_sign_change * self.dt + 1/2 * (t_sign_change * self.dt)**2 * a_last[1,0]
                         elif self.spatial_prediction == CA_Spatial_Separation_Type.CV:
-                            y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
+                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s
                         elif self.spatial_prediction == CA_Spatial_Separation_Type.Ratio:
-                            y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
+                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s
                             if is_training:
                                 if j>=2:
                                     v_nozzle_target = target_np[i, j, 4]/self.dt 
@@ -279,11 +279,31 @@ class CA_Model(KF_Model):
                                     self.spatial_training_list.append(r_i)
                             else:
                                 r = self.spatial_variable
-                                a_ratio = -(1-r)*v_last[1,0]/(dt_pred*self.dt)
-                                y_pred = pos_last[1,0] + v_last[1,0] * dt_pred * self.dt + 1/2 * (dt_pred * self.dt)**2 * a_ratio
+                                a_ratio = -(1-r)*v_last[1,0]/(dt_s)
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
+                        # Variance in x direction
+                        var_x = ca_state.C_e[0,0] + \
+                                (2*ca_state.C_e[0,1] + self.C_w[0,0]) * dt_s + \
+                                (ca_state.C_e[0,2] + ca_state.C_e[1,1] + self.C_w[0,1]) * dt_s**2 + \
+                                (ca_state.C_e[1,2] + 1/3 * self.C_w[0,2] + 1/3 * self.C_w[1,1]) * dt_s**3 + \
+                                1/4 * (ca_state.C_e[2,2] + self.C_w[1,2]) * dt_s**4 + \
+                                1/20 * self.C_w[2,2] * dt_s**5
+                        # Variation in time prediction [frames^2]
+                        # We need to get an approximation for the avg velo in the prediction range
+                        v_avg = (self.x_pred_to-pos_last[0,0])/dt_s
+                        var_t = ( var_x/v_avg**2 ) / self.dt**2
+                        # Variance in y direction
+                        var_y = ca_state.C_e[3,3] + \
+                                (2*ca_state.C_e[3,4] + self.C_w[3,3]) * dt_s + \
+                                (ca_state.C_e[3,5] + ca_state.C_e[4,4] + self.C_w[3,4]) * dt_s**2 + \
+                                (ca_state.C_e[4,5] + 1/3 * self.C_w[3,5] + 1/3 * self.C_w[4,4]) * dt_s**3 + \
+                                1/4 * (ca_state.C_e[5,5] + self.C_w[4,5]) * dt_s**4 + \
+                                1/20 * self.C_w[5,5] * dt_s**5
 
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
+                        predictions[i, j, 4] = np.log(var_y)
+                        predictions[i, j, 5] = np.log(var_t/self.time_normalization**2)
                     else:
                         logging.warning("Track out of measurements at first time step.")
                     break

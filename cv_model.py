@@ -164,7 +164,7 @@ class CV_Model(KF_Model):
 
         n_tracks = np_inp.shape[0]
         track_length = np_inp.shape[1]
-        predictions = np.zeros([n_tracks, track_length, 4])
+        predictions = np.zeros([n_tracks, track_length, 6])
         # For each track in batch
         for i in range(n_tracks):
             cv_state = CV_State(np_inp[i, 0], **self.default_state_options)
@@ -214,6 +214,8 @@ class CV_Model(KF_Model):
                                     dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
                                 else:
                                     logging.warning("Can not perform IA prediction with last x velocity of {} and best acceleration {}.".format(v_last[0], a_best))
+                        # Predicted time difference in seconds
+                        dt_s = dt_pred * self.dt
                         # Then perform spatial prediction
                         y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
                         if self.spatial_prediction == CV_Spatial_Separation_Type.Ratio:
@@ -224,11 +226,19 @@ class CV_Model(KF_Model):
                                     self.spatial_training_list.append(r_i)
                             else:
                                 r = self.spatial_variable
-                                a_ratio = -(1-r)*v_last[1,0]/(dt_pred*self.dt)
-                                y_pred = pos_last[1,0] + v_last[1,0] * dt_pred * self.dt + 1/2 * (dt_pred * self.dt)**2 * a_ratio
+                                a_ratio = -(1-r)*v_last[1,0]/(dt_s)
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
+                        # Variance in x direction
+                        var_x = cv_state.C_e[0,0] + (2*cv_state.C_e[0,1] + self.C_w[0,0]) * dt_s + (cv_state.C_e[1,1] + self.C_w[0,1]) * dt_s**2 + self.C_w[1,1] * dt_s**3 / 3
+                        # Variation in time prediction [frames^2]
+                        var_t = (var_x/(v_last[0,0])**2)/(self.dt)**2
+                        # Variance in y direction
+                        var_y = cv_state.C_e[2,2] + (2*cv_state.C_e[2,3] + self.C_w[2,2]) * dt_s + (cv_state.C_e[3,3] + self.C_w[2,3]) * dt_s**2 + self.C_w[3,3] * dt_s**3 / 3
                         # Save predictions
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
+                        predictions[i, j, 4] = np.log(var_y)
+                        predictions[i, j, 5] = np.log(var_t/self.time_normalization**2)
                     else:
                         logging.warning("Track out of measurements at first time step.")
                     break
