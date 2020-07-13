@@ -229,9 +229,21 @@ class CV_Model(KF_Model):
                                 a_ratio = -(1-r)*v_last[1,0]/(dt_s)
                                 y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
                         # Variance in x direction
-                        var_x = cv_state.C_e[0,0] + (2*cv_state.C_e[0,1] + self.C_w[0,0]) * dt_s + (cv_state.C_e[1,1] + self.C_w[0,1]) * dt_s**2 + self.C_w[1,1] * dt_s**3 / 3
-                        # Variation in time prediction [frames^2]
-                        var_t = (var_x/(v_last[0,0])**2)/(self.dt)**2
+                        var_x = cv_state.C_e[0,0] + \
+                                (2*cv_state.C_e[0,1] + self.C_w[0,0]) * dt_s + \
+                                (cv_state.C_e[1,1] + self.C_w[0,1]) * dt_s**2 + \
+                                self.C_w[1,1] * dt_s**3 / 3
+                        # Cross variance of x velocity and x position
+                        sigma_xvx = cv_state.C_e[0,1] + \
+                                    (cv_state.C_e[1,1] + self.C_w[0,1]) * dt_s + \
+                                    1/2 * self.C_w[1,1] * dt_s**2
+                        # Variance in x velocity
+                        var_vx = cv_state.C_e[1,1] + \
+                                 self.C_w[1,1] * dt_s
+                        # Variation in time prediction [frames^2] estimated with gaussian propagation of uncertainty and taylor approximation
+                        var_t = (1/(v_last[0,0])**2 * var_x + \
+                                (self.x_pred_to/v_last[0,0]**2)**2 * var_vx + \
+                                -2 * self.x_pred_to/v_last[0,0]**3 * sigma_xvx) / (self.dt)**2
                         # Variance in y direction
                         var_y = cv_state.C_e[2,2] + (2*cv_state.C_e[2,3] + self.C_w[2,2]) * dt_s + (cv_state.C_e[3,3] + self.C_w[2,3]) * dt_s**2 + self.C_w[3,3] * dt_s**3 / 3
                         # Save predictions
