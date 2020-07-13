@@ -605,6 +605,76 @@ def find_worst_predictions(target, predictions, mask_value):
         stop=0
         #mse.append(mse_expert)
 
+def create_ence_evaluation(target, predictions, masks, expert_names, result_dir, 
+                              normalization_constant = 1, time_normalization_constant = 22, no_show = False):
+    """Create an evaluation of the predicted error variances with an Expected Normalized Calibration Error analysis.
+
+    Args:
+        target (np.array):      Target values
+        predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape (n_experts=1, n_tracks, 4)
+        masks (np.array):       Masks for every expert
+        expert_names (list):    Names (String) of each expert
+        result_dir (String):    Directory to save the created plot data to
+        normalization_constant (double): Value for denormalization the y_nozzle value
+        time_normalization_constant (double): Value for denormalization the dt_nozzle value
+        no_show (Boolean):      Do not show the figures. The figures will still be saved.
+    """
+    # Create bins
+    n_bins = 5
+    for expert in range(predictions.shape[0]):
+        # Spatial analysis
+        # Sort instances by predicted variance
+        predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 2])[0]
+        target_y = target[ np.where(masks[expert]), 0][0]
+        predicted_y = predictions[expert,  np.where(masks[expert]), 0][0]
+        single_emce_analysis(predicted_var, target_y, predicted_y, result_dir + "spatial_evaluations/", expert_names[expert], n_bins, "spatial", no_show)
+        predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 3])[0]
+        target_y = target[ np.where(masks[expert]), 1][0]
+        predicted_y = predictions[expert,  np.where(masks[expert]), 1][0]
+        single_emce_analysis(predicted_var, target_y, predicted_y, result_dir + "temporal_evaluations/", expert_names[expert], n_bins, "temporal", no_show)
+        stop=0
+            
+    stop=0
+
+def single_emce_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, n_bins=5, domain="spatial", no_show=False):
+    """Create the emce analysis for one expert in one domain."""
+    sorted_indices = np.argsort(predicted_var)
+    n_instances = sorted_indices.shape[0]
+    bin_size = int(np.floor(n_instances/n_bins))
+    # Create RMV and RMSE for every bin
+    RMV = np.zeros(n_bins)
+    RMSE = np.zeros(n_bins)
+    for j in range(n_bins):
+        if j < n_bins-1:
+            bin_indices = sorted_indices[j*bin_size:(j+1)*bin_size-1]
+        else:
+            # The last bin may be larger
+            bin_indices = sorted_indices[j*bin_size:]
+        # RMV = sqrt(1/n * sum(sigma^2))
+        RMV[j] = np.sqrt(np.mean(predicted_var[bin_indices]))
+        # RMSE = sqrt(1/n * sum((y-y_pred)^2))
+        RMSE[j] = np.sqrt(np.mean((target_y[bin_indices] - predicted_y[bin_indices])**2))
+    # ENCE = 1/N * sum(|RMV(j)-RMSE(j)|/RMV(j))
+    ENCE = np.mean(np.abs(RMV-RMSE)/RMV)
+    # STDs Coefficient of Variation
+    mu_sigma = np.mean(predicted_var)
+    C_v = np.sqrt(np.sum((predicted_var-mu_sigma)**2)/(n_instances-1))/mu_sigma
+    # Logging output
+    logging.info("ENCE for expert {} in {} domain = {}".format(expert_name, domain, ENCE))
+    logging.info("C_v for expert {} in {} domain = {}".format(expert_name, domain, C_v))
+    # Plot RMSE over RMV
+    plt.figure(figsize=[19.20, 10.80], dpi=100)
+    plt.plot(RMV, RMSE)
+    plt.plot(RMV, RMV, '--k')
+    plt.xlabel("RMV")
+    plt.ylabel("RMSE")
+    plt.title("Calibration analysis for {} prediction of expert {}".format(domain, expert_name))
+    plt.savefig(result_dir + 'emce_analysis_{}_{}.pdf'.format(domain, expert_name))  
+    if not no_show:
+        plt.show()
+    stop=0
+    
+
 def create_chi_squared_evaluation(target, predictions, masks, expert_names, result_dir, 
                               normalization_constant = 1, time_normalization_constant = 22, no_show = False):
     """Create an evaluation of the predicted error variances.
@@ -646,6 +716,19 @@ def create_chi_squared_evaluation(target, predictions, masks, expert_names, resu
         if not no_show:
             plt.show()
         # Chi squared test
+        plt.figure(figsize=[19.20, 10.80], dpi=100)
+        #bins = []
+        #for i in np.arange(-6.0, 2.0, 1.0):
+        #    for j in np.arange(1.0, 10.0, 1.0):
+        #        bins.append(j * 10.0 ** i)
+        bins = np.arange(0.1, 10, 0.1)
+        plt.hist(chi2_sep[:,0], bins=bins, color=(0.3, 0.3, 0.3, 0.5), label="Spatial prediction")
+        plt.hist(chi2_sep[:,1], bins=bins, color=(1, 0, 0, 0.5), label="Temporal prediction")
+        plt.xlabel("Chi2 values")
+        #plt.xscale('log')
+        plt.legend()
+        if not no_show:
+            plt.show()
         chi2_yt = np.mean(chi2_sep, axis=0)
         total_chi2 = np.sum(chi2_values)
         N = 2*chi2_values.shape[0]

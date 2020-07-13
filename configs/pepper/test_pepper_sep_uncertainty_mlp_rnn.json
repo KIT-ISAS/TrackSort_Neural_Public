@@ -39,6 +39,25 @@
           "use_batchnorm_on_dense": true
         }
       }
+    },
+    "KF_CV_CVBC_CV": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/pepper/KF_sep_CV_CVBC_CV.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 2.1,
+        "s_v": 3.6E-7,
+        "temporal_separator": "BC",
+        "spatial_separator": "default"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
     }
   },
   "gating": {

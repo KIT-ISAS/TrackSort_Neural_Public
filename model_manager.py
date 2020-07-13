@@ -710,6 +710,15 @@ class ModelManager(object):
             os.makedirs(save_path)
         
         if self.is_uncertainty_prediction:
+            # ENCE evaluation
+            create_ence_evaluation(target=all_targets, 
+                                    predictions=all_predictions, 
+                                    masks=all_masks, 
+                                    expert_names = expert_names, 
+                                    normalization_constant=normalization_constant, 
+                                    time_normalization_constant=time_normalization_constant,
+                                    result_dir=result_dir,
+                                    no_show = no_show)
             # Chi squared error evaluation
             create_chi_squared_evaluation(target=all_targets, 
                                     predictions=all_predictions, 
