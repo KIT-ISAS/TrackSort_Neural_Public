@@ -47,7 +47,7 @@
       "model_path": "models/pepper/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
-        "s_w": 2.1,
+        "s_w": 0.75,
         "s_v": 3.6E-7,
         "temporal_separator": "BC",
         "spatial_separator": "default"

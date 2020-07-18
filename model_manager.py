@@ -728,6 +728,7 @@ class ModelManager(object):
                                     time_normalization_constant=time_normalization_constant,
                                     result_dir=result_dir,
                                     no_show = no_show)
+            
         # Diversity measurement evaluations
         create_diversity_evaluation(target=all_targets[:,0], 
                                     predictions=all_predictions[:,:,0], 

@@ -6,6 +6,9 @@ Todo:
 
 import numpy as np
 import logging
+import matplotlib
+plt = matplotlib.pyplot
+
 from enum import Enum, auto
 
 from kf_model import KF_Model, KF_State
@@ -193,7 +196,8 @@ class CV_Model(KF_Model):
                                                 Setting the time to default value = {}!!!".format(v_last[0,0], i, dt_pred))
                             break
                         # First perform temporal predicion
-                        dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                        delta_x = self.x_pred_to-pos_last[0,0]
+                        dt_pred = 1/(v_last[0,0] * self.dt) * (delta_x)
                         target_time = target_np[i, j, 3]*self.time_normalization
                         if self.temporal_prediction == CV_Temporal_Separation_Type.BC:
                             if is_training:
@@ -204,12 +208,12 @@ class CV_Model(KF_Model):
                         elif self.temporal_prediction == CV_Temporal_Separation_Type.IA:
                             if is_training:
                                 # Find optimal acceleration value
-                                a_x_opt = 2*(self.x_pred_to-pos_last[0,0]-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
+                                a_x_opt = 2*(delta_x-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
                                 self.temporal_training_list.append(a_x_opt)
                             else:
                                 # Perform CA prediction with a_opt instead of a_last
                                 a_best = self.temporal_variable
-                                sqrt_val = (v_last[0,0]/a_best)**2 - 2*(pos_last[0,0]-self.x_pred_to)/a_best
+                                sqrt_val = (v_last[0,0]/a_best)**2 + 2*delta_x/a_best
                                 if sqrt_val >= 0:
                                     dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
                                 else:
@@ -217,7 +221,7 @@ class CV_Model(KF_Model):
                         # Predicted time difference in seconds
                         dt_s = dt_pred * self.dt
                         # Then perform spatial prediction
-                        y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
+                        y_pred = pos_last[1,0] + dt_s * v_last[1,0]
                         if self.spatial_prediction == CV_Spatial_Separation_Type.Ratio:
                             if is_training:
                                 if j>=2:
@@ -228,24 +232,53 @@ class CV_Model(KF_Model):
                                 r = self.spatial_variable
                                 a_ratio = -(1-r)*v_last[1,0]/(dt_s)
                                 y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
-                        # Variance in x direction
-                        var_x = cv_state.C_e[0,0] + \
-                                (2*cv_state.C_e[0,1] + self.C_w[0,0]) * dt_s + \
-                                (cv_state.C_e[1,1] + self.C_w[0,1]) * dt_s**2 + \
-                                self.C_w[1,1] * dt_s**3 / 3
-                        # Cross variance of x velocity and x position
-                        sigma_xvx = cv_state.C_e[0,1] + \
-                                    (cv_state.C_e[1,1] + self.C_w[0,1]) * dt_s + \
-                                    1/2 * self.C_w[1,1] * dt_s**2
-                        # Variance in x velocity
-                        var_vx = cv_state.C_e[1,1] + \
-                                 self.C_w[1,1] * dt_s
+                        ## Uncertainty prediction
+                        # Q = Spectral density matrix
+                        Q = self.C_w/self.dt
+                        # Phi = State transition matrix
+                        Phi_x = np.matrix([[1, dt_s],[0, 1]])
+                        Phi = np.bmat([[Phi_x, np.zeros([2,2])],[np.zeros([2,2]), Phi_x]])
+                        # Homogenous solution of uncertainty matrix
+                        C_h = Phi * cv_state.C_e * Phi.T
+                        # Particular solution of uncertainty matrix
+                        C_p_x = np.matrix([[Q[0,0]*dt_s + Q[0,1]*dt_s**2 + 1/3*Q[1,1]*dt_s**3, \
+                                            Q[0,1]*dt_s + 1/2 * Q[1,1] * dt_s**2], \
+                                           [Q[0,1]*dt_s + 1/2 * Q[1,1] * dt_s**2, \
+                                            Q[1,1]*dt_s]])
+                        C_p = np.bmat([[C_p_x, np.zeros([2,2])],[np.zeros([2,2]), C_p_x]])
+                        # C = Covariance matrix
+                        C = C_h + C_p 
+                        # Extract needed variances
+                        var_x = C[0,0]
+                        var_xdot = C[1,1]
+                        cov_xxdot = C[0,1]
+                        var_y = C[2,2]
                         # Variation in time prediction [frames^2] estimated with gaussian propagation of uncertainty and taylor approximation
+                        
                         var_t = (1/(v_last[0,0])**2 * var_x + \
-                                (self.x_pred_to/v_last[0,0]**2)**2 * var_vx + \
-                                -2 * self.x_pred_to/v_last[0,0]**3 * sigma_xvx) / (self.dt)**2
-                        # Variance in y direction
-                        var_y = cv_state.C_e[2,2] + (2*cv_state.C_e[2,3] + self.C_w[2,2]) * dt_s + (cv_state.C_e[3,3] + self.C_w[2,3]) * dt_s**2 + self.C_w[3,3] * dt_s**3 / 3
+                                (delta_x/v_last[0,0]**2)**2 * var_xdot + \
+                                - 2 * delta_x/v_last[0,0]**3 * cov_xxdot) / (self.dt)**2
+                        
+                        # Test: Evaluate at t=t_last instead of t_predto
+                        """
+                        var_x = cv_state.C_e[0,0]
+                        var_xdot = cv_state.C_e[1,1]
+                        cov_xxdot = cv_state.C_e[1,0]
+                        var_t = (1/(v_last[0,0])**2 * var_x + \
+                                (delta_x/v_last[0,0]**2)**2 * var_xdot + \
+                                + 2 * delta_x/v_last[0,0]**3 * cov_xxdot) / (self.dt)**2
+                        """
+                        # Test: linearization of 1/xdot
+                        """
+                        plt.figure(figsize=[19.20, 10.80], dpi=100)
+                        sigma_xdot = np.sqrt(var_xdot)
+                        x_plot = np.arange(v_last[0,0]-3*sigma_xdot, v_last[0,0]+3*sigma_xdot, sigma_xdot/10)
+                        y_plot = 1/(x_plot)
+                        y_lin_plot = -1/(v_last[0,0]**2) * x_plot + 2/v_last[0,0]
+                        plt.plot(x_plot, y_plot)
+                        plt.plot(x_plot, y_lin_plot)
+                        plt.show()
+                        """
                         # Save predictions
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
