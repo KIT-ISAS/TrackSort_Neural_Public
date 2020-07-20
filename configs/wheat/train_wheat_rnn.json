@@ -6,6 +6,9 @@
       "model_path": "models/wheat/LSTM_1024_16.h5",
       "options": {
         "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "num_units_first_rnn": 1024,
           "num_units_second_rnn": 16,

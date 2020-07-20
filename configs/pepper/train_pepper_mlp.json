@@ -6,31 +6,27 @@
       "model_path": "models/pepper/MLP_16_16_16.h5",
       "options": {
         "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "layers": [16, 16, 16],
-          "activation": "leakly_relu"
+          "activation": "leakly_relu",
+          "l1_regularization": 0,
+          "l2_regularization": 0
         }
-      }
-    },
-    "KF_CV_sv3_6E-7": {
-      "type": "KF",
-      "sub_type": "CV",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 18,
-        "s_v": 3.6E-7
-      },
-      "state_options": {
-        "velocity_guess": 6.5,
-        "velo_var_x": 1.8,
-        "velo_var_y": 180,
-        "pos_var": 3.6E-7
       }
     }
   },
   "gating": {
     "type": "Simple_Ensemble",
     "model_path": "models/pepper/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "gating_separation": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating_sep.pkl",
     "options": {
 
     }

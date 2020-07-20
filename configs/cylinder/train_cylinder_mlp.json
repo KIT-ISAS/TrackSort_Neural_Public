@@ -6,6 +6,8 @@
       "model_path": "models/cylinder/MLP_16_16_16.h5",
       "options": {
         "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.96,
         "model_structure": {
           "layers": [16, 16, 16],
           "activation": "leakly_relu"
