@@ -620,7 +620,7 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
         no_show (Boolean):      Do not show the figures. The figures will still be saved.
     """
     # Create bins
-    n_bins = 5
+    n_bins = 3
     for expert in range(predictions.shape[0]):
         # Spatial analysis
         # Sort instances by predicted variance
@@ -638,12 +638,24 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
 
 def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, n_bins=5, domain="spatial", no_show=False):
     """Create the ence analysis for one expert in one domain."""
+    # Temp Hist Test
+    """
+    errors = target_y-predicted_y
+    plt.figure(figsize=[19.20, 10.80], dpi=100)
+    plt.hist(bin_errors, bins=30)
+    plt.xlabel("Error: target-prediction")
+    plt.title("Error histogram for {} prediction of expert {}".format(domain, expert_name))
+    plt.show()
+    """
     sorted_indices = np.argsort(predicted_var)
     n_instances = sorted_indices.shape[0]
     bin_size = int(np.floor(n_instances/n_bins))
     # Create RMV and RMSE for every bin
     RMV = np.zeros(n_bins)
     RMSE = np.zeros(n_bins)
+    RMSE_BC = np.zeros(n_bins)
+    MSTD = np.zeros(n_bins)
+    MAE = np.zeros(n_bins)
     for j in range(n_bins):
         if j < n_bins-1:
             bin_indices = sorted_indices[j*bin_size:(j+1)*bin_size-1]
@@ -653,8 +665,46 @@ def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, exper
         # RMV = sqrt(1/n * sum(sigma^2))
         #RMV[j] = np.mean(np.sqrt(predicted_var[bin_indices]))
         RMV[j] = np.sqrt(np.mean(predicted_var[bin_indices]))
+        MSTD[j] = np.mean(np.sqrt(predicted_var[bin_indices]))
         # RMSE = sqrt(1/n * sum((y-y_pred)^2))
-        RMSE[j] = np.sqrt(np.mean((target_y[bin_indices] - predicted_y[bin_indices])**2))
+        bin_errors = target_y[bin_indices] - predicted_y[bin_indices]
+        
+        fig, ax1 = plt.subplots(figsize=[19.20, 10.80], dpi=100)
+        plot_x_range = [-0.05, 0.05]
+        plot_x = np.arange(plot_x_range[0], plot_x_range[1], 0.0001) 
+        ax2 = ax1.twinx()
+        ax1.hist(bin_errors, bins=15, color=[0.8, 0.8, 0.8])
+        plot_y = 1/np.sqrt(2*np.pi*MSTD[j]**2) * np.exp(-1/2 * (plot_x-0)**2 / MSTD[j]**2)
+        ax2.plot(plot_x, plot_y, '-g', label="Predicted PDF of errors")
+        ax2.set_ylim(0)
+        plt.xlim(plot_x_range)
+        plt.xlabel("Error")
+        plt.title("Errors for {} prediction of expert {} in bin {}".format(domain, expert_name, j))
+        plt.legend()
+        plt.show()
+        
+        #Squared mahalanobis distance histogram
+        """
+        squared_mahalanobis_distance = bin_errors**2/predicted_var[bin_indices]
+        fig, ax1 = plt.subplots(figsize=[19.20, 10.80], dpi=100)
+        plot_x_range = [0, 5]
+        plot_x = np.arange(plot_x_range[0]+0.1, plot_x_range[1], 0.0001) 
+        ax2 = ax1.twinx()
+        ax1.set_ylim([0, 150])
+        ax1.hist(squared_mahalanobis_distance, bins=np.arange(plot_x_range[0],plot_x_range[1],0.3), color=[0.8, 0.8, 0.8])
+        plot_chi2 = 1/np.sqrt(2*np.pi*plot_x) * np.exp(-1/2 * plot_x)
+        ax2.plot(plot_x, plot_chi2, '-g', label="Chi2 distribution")
+        ax2.set_ylim(0)
+        plt.xlim([0, 5])
+        plt.xlabel("Squared Mahalanobis Distance")
+        plt.title("Squared Mahalanobis Distances for {} prediction of expert {} in bin {}".format(domain, expert_name, j))
+        #plt.legend()
+        plt.show()
+        """
+        error_bias = np.mean(bin_errors)
+        RMSE[j] = np.sqrt(np.mean(bin_errors**2))
+        RMSE_BC[j] = np.sqrt(np.mean((bin_errors-error_bias)**2))
+        MAE[j] = np.mean(np.abs(target_y[bin_indices] - predicted_y[bin_indices]))
         #RMSE[j] = np.mean(np.abs(target_y[bin_indices] - predicted_y[bin_indices]))
         stop=0
     # ENCE = 1/N * sum(|RMV(j)-RMSE(j)|/RMV(j))
@@ -667,8 +717,12 @@ def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, exper
     logging.info("C_v for expert {} in {} domain = {}".format(expert_name, domain, C_v))
     # Plot RMSE over RMV
     plt.figure(figsize=[19.20, 10.80], dpi=100)
-    plt.plot(RMV, RMSE)
+    plt.plot(RMV, RMSE, '-ob')
     plt.plot(RMV, RMV, '--k')
+    #plt.plot(MSTD, MAE, '-ob')
+    #plt.plot(MSTD, MSTD, '--k')
+    #plt.xlabel("MSTD")
+    #plt.ylabel("MAE")
     plt.xlabel("RMV")
     plt.ylabel("RMSE")
     plt.title("Calibration analysis for {} prediction of expert {}".format(domain, expert_name))

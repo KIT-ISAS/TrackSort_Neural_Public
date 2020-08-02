@@ -8,9 +8,31 @@
       "model_path": "models/pepper/KF_sep_CA_CA_CA.pkl",
       "model_options": {
         "dt": 0.005,
-        "s_w": 1.5E3,
+        "s_w": 1.2E3,
         "s_v": 3.6E-7,
         "temporal_separator": "CA",
+        "spatial_separator": "CA"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    },
+    "KF_CA_CVBC_CA": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/pepper/KF_sep_CA_CVBC_CA.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 3E2,
+        "s_v": 3.6E-7,
+        "temporal_separator": "CVBC",
         "spatial_separator": "CA"
       },
       "state_options": {

@@ -9,6 +9,7 @@ import logging
 import matplotlib
 plt = matplotlib.pyplot
 
+from sklearn.linear_model import LinearRegression
 from enum import Enum, auto
 
 from kf_model import KF_Model, KF_State
@@ -24,6 +25,7 @@ class CV_Temporal_Separation_Type(Enum):
     Default = auto()
     BC = auto()
     IA = auto()
+    VBC = auto()
 
 class CV_Spatial_Separation_Type(Enum):
     """Simple enumeration class for spatial separion prediction with the CV model.
@@ -61,6 +63,7 @@ class CV_Model(KF_Model):
             spatial_separator (String):     Spatial separation prediction type ("default", "ratio")
         """
         self.dt = dt
+        self.s_w = s_w
         self.x_pred_to = x_pred_to
         self.time_normalization = time_normalization
         # Temporal separation prediction type
@@ -70,6 +73,8 @@ class CV_Model(KF_Model):
             self.temporal_prediction = CV_Temporal_Separation_Type.BC 
         elif temporal_separator == "IA":
             self.temporal_prediction = CV_Temporal_Separation_Type.IA
+        elif temporal_separator == "VBC":
+            self.temporal_prediction = CV_Temporal_Separation_Type.VBC 
         else:
             logging.warning("Temporal separation prediction type '{}' is unknown. Setting to default.".format(temporal_separator)) 
             self.temporal_prediction = CV_Temporal_Separation_Type.Default
@@ -218,6 +223,14 @@ class CV_Model(KF_Model):
                                     dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
                                 else:
                                     logging.warning("Can not perform IA prediction with last x velocity of {} and best acceleration {}.".format(v_last[0], a_best))
+                        elif self.temporal_prediction == CV_Temporal_Separation_Type.VBC:
+                            if is_training:
+                                # Calculate error in cv prediction
+                                temp_err = dt_pred - target_time
+                                self.temporal_training_list.append([v_last[0,0], temp_err])
+                            else:
+                                # Substract the predicted error for this velocity
+                                dt_pred -= (self.temporal_variable[0] * v_last[0] + self.temporal_variable[1])
                         # Predicted time difference in seconds
                         dt_s = dt_pred * self.dt
                         # Then perform spatial prediction
@@ -233,52 +246,20 @@ class CV_Model(KF_Model):
                                 a_ratio = -(1-r)*v_last[1,0]/(dt_s)
                                 y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
                         ## Uncertainty prediction
-                        # Q = Spectral density matrix
-                        Q = self.C_w/self.dt
-                        # Phi = State transition matrix
-                        Phi_x = np.matrix([[1, dt_s],[0, 1]])
-                        Phi = np.bmat([[Phi_x, np.zeros([2,2])],[np.zeros([2,2]), Phi_x]])
-                        # Homogenous solution of uncertainty matrix
-                        C_h = Phi * cv_state.C_e * Phi.T
-                        # Particular solution of uncertainty matrix
-                        C_p_x = np.matrix([[Q[0,0]*dt_s + Q[0,1]*dt_s**2 + 1/3*Q[1,1]*dt_s**3, \
-                                            Q[0,1]*dt_s + 1/2 * Q[1,1] * dt_s**2], \
-                                           [Q[0,1]*dt_s + 1/2 * Q[1,1] * dt_s**2, \
-                                            Q[1,1]*dt_s]])
-                        C_p = np.bmat([[C_p_x, np.zeros([2,2])],[np.zeros([2,2]), C_p_x]])
-                        # C = Covariance matrix
-                        C = C_h + C_p 
-                        # Extract needed variances
-                        var_x = C[0,0]
-                        var_xdot = C[1,1]
-                        cov_xxdot = C[0,1]
-                        var_y = C[2,2]
-                        # Variation in time prediction [frames^2] estimated with gaussian propagation of uncertainty and taylor approximation
-                        
-                        var_t = (1/(v_last[0,0])**2 * var_x + \
-                                (delta_x/v_last[0,0]**2)**2 * var_xdot + \
-                                - 2 * delta_x/v_last[0,0]**3 * cov_xxdot) / (self.dt)**2
-                        
-                        # Test: Evaluate at t=t_last instead of t_predto
-                        """
-                        var_x = cv_state.C_e[0,0]
-                        var_xdot = cv_state.C_e[1,1]
-                        cov_xxdot = cv_state.C_e[1,0]
-                        var_t = (1/(v_last[0,0])**2 * var_x + \
-                                (delta_x/v_last[0,0]**2)**2 * var_xdot + \
-                                + 2 * delta_x/v_last[0,0]**3 * cov_xxdot) / (self.dt)**2
-                        """
-                        # Test: linearization of 1/xdot
-                        """
-                        plt.figure(figsize=[19.20, 10.80], dpi=100)
-                        sigma_xdot = np.sqrt(var_xdot)
-                        x_plot = np.arange(v_last[0,0]-3*sigma_xdot, v_last[0,0]+3*sigma_xdot, sigma_xdot/10)
-                        y_plot = 1/(x_plot)
-                        y_lin_plot = -1/(v_last[0,0]**2) * x_plot + 2/v_last[0,0]
-                        plt.plot(x_plot, y_plot)
-                        plt.plot(x_plot, y_lin_plot)
-                        plt.show()
-                        """
+                        # Calculate uncertainty at nozzle array
+                        Phi = np.matrix([[1, dt_s, 0, 0], [0, 1, 0, 0], 
+                                         [0, 0, 1, dt_s], [0, 0, 0, 1]])
+                        Q2 = np.matrix([[pow(dt_s, 3)/3, pow(dt_s, 2)/2, 0, 0],
+                                        [pow(dt_s, 2)/2, dt_s, 0, 0],
+                                        [0, 0, pow(dt_s, 3)/3, pow(dt_s, 2)/2],
+                                        [0, 0, pow(dt_s, 2)/2, dt_s]])
+                        C_p = Phi * cv_state.C_e * Phi.T + self.s_w * Q2
+                        # Evaluate uncertainty in temporal dimension
+                        var_t_taylor = (1/v_last[0,0])**2 * C_p[0, 0]
+                        var_t = var_t_taylor/(self.dt)**2
+                        # Evaluate uncertainty in spatial dimension
+                        var_y_taylor = C_p[2, 2] + (v_last[1,0])**2 * var_t_taylor
+                        var_y = var_y_taylor
                         # Save predictions
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
@@ -289,7 +270,22 @@ class CV_Model(KF_Model):
                     break
         if is_training:
             if len(self.temporal_training_list)>0:
-                self.temporal_variable = np.nanmedian(self.temporal_training_list)
+                if self.temporal_prediction == CV_Temporal_Separation_Type.VBC:
+                    v_err = np.array(self.temporal_training_list)
+                    reg = LinearRegression().fit(np.expand_dims(v_err[:, 0], -1), v_err[:, 1])
+                    """
+                    x = np.arange(np.min(v_err[:,0]), np.max(v_err[:,0]), 0.1)
+                    plt.figure(figsize=[19.20, 10.80], dpi=100)
+                    plt.scatter(v_err[:,0], v_err[:,1], label="Errors")
+                    plt.plot(x, reg.predict(np.expand_dims(x, -1)), '-k', label="Linear Regression")
+                    plt.xlabel("x velocity")
+                    plt.ylabel("Error [frames]")
+                    plt.legend()
+                    plt.show()
+                    """
+                    self.temporal_variable = [reg.coef_[0], reg.intercept_]
+                else:
+                    self.temporal_variable = np.nanmedian(self.temporal_training_list)
             if len(self.spatial_training_list)>0:
                 self.spatial_variable = np.nanmedian(self.spatial_training_list)
         return predictions

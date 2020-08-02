@@ -1,5 +1,5 @@
 {
-  "batch_size": 64,
+  "batch_size": 128,
   "experts": {
     "KF_CV_CV_CV": {
       "type": "KF",

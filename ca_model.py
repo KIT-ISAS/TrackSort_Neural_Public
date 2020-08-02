@@ -66,6 +66,7 @@ class CA_Model(KF_Model):
             belt_velocity (double):         The velocity of the belt. Only needed for temporal prediction type limited velocity "LV".
         """
         self.dt = dt        
+        self.s_w = s_w
         self.x_pred_to = x_pred_to
         self.time_normalization = time_normalization
         self.belt_velocity = belt_velocity
@@ -203,14 +204,15 @@ class CA_Model(KF_Model):
                         a_last = ca_state.get_a()
                         v_last = ca_state.get_v()
                         pos_last = ca_state.get_pos()
+                        delta_x = self.x_pred_to-pos_last[0,0]
                         # Sanity checks and error management
                         if a_last[0,0]==0:
                             a_last[0,0]=1E-20
-                        sqrt_val = (v_last[0,0]/a_last[0,0])**2 - 2*(pos_last[0,0]-self.x_pred_to)/a_last[0,0]
+                        sqrt_val = (v_last[0,0]/a_last[0,0])**2 + 2 * delta_x/a_last[0,0]
                         if sqrt_val < 0:
                             logging.warning("With the predicted velocity of {} and the predicted acceleration of {} the track {} would not reach the nozzle array. Perform cv prediction!".format(v_last[0], a_last[0], i))
                             if v_last[0,0] > 0:
-                                dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                                dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
                                 y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
                             else:
                                 logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model.".format(v_last[0], i))
@@ -222,22 +224,22 @@ class CA_Model(KF_Model):
                         if self.temporal_prediction == CA_Temporal_Separation_Type.CA:
                             dt_pred = 1/self.dt * (- v_last[0,0]/a_last[0,0] + np.sign(a_last[0,0]) * np.sqrt(sqrt_val))
                         elif self.temporal_prediction == CA_Temporal_Separation_Type.CVBC:
-                            dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                            dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
                             if is_training:
                                 self.temporal_training_list.append(dt_pred - target_time)
                             else:
                                 # Adjust prediction with bias
                                 dt_pred -= self.temporal_variable
                         elif self.temporal_prediction == CA_Temporal_Separation_Type.IA:
-                            dt_pred = 1/(v_last[0,0] * self.dt) * (self.x_pred_to-pos_last[0,0])
+                            dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
                             if is_training:
                                 # Find optimal acceleration value
-                                a_x_opt = 2*(self.x_pred_to-pos_last[0,0]-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
+                                a_x_opt = 2*(delta_x-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
                                 self.temporal_training_list.append(a_x_opt)
                             else:
                                 # Perform CA prediction with a_opt instead of a_last
                                 a_best = self.temporal_variable
-                                sqrt_val = (v_last[0,0]/a_best)**2 - 2*(pos_last[0,0]-self.x_pred_to)/a_best
+                                sqrt_val = (v_last[0,0]/a_best)**2 + 2*delta_x/a_best
                                 if sqrt_val >= 0:
                                     dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
                                 else:
@@ -281,25 +283,27 @@ class CA_Model(KF_Model):
                                 r = self.spatial_variable
                                 a_ratio = -(1-r)*v_last[1,0]/(dt_s)
                                 y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
-                        # Variance in x direction
-                        var_x = ca_state.C_e[0,0] + \
-                                (2*ca_state.C_e[0,1] + self.C_w[0,0]) * dt_s + \
-                                (ca_state.C_e[0,2] + ca_state.C_e[1,1] + self.C_w[0,1]) * dt_s**2 + \
-                                (ca_state.C_e[1,2] + 1/3 * self.C_w[0,2] + 1/3 * self.C_w[1,1]) * dt_s**3 + \
-                                1/4 * (ca_state.C_e[2,2] + self.C_w[1,2]) * dt_s**4 + \
-                                1/20 * self.C_w[2,2] * dt_s**5
-                        # Variation in time prediction [frames^2]
-                        # We need to get an approximation for the avg velo in the prediction range
-                        v_avg = (self.x_pred_to-pos_last[0,0])/dt_s
-                        var_t = ( var_x/v_avg**2 ) / self.dt**2
-                        # Variance in y direction
-                        var_y = ca_state.C_e[3,3] + \
-                                (2*ca_state.C_e[3,4] + self.C_w[3,3]) * dt_s + \
-                                (ca_state.C_e[3,5] + ca_state.C_e[4,4] + self.C_w[3,4]) * dt_s**2 + \
-                                (ca_state.C_e[4,5] + 1/3 * self.C_w[3,5] + 1/3 * self.C_w[4,4]) * dt_s**3 + \
-                                1/4 * (ca_state.C_e[5,5] + self.C_w[4,5]) * dt_s**4 + \
-                                1/20 * self.C_w[5,5] * dt_s**5
-
+                        ## Uncertainty prediction
+                        # Calculate uncertainty at nozzle array
+                        Phi = np.matrix([[1, dt_s, dt_s**2/2, 0, 0, 0], [0, 1, dt_s, 0, 0, 0], [0, 0, 1, 0, 0, 0],
+                                    [0, 0, 0, 1, dt_s, dt_s**2/2], [0, 0, 0, 0, 1, dt_s], [0, 0, 0, 0, 0, 1]])
+                        Q3 = np.matrix([[pow(dt_s, 5)/20, pow(dt_s, 4)/8, pow(dt_s, 3)/6, 0, 0, 0],
+                                            [pow(dt_s, 4)/8, pow(dt_s, 3)/3, pow(dt_s, 2)/2, 0, 0, 0],
+                                            [pow(dt_s, 3)/6, pow(dt_s, 2)/2, dt_s, 0, 0, 0],
+                                            [0, 0, 0, pow(dt_s, 5)/20, pow(dt_s, 4)/8, pow(dt_s, 3)/6],
+                                            [0, 0, 0, pow(dt_s, 4)/8, pow(dt_s, 3)/3, pow(dt_s, 2)/2],
+                                            [0, 0, 0, pow(dt_s, 3)/6, pow(dt_s, 2)/2, dt_s]])
+                        C_p = Phi * ca_state.C_e * Phi.T + self.s_w * Q3
+                        x_p = Phi.dot(ca_state.state)
+                        # Evaluate uncertainty in temporal dimension
+                        var_t_taylor = (1/x_p[1, 0])**2 * C_p[0, 0]
+                        var_t = var_t_taylor/self.dt**2
+                        # Evaluate uncertainty in spatial dimension
+                        var_y_taylor = C_p[3, 3] + x_p[4, 0]**2 * var_t_taylor
+                        var_y = var_y_taylor
+                        # sigma_t^2 if temporal prediction is CV based
+                        #if self.temporal_prediction == CA_Temporal_Separation_Type.CVBC or \
+                        #   self.temporal_prediction == CA_Temporal_Separation_Type.IA:
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                         predictions[i, j, 4] = np.log(var_y)

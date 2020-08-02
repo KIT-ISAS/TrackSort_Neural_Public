@@ -269,7 +269,7 @@ def run_global_config(global_config, experiment_series_names=''):
     ## Get tracking training and test dataset
     # TODO: 
     #   * Ask for these arguments in main run args
-    random_seed = 0
+    random_seed = 1
     if global_config["tracking"]:
         mlp_dataset_train, mlp_dataset_eval, mlp_dataset_test = data_source.get_tf_data_sets_mlp_data(
                                         normalized=True, 
