@@ -8,8 +8,7 @@ Todo:
 import numpy as np
 import pickle
 import logging
-
-from os import path
+import os
 from abc import ABC, abstractmethod
 
 from expert import Expert, Expert_Type
@@ -192,7 +191,7 @@ class KF_Model(Expert):
 
     def load_model(self):
         """Load parameters for KF model."""
-        if path.exists(self.model_path):
+        if os.path.exists(self.model_path):
             with open(self.model_path, 'rb') as f:
                 self.spatial_prediction, self.spatial_variable, self.temporal_prediction, self.temporal_variable = pickle.load(f)
         else:
@@ -201,6 +200,9 @@ class KF_Model(Expert):
 
     def save_model(self):
         """Save parameters for KF model."""
+        folder_path = os.path.dirname(self.model_path)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
         with open(self.model_path, 'wb') as f:
             pickle.dump([self.spatial_prediction, self.spatial_variable, self.temporal_prediction, self.temporal_variable], f)
         

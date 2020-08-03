@@ -86,6 +86,8 @@ parser.add_argument('--rotate_columns', type=str2bool, default=False,
                     help='Set this to true if the order of columns in your csv is (x, y). Default is (y, x)')
 parser.add_argument('--run_hyperparameter_search', type=str2bool, default=False,
                     help='Whether to run the hyperparameter search or not')
+parser.add_argument('--n_folded_cross_evaluation', type=int, default=-1,
+                    help='Change this from -1 to i.e. 5 to activate cross evaluation training')
 parser.add_argument('--test_noise_robustness', type=str2bool, default=False,
                     help='Should the Dataset be tested with multiple noise values?')
 parser.add_argument('--tracking', type=str2bool, default=True,
@@ -179,6 +181,7 @@ global_config = {
     'verbose': 1,
     'visualize': args.visualize_multi_target_tracking,
     'run_hyperparameter_search': args.run_hyperparameter_search,
+    'n_folded_cross_evaluation': args.n_folded_cross_evaluation,
     'debug': False,
     'test_noise_robustness': args.test_noise_robustness,
     'experiment_series': 'independent',
@@ -215,7 +218,7 @@ else:
 logging.log(log_level, "LOG LEVEL: %s", log_level)
 
 
-def run_global_config(global_config, experiment_series_names=''):
+def run_global_config(global_config, experiment_series_names='', cross_eval_set = -1):
     # Create paths for run
     now = datetime.datetime.now()
     experiment_name = now.strftime("%Y_%m_%d__%H_%M_%S")
@@ -253,7 +256,31 @@ def run_global_config(global_config, experiment_series_names=''):
     # TODO: Create json schema to check config validity
     with open(global_config["config_path"]) as f:
         model_config = json.load(f)
+
+    # If cross evaluation is activated
+    if global_config['n_folded_cross_evaluation'] > 1:
+        # Rename models
+        for expert_name in model_config.get('experts'):
+            model_path = model_config['experts'][expert_name]["model_path"]
+            head, tail = os.path.split(model_path)
+            model_path = "{}/cross_evaluations/{}_CE{}{}".format(head, os.path.splitext(tail)[0], cross_eval_set, os.path.splitext(tail)[1])
+            model_config['experts'][expert_name]["model_path"] = model_path
+        # Rename results path
+        result_path = global_config['result_path']
+        result_path = "{}cross_evaluations/CE{}/".format(result_path, cross_eval_set)
+        global_config['result_path'] = result_path
+        # Rename gating network
+        gating_path = model_config['gating']["model_path"]
+        head, tail = os.path.split(gating_path)
+        gating_path = "{}/cross_evaluations/{}_CE{}{}".format(head, os.path.splitext(tail)[0], cross_eval_set, os.path.splitext(tail)[1])
+        model_config['gating']["model_path"] = gating_path
+        # Rename gating network separation
+        gating_path = model_config['gating_separation']["model_path"]
+        head, tail = os.path.split(gating_path)
+        gating_path = "{}/cross_evaluations/{}_CE{}{}".format(head, os.path.splitext(tail)[0], cross_eval_set, os.path.splitext(tail)[1])
+        model_config['gating_separation']["model_path"] = gating_path
         
+
     ## Initialize models
     # model_config, is_loaded, num_time_steps, overwriting_activated=True, x_pred_to = 1550, time_normalization = 22.
     model_manager = ModelManager(model_config = model_config,
@@ -276,14 +303,18 @@ def run_global_config(global_config, experiment_series_names=''):
                                         evaluation_ratio = global_config.get("evaluation_ratio"), 
                                         test_ratio= global_config.get("test_ratio"),
                                         batch_size = global_config.get('batch_size'), 
-                                        random_seed = random_seed)
+                                        random_seed = random_seed,
+                                        cross_eval_set = cross_eval_set, 
+                                        n_cross_eval_sets = global_config['n_folded_cross_evaluation'])
 
         seq2seq_dataset_train, seq2seq_dataset_eval, seq2seq_dataset_test = data_source.get_tf_data_sets_seq2seq_data(
                                         normalized=True, 
                                         evaluation_ratio = global_config.get("evaluation_ratio"), 
                                         test_ratio= global_config.get("test_ratio"),
                                         batch_size = global_config.get('batch_size'), 
-                                        random_seed = random_seed)
+                                        random_seed = random_seed,
+                                        cross_eval_set = cross_eval_set, 
+                                        n_cross_eval_sets = global_config['n_folded_cross_evaluation'])
     
     ## Get separation prediction training and test dataset
     if global_config["separation_prediction"]:
@@ -295,7 +326,9 @@ def run_global_config(global_config, experiment_series_names=''):
                 batch_size=global_config['batch_size'], 
                 random_seed=random_seed,
                 time_normalization=global_config['time_normalization_constant'],
-                n_inp_points = global_config['separation_mlp_input_dim'])
+                n_inp_points = global_config['separation_mlp_input_dim'],
+                cross_eval_set = cross_eval_set, 
+                n_cross_eval_sets = global_config['n_folded_cross_evaluation'])
 
         seq2seq_dataset_train_sp, seq2seq_dataset_eval_sp, seq2seq_dataset_test_sp, num_time_steps = \
             data_source.get_tf_data_sets_seq2seq_with_separation_data(
@@ -304,7 +337,9 @@ def run_global_config(global_config, experiment_series_names=''):
                 test_ratio= global_config.get("test_ratio"),
                 batch_size=global_config['batch_size'], 
                 random_seed=random_seed,
-                time_normalization=global_config['time_normalization_constant'])
+                time_normalization=global_config['time_normalization_constant'],
+                cross_eval_set = cross_eval_set, 
+                n_cross_eval_sets = global_config['n_folded_cross_evaluation'])
     # Testing reasons
     #test_separation_mlp_advanced_training(data_source)
     #test_separation_mlp(data_source)
@@ -371,8 +406,8 @@ def run_global_config(global_config, experiment_series_names=''):
     if global_config["separation_prediction"]:
         if global_config.get('execute_evaluation'):
             model_manager.test_models_separation_prediction(result_dir = global_config['result_path'],
-                                    seq2seq_dataset_test = seq2seq_dataset_train_sp, 
-                                    mlp_dataset_test = mlp_dataset_train_sp,
+                                    seq2seq_dataset_test = seq2seq_dataset_eval_sp, 
+                                    mlp_dataset_test = mlp_dataset_eval_sp,
                                     normalization_constant = data_source.normalization_constant,
                                     time_normalization_constant=global_config['time_normalization_constant'],
                                     virtual_belt_edge = global_config['virtual_belt_edge_x_position'],
@@ -428,7 +463,12 @@ def run_global_config(global_config, experiment_series_names=''):
 
 if not global_config['run_hyperparameter_search']:
     if not global_config['test_noise_robustness']:
-        score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
+        # Run cross evaluation
+        if global_config['n_folded_cross_evaluation'] > 1 and not global_config['is_loaded']:
+            for i in range(global_config['n_folded_cross_evaluation']):
+                score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config=global_config, cross_eval_set=i)
+        else:
+            score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
         logging.info('data association finished!')
         #code.interact(local=dict(globals(), **locals()))
     else:

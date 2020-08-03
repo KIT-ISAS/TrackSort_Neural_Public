@@ -357,7 +357,8 @@ class AbstractDataSet(ABC):
 
         return input_seq, target_seq
 
-    def get_tf_data_sets_seq2seq_data(self, normalized=True, evaluation_ratio = 0.15, test_ratio=0.15, batch_size=64, random_seed = None):
+    def get_tf_data_sets_seq2seq_data(self, normalized=True, evaluation_ratio = 0.15, test_ratio=0.15, batch_size=64, 
+                                      random_seed = None, cross_eval_set = -1, n_cross_eval_sets = -1):
         """Seperate Seq2Seq data in training, evaluation and test set and convert them to Tensor data.
 
         Set random_seed to not None to fix the shuffling of training, eval and test data.
@@ -368,6 +369,9 @@ class AbstractDataSet(ABC):
             test_ratio (double):        Rate of data that is turned into test data
             batch_size (int):           Batch size for training and test data
             random_seed (int):          None: Random shuffling; int: Fixed shuffling
+            cross_eval_set (int):       -1: No cross evaluation, int: Number of current set
+            n_cross_eval_sets (int):    -1: No cross evaluation, int: Number of cross evaluations. 
+                                        Cross evaluation disables evaluation_ratio and test_ratio.
 
         Returns:
             dataset_train, dataset_eval, dataset_test (tf.Tensor): Train, evaluation and test data in tensorflow format
@@ -379,7 +383,8 @@ class AbstractDataSet(ABC):
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
         
         # Create ids for train and test tracks with optional random seed
-        train_ids, eval_ids, test_ids = train_eval_test_split(np.arange(tracks.shape[0]), evaluation_ratio, test_ratio, random_seed)
+        train_ids, eval_ids, test_ids = \
+            train_eval_test_split(np.arange(tracks.shape[0]), evaluation_ratio, test_ratio, random_seed, cross_eval_set, n_cross_eval_sets)
         
         train_tracks = tracks[train_ids]
         eval_tracks = tracks[eval_ids]
@@ -418,7 +423,8 @@ class AbstractDataSet(ABC):
 
         return dataset_train, dataset_eval, dataset_test
 
-    def get_tf_data_sets_mlp_data(self, normalized=True, evaluation_ratio = 0.15, test_ratio=0.15, batch_size=64, random_seed = None):
+    def get_tf_data_sets_mlp_data(self, normalized=True, evaluation_ratio = 0.15, test_ratio=0.15, batch_size=64, 
+                                  random_seed = None, cross_eval_set = -1, n_cross_eval_sets = -1):
         """Seperate MLP data in training, evaluation and test set and convert them to Tensor data.
 
         Set random_seed to not None to fix the shuffling of training, eval and test data.
@@ -429,6 +435,9 @@ class AbstractDataSet(ABC):
             test_ratio (double):        Rate of data that is turned into test data
             batch_size (int):           Batch size for training and test data
             random_seed (int):          None: Random shuffling; int: Fixed shuffling
+            cross_eval_set (int):       -1: No cross evaluation, int: Number of current set
+            n_cross_eval_sets (int):    -1: No cross evaluation, int: Number of cross evaluations. 
+                                        Cross evaluation disables evaluation_ratio and test_ratio.
 
         Returns:
             dataset_train, dataset_eval, dataset_test (tf.Tensor): Train, evaluation and test data in tensorflow format
@@ -441,7 +450,8 @@ class AbstractDataSet(ABC):
             mlp_data = self.normalize_data(mlp_data)
         
         # Create ids for train, evaluation and test tracks with optional random seed
-        train_track_ids, eval_track_ids, test_track_ids = train_eval_test_split(np.arange(tracks.shape[0]), evaluation_ratio, test_ratio, random_seed)
+        train_track_ids, eval_track_ids, test_track_ids = \
+            train_eval_test_split(np.arange(tracks.shape[0]), evaluation_ratio, test_ratio, random_seed, cross_eval_set, n_cross_eval_sets)
 
         # Get the mlp data ids of the track ids
         train_ids = []
@@ -508,7 +518,9 @@ class AbstractDataSet(ABC):
                                                       batch_size=64, 
                                                       random_seed=None,
                                                       time_normalization=22.,
-                                                      only_last_timestep_additional_loss = True):
+                                                      only_last_timestep_additional_loss = True,
+                                                      cross_eval_set = -1, 
+                                                      n_cross_eval_sets = -1):
         """Get the training, evaluation and test datasets for RNN separation prediction.
 
         input format: [[x_0, y_0], ..., [x_n, y_n]]
@@ -529,6 +541,9 @@ class AbstractDataSet(ABC):
             random_seed (int):              Random seed for train/test split. Set this to None to be random every time.
             time_normalization (double):    Normalize the time step target with this parameter
             only_last_timestep_additional_loss (Boolean): Sets the style of the separation mask.
+            cross_eval_set (int):           -1: No cross evaluation, int: Number of current set
+            n_cross_eval_sets (int):        -1: No cross evaluation, int: Number of cross evaluations. 
+                                            Cross evaluation disables evaluation_ratio and test_ratio.
 
         Returns:
             training_dataset (tf.Dataset):      Batches of (input, target, tracking_mask, separation_mask) pairs for training
@@ -574,7 +589,8 @@ class AbstractDataSet(ABC):
 
         tracks = np.concatenate((tracks, tracking_mask[:,:,np.newaxis], separation_mask[:,:,np.newaxis]), axis=-1)
 
-        train_tracks, eval_tracks, test_tracks =  train_eval_test_split(tracks, evaluation_ratio, test_ratio, random_seed)
+        train_tracks, eval_tracks, test_tracks =  \
+            train_eval_test_split(tracks, evaluation_ratio, test_ratio, random_seed, cross_eval_set, n_cross_eval_sets)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_tracks)
         raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_tracks)
@@ -612,7 +628,9 @@ class AbstractDataSet(ABC):
                                                   batch_size=64, 
                                                   random_seed=None,
                                                   time_normalization=22.,
-                                                  n_inp_points = 5):
+                                                  n_inp_points = 5,
+                                                  cross_eval_set = -1, 
+                                                  n_cross_eval_sets = -1):
         """Get the training, evaluation and test datasets for MLP separation prediction.
 
         input format: [x_1, x_2, ..., x_n_inp, y_1, y_2, ..., y_n_inp]
@@ -631,6 +649,9 @@ class AbstractDataSet(ABC):
             random_seed (int):          Random seed for train/test split. Set this to None to be random every time.
             time_normalization (double):  Normalize the time step target with this parameter
             n_inp_points (int):         Number of measurements for the input of the MLP
+            cross_eval_set (int):       -1: No cross evaluation, int: Number of current set
+            n_cross_eval_sets (int):    -1: No cross evaluation, int: Number of cross evaluations. 
+                                        Cross evaluation disables evaluation_ratio and test_ratio.
 
         Returns:
             training_dataset (tf.Dataset): Batches of (input, target, mask) sets for training
@@ -676,7 +697,8 @@ class AbstractDataSet(ABC):
             # normalize velocity prediction
             mlp_data[:, -2] /= self.normalization_constant
 
-        train_data, eval_data, test_data =  train_eval_test_split(mlp_data, evaluation_ratio, test_ratio, random_seed)
+        train_data, eval_data, test_data = \
+            train_eval_test_split(mlp_data, evaluation_ratio, test_ratio, random_seed, cross_eval_set, n_cross_eval_sets)
 
         raw_train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
         raw_eval_dataset = tf.data.Dataset.from_tensor_slices(eval_data)
@@ -1057,7 +1079,7 @@ class AbstractDataSet(ABC):
 
         return aligned_tracks
 
-def train_eval_test_split(dataset, eval_ratio, test_ratio, random_seed=None):
+def train_eval_test_split(dataset, eval_ratio, test_ratio, random_seed=None, cross_eval_set = -1, n_cross_eval_sets = -1):
     """Split a numpy array into a train, evaluation and test set.
 
     The split will be done along axis 0.
@@ -1068,6 +1090,9 @@ def train_eval_test_split(dataset, eval_ratio, test_ratio, random_seed=None):
         test_ratio (double):         A double between 0 and 1. 
         random_seed (int or None):  If int: Fixed random seed for random generator. 
                                     If None: Numbers will be random every time.
+        cross_eval_set (int):       -1: No cross evaluation, int: Number of current set
+        n_cross_eval_sets (int):    -1: No cross evaluation, int: Number of cross evaluations. 
+                                    Cross evaluation disables evaluation_ratio and test_ratio.
 
     Returns:
         dataset_train, dataset_eval, dataset_test
@@ -1075,11 +1100,29 @@ def train_eval_test_split(dataset, eval_ratio, test_ratio, random_seed=None):
     assert(eval_ratio + test_ratio < 1)
     assert(eval_ratio>0 and eval_ratio<1)
     assert(test_ratio>0 and test_ratio<1)
-    # First split the dataset into training and rest
-    rest_ratio = eval_ratio + test_ratio
-    dataset_train, dataset_rest = train_test_split(dataset, test_size=rest_ratio, random_state=random_seed)
-    split_test_ratio = test_ratio/rest_ratio
-    dataset_eval, dataset_test = train_test_split(dataset_rest, test_size=split_test_ratio, random_state=random_seed)
+    # No cross evaluation
+    if n_cross_eval_sets == -1:
+        # First split the dataset into training and rest
+        rest_ratio = eval_ratio + test_ratio
+        dataset_train, dataset_rest = train_test_split(dataset, test_size=rest_ratio, random_state=random_seed)
+        split_test_ratio = test_ratio/rest_ratio
+        dataset_eval, dataset_test = train_test_split(dataset_rest, test_size=split_test_ratio, random_state=random_seed)
+    else:
+        # Cross evaluation
+        split_ratio = 1/n_cross_eval_sets
+        # Fix random seed
+        np.random.seed(random_seed)
+        # Create random ids
+        rand_ids = np.random.choice(dataset.shape[0], dataset.shape[0])
+        block_length = int(np.floor(split_ratio*dataset.shape[0]))
+        train_idx = np.append(np.arange(0, cross_eval_set*block_length), np.arange((cross_eval_set+1)*block_length, dataset.shape[0]))
+        train_ids = rand_ids[train_idx]
+        eval_idx = np.arange(cross_eval_set*block_length, (cross_eval_set+1)*block_length)
+        eval_ids = rand_ids[eval_idx]
+        dataset_train = dataset[train_ids]
+        dataset_eval = dataset[eval_ids]
+        # This will be a copy of the eval set.
+        dataset_test = dataset_eval
     return dataset_train, dataset_eval, dataset_test
 
 class FakeDataSet(AbstractDataSet):
