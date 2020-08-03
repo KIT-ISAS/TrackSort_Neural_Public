@@ -6,7 +6,11 @@ Todo:
 
 import numpy as np
 import logging
+import matplotlib
+plt = matplotlib.pyplot
+
 from enum import Enum, auto
+from sklearn.linear_model import LinearRegression
 
 from kf_model import KF_Model, KF_State
 
@@ -15,15 +19,17 @@ class CA_Temporal_Separation_Type(Enum):
     """Simple enumeration class for temporal separion prediction with the CA model.
     
     Available options are:
-        * CA:  The CA motion model
+        * CA:       The CA motion model
         * CVBC:     The bias corrected CV motion model
-        * IA:     Identically Acceleration model. The median acceleration is learned on training data. CA model with the median acc is applied.
+        * IA:       Identically Acceleration model. The median acceleration is learned on training data. CA model with the median acc is applied.
         * LV:       CA model with Limited Velocity - Particles will not be faster than belt speed
+        * VABC:     Velocity and Acceleration based Bias Correction - CA projection corrected dependent on velocity and acceleration
     """
     CA = auto()
     CVBC = auto()
     IA = auto()
     LV = auto()
+    VABC = auto()
 
 class CA_Spatial_Separation_Type(Enum):
     """Simple enumeration class for spatial separion prediction with the CA model.
@@ -79,6 +85,8 @@ class CA_Model(KF_Model):
             self.temporal_prediction = CA_Temporal_Separation_Type.IA
         elif temporal_separator == "LV":
             self.temporal_prediction = CA_Temporal_Separation_Type.LV
+        elif temporal_separator == "VABC":
+            self.temporal_prediction = CA_Temporal_Separation_Type.VABC
         else:
             logging.warning("Temporal separation prediction type '{}' is unknown. Setting to default = CA.".format(temporal_separator)) 
             self.temporal_prediction = CA_Temporal_Separation_Type.CA
@@ -209,112 +217,160 @@ class CA_Model(KF_Model):
                         if a_last[0,0]==0:
                             a_last[0,0]=1E-20
                         sqrt_val = (v_last[0,0]/a_last[0,0])**2 + 2 * delta_x/a_last[0,0]
-                        if sqrt_val < 0:
+                        if sqrt_val < 0 or j<=2:
                             logging.warning("With the predicted velocity of {} and the predicted acceleration of {} the track {} would not reach the nozzle array. Perform cv prediction!".format(v_last[0], a_last[0], i))
                             if v_last[0,0] > 0:
                                 dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
                                 y_pred = pos_last[1,0] + dt_pred * v_last[1,0] * self.dt
+                                # There is no ther way than taking default values here.
+                                var_t = 0.5
+                                var_y = 0.0006
                             else:
                                 logging.warning("The predicted velocity in x direction was {} <= 0 in track {} using the CV KF model.".format(v_last[0], i))
                                 y_pred = pos_last[1,0]
-                                dt_pred = 11 # This is a fairly close value. Please investigate the issue!   
-                            break 
-                        ## First perform temporal predicion
-                        target_time = target_np[i, j, 3]*self.time_normalization
-                        if self.temporal_prediction == CA_Temporal_Separation_Type.CA:
-                            dt_pred = 1/self.dt * (- v_last[0,0]/a_last[0,0] + np.sign(a_last[0,0]) * np.sqrt(sqrt_val))
-                        elif self.temporal_prediction == CA_Temporal_Separation_Type.CVBC:
-                            dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
-                            if is_training:
-                                self.temporal_training_list.append(dt_pred - target_time)
-                            else:
-                                # Adjust prediction with bias
-                                dt_pred -= self.temporal_variable
-                        elif self.temporal_prediction == CA_Temporal_Separation_Type.IA:
-                            dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
-                            if is_training:
-                                # Find optimal acceleration value
-                                a_x_opt = 2*(delta_x-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
-                                self.temporal_training_list.append(a_x_opt)
-                            else:
-                                # Perform CA prediction with a_opt instead of a_last
-                                a_best = self.temporal_variable
-                                sqrt_val = (v_last[0,0]/a_best)**2 + 2*delta_x/a_best
-                                if sqrt_val >= 0:
-                                    dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
+                                dt_pred = 11 # This is a fairly close value. Please investigate the issue!  
+                                var_t = 0.5
+                                var_y = 0.0006 
+                        else:
+                            ## First perform temporal predicion
+                            target_time = target_np[i, j, 3]*self.time_normalization
+                            if self.temporal_prediction == CA_Temporal_Separation_Type.CA:
+                                dt_pred = 1/self.dt * (- v_last[0,0]/a_last[0,0] + np.sign(a_last[0,0]) * np.sqrt(sqrt_val))
+                            elif self.temporal_prediction == CA_Temporal_Separation_Type.CVBC:
+                                dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
+                                if is_training:
+                                    self.temporal_training_list.append(dt_pred - target_time)
                                 else:
-                                    logging.warning("Can not perform IA prediction with last x velocity of {} and best acceleration {}.".format(v_last[0], a_best))
-                        elif self.temporal_prediction == CA_Temporal_Separation_Type.LV:
-                            dt_pred = 1/self.dt * (- v_last[0,0]/a_last[0,0] + np.sign(a_last[0,0]) * np.sqrt(sqrt_val))
-                            if ~is_training:
-                                t_max_vel = 1/self.dt * (self.belt_velocity-v_last[0,0])/a_last[0,0]
-                                # If the paticle x velocity would exceed the belt velocity before the nozzle array
-                                if t_max_vel < dt_pred and t_max_vel>0:
-                                    # Distance to exceeding point
-                                    x_ca = pos_last[0,0] + v_last[0,0]  * self.dt * t_max_vel + 1/2 * a_last[0,0] * (self.dt * t_max_vel)**2
-                                    # CV with v_x = v_belt afterwards
-                                    dt_pred = t_max_vel + 1/self.dt * (self.x_pred_to - x_ca)/self.belt_velocity
-                        dt_s = dt_pred * self.dt
-                        ## Then perform spatial prediction
-                        if a_last[1,0]==0:
-                            a_last[1,0]=1E-20
-                        if v_last[1,0]==0:
-                            v_last[1,0]=1E-20
-                        if self.spatial_prediction == CA_Spatial_Separation_Type.CA:
-                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_last[1,0]
-                        elif self.spatial_prediction == CA_Spatial_Separation_Type.DSC:
-                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_last[1,0]
-                            if ~is_training:
-                                t_sign_change = 1/self.dt * (0-v_last[1,0])/a_last[1,0]
-                                # If the paticle y velocity would hit a sign change before the nozzle array
-                                if t_sign_change < dt_pred and t_sign_change > 0:
-                                    # Y position is fix after t sign change
-                                    y_pred = pos_last[1,0] + v_last[1,0] * t_sign_change * self.dt + 1/2 * (t_sign_change * self.dt)**2 * a_last[1,0]
-                        elif self.spatial_prediction == CA_Spatial_Separation_Type.CV:
-                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s
-                        elif self.spatial_prediction == CA_Spatial_Separation_Type.Ratio:
-                            y_pred = pos_last[1,0] + v_last[1,0] * dt_s
-                            if is_training:
-                                if j>=2:
-                                    v_nozzle_target = target_np[i, j, 4]/self.dt 
-                                    r_i = v_nozzle_target/v_last[1,0]
-                                    self.spatial_training_list.append(r_i)
-                            else:
-                                r = self.spatial_variable
-                                a_ratio = -(1-r)*v_last[1,0]/(dt_s)
-                                y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
-                        ## Uncertainty prediction
-                        # Calculate uncertainty at nozzle array
-                        Phi = np.matrix([[1, dt_s, dt_s**2/2, 0, 0, 0], [0, 1, dt_s, 0, 0, 0], [0, 0, 1, 0, 0, 0],
-                                    [0, 0, 0, 1, dt_s, dt_s**2/2], [0, 0, 0, 0, 1, dt_s], [0, 0, 0, 0, 0, 1]])
-                        Q3 = np.matrix([[pow(dt_s, 5)/20, pow(dt_s, 4)/8, pow(dt_s, 3)/6, 0, 0, 0],
-                                            [pow(dt_s, 4)/8, pow(dt_s, 3)/3, pow(dt_s, 2)/2, 0, 0, 0],
-                                            [pow(dt_s, 3)/6, pow(dt_s, 2)/2, dt_s, 0, 0, 0],
-                                            [0, 0, 0, pow(dt_s, 5)/20, pow(dt_s, 4)/8, pow(dt_s, 3)/6],
-                                            [0, 0, 0, pow(dt_s, 4)/8, pow(dt_s, 3)/3, pow(dt_s, 2)/2],
-                                            [0, 0, 0, pow(dt_s, 3)/6, pow(dt_s, 2)/2, dt_s]])
-                        C_p = Phi * ca_state.C_e * Phi.T + self.s_w * Q3
-                        x_p = Phi.dot(ca_state.state)
-                        # Evaluate uncertainty in temporal dimension
-                        var_t_taylor = (1/x_p[1, 0])**2 * C_p[0, 0]
-                        var_t = var_t_taylor/self.dt**2
-                        # Evaluate uncertainty in spatial dimension
-                        var_y_taylor = C_p[3, 3] + x_p[4, 0]**2 * var_t_taylor
-                        var_y = var_y_taylor
-                        # sigma_t^2 if temporal prediction is CV based
-                        #if self.temporal_prediction == CA_Temporal_Separation_Type.CVBC or \
-                        #   self.temporal_prediction == CA_Temporal_Separation_Type.IA:
+                                    # Adjust prediction with bias
+                                    dt_pred -= self.temporal_variable
+                            elif self.temporal_prediction == CA_Temporal_Separation_Type.IA:
+                                dt_pred = 1/(v_last[0,0] * self.dt) * delta_x
+                                if is_training:
+                                    # Find optimal acceleration value
+                                    a_x_opt = 2*(delta_x-v_last[0,0] * self.dt * target_time)/(target_time * self.dt)**2
+                                    self.temporal_training_list.append(a_x_opt)
+                                else:
+                                    # Perform CA prediction with a_opt instead of a_last
+                                    a_best = self.temporal_variable
+                                    sqrt_val = (v_last[0,0]/a_best)**2 + 2*delta_x/a_best
+                                    if sqrt_val >= 0:
+                                        dt_pred = 1/self.dt * (- v_last[0,0]/a_best + np.sign(a_best) * np.sqrt(sqrt_val))
+                                    else:
+                                        logging.warning("Can not perform IA prediction with last x velocity of {} and best acceleration {}.".format(v_last[0], a_best))
+                            elif self.temporal_prediction == CA_Temporal_Separation_Type.LV:
+                                dt_pred = 1/self.dt * (- v_last[0,0]/a_last[0,0] + np.sign(a_last[0,0]) * np.sqrt(sqrt_val))
+                                if ~is_training:
+                                    t_max_vel = 1/self.dt * (self.belt_velocity-v_last[0,0])/a_last[0,0]
+                                    # If the paticle x velocity would exceed the belt velocity before the nozzle array
+                                    if t_max_vel < dt_pred and t_max_vel>0:
+                                        # Distance to exceeding point
+                                        x_ca = pos_last[0,0] + v_last[0,0]  * self.dt * t_max_vel + 1/2 * a_last[0,0] * (self.dt * t_max_vel)**2
+                                        # CV with v_x = v_belt afterwards
+                                        dt_pred = t_max_vel + 1/self.dt * (self.x_pred_to - x_ca)/self.belt_velocity
+                            elif self.temporal_prediction == CA_Temporal_Separation_Type.VABC:
+                                dt_pred = 1/self.dt * (- v_last[0,0]/a_last[0,0] + np.sign(a_last[0,0]) * np.sqrt(sqrt_val))
+                                if is_training:
+                                    # Calculate error in ca prediction
+                                    temp_err = dt_pred - target_time
+                                    self.temporal_training_list.append([v_last[0,0], a_last[0,0], temp_err])
+                                else:
+                                    # Substract the predicted error for this velocity and accelartion
+                                    dt_pred -= (self.temporal_variable[0] * v_last[0, 0] + \
+                                                self.temporal_variable[1] * a_last[0,0]  + \
+                                                self.temporal_variable[2])
+                            dt_s = dt_pred * self.dt
+                            ## Then perform spatial prediction
+                            if a_last[1,0]==0:
+                                a_last[1,0]=1E-20
+                            if v_last[1,0]==0:
+                                v_last[1,0]=1E-20
+                            if self.spatial_prediction == CA_Spatial_Separation_Type.CA:
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_last[1,0]
+                            elif self.spatial_prediction == CA_Spatial_Separation_Type.DSC:
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_last[1,0]
+                                if ~is_training:
+                                    t_sign_change = 1/self.dt * (0-v_last[1,0])/a_last[1,0]
+                                    # If the paticle y velocity would hit a sign change before the nozzle array
+                                    if t_sign_change < dt_pred and t_sign_change > 0:
+                                        # Y position is fix after t sign change
+                                        y_pred = pos_last[1,0] + v_last[1,0] * t_sign_change * self.dt + 1/2 * (t_sign_change * self.dt)**2 * a_last[1,0]
+                            elif self.spatial_prediction == CA_Spatial_Separation_Type.CV:
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_s
+                            elif self.spatial_prediction == CA_Spatial_Separation_Type.Ratio:
+                                y_pred = pos_last[1,0] + v_last[1,0] * dt_s
+                                if is_training:
+                                    if j>=2:
+                                        v_nozzle_target = target_np[i, j, 4]/self.dt 
+                                        r_i = v_nozzle_target/v_last[1,0]
+                                        self.spatial_training_list.append(r_i)
+                                else:
+                                    r = self.spatial_variable
+                                    a_ratio = -(1-r)*v_last[1,0]/(dt_s)
+                                    y_pred = pos_last[1,0] + v_last[1,0] * dt_s + 1/2 * (dt_s)**2 * a_ratio
+                            ## Uncertainty prediction
+                            # Calculate uncertainty at nozzle array
+                            Phi = np.matrix([[1, dt_s, dt_s**2/2, 0, 0, 0], [0, 1, dt_s, 0, 0, 0], [0, 0, 1, 0, 0, 0],
+                                        [0, 0, 0, 1, dt_s, dt_s**2/2], [0, 0, 0, 0, 1, dt_s], [0, 0, 0, 0, 0, 1]])
+                            Q3 = np.matrix([[pow(dt_s, 5)/20, pow(dt_s, 4)/8, pow(dt_s, 3)/6, 0, 0, 0],
+                                                [pow(dt_s, 4)/8, pow(dt_s, 3)/3, pow(dt_s, 2)/2, 0, 0, 0],
+                                                [pow(dt_s, 3)/6, pow(dt_s, 2)/2, dt_s, 0, 0, 0],
+                                                [0, 0, 0, pow(dt_s, 5)/20, pow(dt_s, 4)/8, pow(dt_s, 3)/6],
+                                                [0, 0, 0, pow(dt_s, 4)/8, pow(dt_s, 3)/3, pow(dt_s, 2)/2],
+                                                [0, 0, 0, pow(dt_s, 3)/6, pow(dt_s, 2)/2, dt_s]])
+                            C_p = Phi * ca_state.C_e * Phi.T + self.s_w * Q3
+                            x_p = Phi.dot(ca_state.state)
+                            # Evaluate uncertainty in temporal dimension
+                            var_t_taylor = (1/x_p[1, 0])**2 * C_p[0, 0]
+                            var_t = var_t_taylor/self.dt**2
+                            # Evaluate uncertainty in spatial dimension
+                            var_y_taylor = C_p[3, 3] + x_p[4, 0]**2 * var_t_taylor
+                            var_y = var_y_taylor
+                            # sigma_t^2 if temporal prediction is CV based
+                            #if self.temporal_prediction == CA_Temporal_Separation_Type.CVBC or \
+                            #   self.temporal_prediction == CA_Temporal_Separation_Type.IA:
                         predictions[i, j, 2] = y_pred
                         predictions[i, j, 3] = dt_pred/self.time_normalization
                         predictions[i, j, 4] = np.log(var_y)
                         predictions[i, j, 5] = np.log(var_t/self.time_normalization**2)
                     else:
-                        logging.warning("Track out of measurements at first time step.")
+                        logging.warning("Track length too short for CA predictions.")
                     break
 
         if is_training:
             if len(self.temporal_training_list)>0:
-                self.temporal_variable = np.nanmedian(self.temporal_training_list)
+                if self.temporal_prediction == CA_Temporal_Separation_Type.VABC:
+                    v_err = np.array(self.temporal_training_list)
+                    # Delete entries with outliers in acceleration
+                    sorted_indices = np.argsort(v_err[:, 1])
+                    n_id = sorted_indices.shape[0]
+                    outlier_free_indices = sorted_indices[int(n_id*0.05):int(n_id*0.95)]
+                    v_err = v_err[outlier_free_indices]
+                    reg = LinearRegression().fit(v_err[:, 0:2], v_err[:, 2])
+                    """
+                    reg_v = LinearRegression().fit(np.expand_dims(v_err[:, 0], -1), v_err[:, 2])
+                    reg_a = LinearRegression().fit(np.expand_dims(v_err[:, 1], -1), v_err[:, 2])
+                    # Error over velocity plot
+                    x = np.arange(np.min(v_err[:,0]), np.max(v_err[:,0]), 0.1)
+                    plt.figure(figsize=[19.20, 10.80], dpi=100)
+                    plt.scatter(v_err[:,0], v_err[:,2], label="Errors")
+                    plt.plot(x, reg_v.predict(np.expand_dims(x, -1)), '-k', label="Linear Regression")
+                    plt.xlabel("x velocity")
+                    plt.ylabel("Error [frames]")
+                    plt.legend()
+                    plt.show()
+                    # Error over velocity plot
+                    x = np.arange(np.min(v_err[:,1]), np.max(v_err[:,1]), 0.1)
+                    plt.figure(figsize=[19.20, 10.80], dpi=100)
+                    plt.scatter(v_err[:,1], v_err[:,2], label="Errors")
+                    plt.plot(x, reg_a.predict(np.expand_dims(x, -1)), '-k', label="Linear Regression")
+                    plt.xlabel("x acceleration")
+                    plt.ylabel("Error [frames]")
+                    plt.legend()
+                    plt.show()
+                    """
+                    self.temporal_variable = np.append(reg.coef_, reg.intercept_)
+                else:
+                    self.temporal_variable = np.nanmedian(self.temporal_training_list)
             if len(self.spatial_training_list)>0:
                 self.spatial_variable = np.nanmedian(self.spatial_training_list)
         return predictions

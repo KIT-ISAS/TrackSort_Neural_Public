@@ -186,7 +186,7 @@ class CV_Model(KF_Model):
                     self.predict(cv_state)
                     predictions[i, j, :2] = [cv_state.get_pos()[0], cv_state.get_pos()[1]]
                 else:
-                    if j>= 1:
+                    if j>= 2:
                         # only perform update step
                         self.update(cv_state, np_inp[i, j])
                         # Make separation prediction

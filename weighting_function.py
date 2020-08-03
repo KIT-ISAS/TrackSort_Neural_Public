@@ -57,6 +57,7 @@ def weighting_function_separation(predictions, weights, is_uncertainty_predictio
         total_prediction = np.zeros(predictions.shape[1:])
         # Weighted mean = First moment of gaussian mixture
         total_prediction[:,:2] = np.sum(predictions[:,:,:2] * weights, axis=0)
+        """
         # Calculate the second central moment of the gaussian mixture
         # First calculate the second moment of the gaussian mixture
         e2_GM_0 = np.sum(weights[:,:,0] * (predictions[:,:,0]**2 + np.exp(predictions[:,:,2])), axis=0)
@@ -67,6 +68,9 @@ def weighting_function_separation(predictions, weights, is_uncertainty_predictio
         # Lastly, convert the second central moment back to the log format
         total_prediction[:,2] = np.log(c2_GM_0)
         total_prediction[:,3] = np.log(c2_GM_1)
+        """
+        total_prediction[:,2] = np.log(np.sum(weights[:,:,0] * np.exp(predictions[:,:,2])))
+        total_prediction[:,3] = np.log(np.sum(weights[:,:,1] * np.exp(predictions[:,:,3])))
         # Error handling if every expert has weight = 0
         total_prediction[(np.sum(np.sum(weights, axis=-1),axis=0)==0),0:2]=np.mean(total_prediction[(np.sum(np.sum(weights, axis=-1),axis=0)>0),0:2],axis=0)
         # Very high uncertainty

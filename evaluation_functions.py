@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 import pandas as pd
 plt = matplotlib.pyplot
+from sklearn.linear_model import LinearRegression
 
 def calculate_error_first_and_second_kind(tracks, particle_ids):
     """Calculate the error of first and second kind of the MTT.
@@ -620,20 +621,77 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
         no_show (Boolean):      Do not show the figures. The figures will still be saved.
     """
     # Create bins
-    n_bins = 3
+    percentage_bin_size = 0.25
     for expert in range(predictions.shape[0]):
         # Spatial analysis
         # Sort instances by predicted variance
         predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 2])[0]
         target_y = target[ np.where(masks[expert]), 0][0]
         predicted_y = predictions[expert,  np.where(masks[expert]), 0][0]
-        single_ence_analysis(predicted_var, target_y, predicted_y, result_dir + "spatial_evaluations/", expert_names[expert], n_bins, "spatial", no_show)
+        advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir + "spatial_evaluations/", expert_names[expert], percentage_bin_size, "spatial", no_show)
         predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 3])[0]
         target_y = target[ np.where(masks[expert]), 1][0]
         predicted_y = predictions[expert,  np.where(masks[expert]), 1][0]
-        single_ence_analysis(predicted_var, target_y, predicted_y, result_dir + "temporal_evaluations/", expert_names[expert], n_bins, "temporal", no_show)
-        stop=0
-            
+        advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir + "temporal_evaluations/", expert_names[expert], percentage_bin_size, "temporal", no_show)
+
+def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, percentage_bin_size=0.25, domain="spatial", no_show=False):
+    """Create an advanced ence analysis with a sliding window for one expert in one domain.
+
+    Args:
+        predicted_var (np.array):   The predicted variances of an expert
+        target_y (np.array):        The target vector
+        predicted_y (np.array):     The prediction vector of an expert
+        result_dir (String):        Directory to save the created plot data to
+        expert_name (String):       Name of the expert
+        percentage_bin_size (double): The percentage bin size [0, 1]
+        domain (String):            Spatial or Temporal
+        no_show (Boolean):          Don't show the images
+    """
+    assert(percentage_bin_size>0)
+    assert(percentage_bin_size<1)
+    sorted_indices = np.argsort(predicted_var)
+    n_instances = sorted_indices.shape[0]
+    bin_size = int(np.floor(n_instances*percentage_bin_size))
+    start_ids = np.arange(start=0, stop=n_instances-bin_size, step=1)
+    n_bins = start_ids.shape[0]
+    RMV = np.zeros(n_bins)
+    RMSE = np.zeros(n_bins)
+    # Sliding window
+    for start_id in start_ids:
+        bin_indices = sorted_indices[start_id:start_id+bin_size]
+        RMV[start_id] = np.sqrt(np.mean(predicted_var[bin_indices]))
+        bin_errors = target_y[bin_indices] - predicted_y[bin_indices]
+        RMSE[start_id] = np.sqrt(np.mean(bin_errors**2))
+
+    # ENCE = 1/N * sum(|RMV(j)-RMSE(j)|/RMV(j))
+    ENCE = np.mean(np.abs(RMV-RMSE)/RMV)
+    # STDs Coefficient of Variation
+    mu_sigma = np.mean(predicted_var)
+    C_v = np.sqrt(np.sum((predicted_var-mu_sigma)**2)/(n_instances-1))/mu_sigma
+    # Create linear regression for RMV/RMSE plot
+    reg = LinearRegression().fit(np.expand_dims(RMV, -1), RMSE)
+    RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
+    corrected_ENCE = np.mean(np.abs(RMV_corrected-RMSE)/RMV_corrected)
+    # Logging output
+    logging.info("ENCE for expert {} in {} domain = {}".format(expert_name, domain, ENCE))
+    logging.info("Corrected ENCE for expert {} in {} domain = {}".format(expert_name, domain, corrected_ENCE))
+    logging.info("C_v for expert {} in {} domain = {}".format(expert_name, domain, C_v))
+    # Plot RMSE over RMV
+    min_RMV = np.min([np.min(RMV),np.min(RMV_corrected)])
+    max_RMV = np.max([np.max(RMV),np.max(RMV_corrected)])
+    plot_RMV = np.arange(min_RMV, max_RMV, (max_RMV-min_RMV)/1000)
+    plt.figure(figsize=[19.20, 10.80], dpi=100)
+    plt.plot(RMV, RMSE, '-b', label="ENCE analysis")
+    plt.plot(plot_RMV, reg.predict(np.expand_dims(plot_RMV, -1)), '-.b', label="Linear regression of ENCE analysis")
+    plt.plot(RMV_corrected, RMSE, '-g', label="Linearly calibrated predictions")
+    plt.plot(plot_RMV, plot_RMV, '--k', label="Optimal calibration")
+    plt.xlabel("RMV")
+    plt.ylabel("RMSE")
+    plt.legend()
+    plt.title("Calibration analysis for {} prediction of expert {}".format(domain, expert_name))
+    plt.savefig(result_dir + 'advanced_ence_analysis_{}_{}.pdf'.format(domain, expert_name))  
+    if not no_show:
+        plt.show()
     stop=0
 
 def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, n_bins=5, domain="spatial", no_show=False):
