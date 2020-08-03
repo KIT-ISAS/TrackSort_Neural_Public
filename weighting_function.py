@@ -69,8 +69,8 @@ def weighting_function_separation(predictions, weights, is_uncertainty_predictio
         total_prediction[:,2] = np.log(c2_GM_0)
         total_prediction[:,3] = np.log(c2_GM_1)
         """
-        total_prediction[:,2] = np.log(np.sum(weights[:,:,0] * np.exp(predictions[:,:,2])))
-        total_prediction[:,3] = np.log(np.sum(weights[:,:,1] * np.exp(predictions[:,:,3])))
+        total_prediction[:,2] = np.log(np.sum(weights[:,:,0] * np.exp(predictions[:,:,2]), axis=0))
+        total_prediction[:,3] = np.log(np.sum(weights[:,:,1] * np.exp(predictions[:,:,3]), axis=0))
         # Error handling if every expert has weight = 0
         total_prediction[(np.sum(np.sum(weights, axis=-1),axis=0)==0),0:2]=np.mean(total_prediction[(np.sum(np.sum(weights, axis=-1),axis=0)>0),0:2],axis=0)
         # Very high uncertainty

@@ -624,11 +624,11 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
     percentage_bin_size = 0.25
     for expert in range(predictions.shape[0]):
         # Spatial analysis
-        # Sort instances by predicted variance
         predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 2])[0]
         target_y = target[ np.where(masks[expert]), 0][0]
         predicted_y = predictions[expert,  np.where(masks[expert]), 0][0]
         advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir + "spatial_evaluations/", expert_names[expert], percentage_bin_size, "spatial", no_show)
+        # Temporal analysis
         predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 3])[0]
         target_y = target[ np.where(masks[expert]), 1][0]
         predicted_y = predictions[expert,  np.where(masks[expert]), 1][0]
@@ -654,12 +654,14 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
     bin_size = int(np.floor(n_instances*percentage_bin_size))
     start_ids = np.arange(start=0, stop=n_instances-bin_size, step=1)
     n_bins = start_ids.shape[0]
-    RMV = np.zeros(n_bins)
-    RMSE = np.zeros(n_bins)
+    RMV = np.full(n_bins, np.nan)
+    RMSE = np.full(n_bins, np.nan)
     # Sliding window
     for start_id in start_ids:
         bin_indices = sorted_indices[start_id:start_id+bin_size]
-        RMV[start_id] = np.sqrt(np.mean(predicted_var[bin_indices]))
+        rmv = np.sqrt(np.mean(predicted_var[bin_indices]))
+        if rmv != np.inf:
+            RMV[start_id] = rmv
         bin_errors = target_y[bin_indices] - predicted_y[bin_indices]
         RMSE[start_id] = np.sqrt(np.mean(bin_errors**2))
 
@@ -669,21 +671,21 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
     mu_sigma = np.mean(predicted_var)
     C_v = np.sqrt(np.sum((predicted_var-mu_sigma)**2)/(n_instances-1))/mu_sigma
     # Create linear regression for RMV/RMSE plot
-    reg = LinearRegression().fit(np.expand_dims(RMV, -1), RMSE)
-    RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
-    corrected_ENCE = np.mean(np.abs(RMV_corrected-RMSE)/RMV_corrected)
+    #reg = LinearRegression().fit(np.expand_dims(RMV, -1), RMSE)
+    #RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
+    #corrected_ENCE = np.mean(np.abs(RMV_corrected-RMSE)/RMV_corrected)
     # Logging output
     logging.info("ENCE for expert {} in {} domain = {}".format(expert_name, domain, ENCE))
-    logging.info("Corrected ENCE for expert {} in {} domain = {}".format(expert_name, domain, corrected_ENCE))
+    #logging.info("Corrected ENCE for expert {} in {} domain = {}".format(expert_name, domain, corrected_ENCE))
     logging.info("C_v for expert {} in {} domain = {}".format(expert_name, domain, C_v))
     # Plot RMSE over RMV
-    min_RMV = np.min([np.min(RMV),np.min(RMV_corrected)])
-    max_RMV = np.max([np.max(RMV),np.max(RMV_corrected)])
+    min_RMV = np.nanmin([np.nanmin(RMV)])#,np.nanmin(RMV_corrected)])
+    max_RMV = np.nanmax([np.nanmax(RMV)])#,np.nanmax(RMV_corrected)])
     plot_RMV = np.arange(min_RMV, max_RMV, (max_RMV-min_RMV)/1000)
     plt.figure(figsize=[19.20, 10.80], dpi=100)
     plt.plot(RMV, RMSE, '-b', label="ENCE analysis")
-    plt.plot(plot_RMV, reg.predict(np.expand_dims(plot_RMV, -1)), '-.b', label="Linear regression of ENCE analysis")
-    plt.plot(RMV_corrected, RMSE, '-g', label="Linearly calibrated predictions")
+    #plt.plot(plot_RMV, reg.predict(np.expand_dims(plot_RMV, -1)), '-.b', label="Linear regression of ENCE analysis")
+    #plt.plot(RMV_corrected, RMSE, '-g', label="Linearly calibrated predictions")
     plt.plot(plot_RMV, plot_RMV, '--k', label="Optimal calibration")
     plt.xlabel("RMV")
     plt.ylabel("RMSE")

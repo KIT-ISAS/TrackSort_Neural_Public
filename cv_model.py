@@ -162,7 +162,18 @@ class CV_Model(KF_Model):
         return predictions
 
     def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
-        """Predict a batch of data with the cv model."""
+        """Predict a batch of data with the cv model.
+        
+        Returns:
+            prediction (np.array): shape = n_tracks, n_timesteps, 6
+                Tracking entries:
+                    prediction[i, 0:end_track, 0:2] = [x_pred, y_pred]
+                Separation prediction entries:
+                    prediction[i, end_track, 2] = y_nozzle_pred    (Predicted y position at nozzle array)
+                    prediction[i, end_track, 3] = dt_nozzle_pred   (Predicted time to nozzle array)
+                    prediction[i, end_track, 4] = log(var_y)       (Predicted variance of spatial prediction)
+                    prediction[i, end_track, 5] = log(var_t)       (Predicted variance of temporal prediction)
+        """
         np_inp = inp.numpy()
         np_separation_mask = separation_mask.numpy()
         if target is not None:

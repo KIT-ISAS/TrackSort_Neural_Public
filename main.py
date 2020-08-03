@@ -327,6 +327,11 @@ def run_global_config(global_config, experiment_series_names=''):
                                     num_train_epochs = global_config.get("num_train_epochs"),
                                     evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
                                     improvement_break_condition = global_config.get("improvement_break_condition"))
+            # Calibrate the uncertainty prediction with an ENCE analysis
+            if global_config["uncertainty_prediction"]:
+                model_manager.ence_calibrate_models_separation(seq2seq_dataset_train = seq2seq_dataset_train_sp,
+                                    mlp_dataset_train = mlp_dataset_train_sp,
+                                    percentage_bin_size = 0.25)
     ## Train gating network     
     if global_config["tracking"]:                           
         if global_config["is_loaded_gating_network"]:

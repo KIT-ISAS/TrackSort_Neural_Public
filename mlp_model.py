@@ -80,6 +80,7 @@ class MLP_Model(Expert):
             logging.warning("Input size was unknown. Most likely you tried to import your custom model which did not define the input shape in the first layer. Shame on you.")
         self.setup_model()
         logging.info(self.mlp_model.summary())
+        self.load_calibration()
 
     def setup_model(self):
         """Setup the model.
@@ -147,7 +148,33 @@ class MLP_Model(Expert):
             temporal_loss (tf.Tensor):  MSE of dt_nozzle prediction
             spacial_mae, temporal_mae:  MAE --""--
         """
-        return self.train_step_fn(inp, target, mask, training=False)
+        prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = self.train_step_fn(inp, target, mask, training=False)
+        prediction = self.correct_separation_prediction(np.array(prediction), mask)
+        return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae
+ 
+    def correct_separation_prediction(self, prediction, mask):
+        """Correct the uncertainty prediction of the expert with the ENCE calibration.
+
+        Args:
+            prediction (np.array): Predicted positions for training instances, shape = [n_tracks, 4]
+                                    y_nozzle, dt_nozzle, sigma_y_nozzle, sigma_dt_nozzle
+            mask (tf.Tensor):   Indicates which tracks are valid
+
+        Returns:
+            prediction
+        """
+        for track in range(prediction.shape[0]):
+            if mask[track] == 0:
+                std_y = np.sqrt(np.exp(prediction[track, 2]))
+                # spatial correction
+                corrected_std_y = self.calibration_separation_regression_var_spatial[0] * std_y + self.calibration_separation_regression_var_spatial[1]
+                prediction[track, 2] = np.log(corrected_std_y**2)
+
+                std_t = np.sqrt(np.exp(prediction[track, 3]))
+                # temporal correction
+                corrected_std_t = self.calibration_separation_regression_var_temporal[0] * std_t + self.calibration_separation_regression_var_temporal[1]
+                prediction[track, 3] = np.log(corrected_std_t**2)
+        return prediction
 
     def predict_batch(self, inp):
         """Predict a batch of input data."""

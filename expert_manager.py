@@ -220,6 +220,39 @@ class Expert_Manager(object):
             
         return prediction_list, spatial_losses, temporal_losses, spatial_maes, temporal_maes
 
+    def ence_calibrate_models_separation(self, target, predictions, masks, expert_names, percentage_bin_size = 0.25):
+        """Calibrate the separation uncertainty prediction of all experts with an ENCE calibration.
+
+        Args:
+            target (np.array):      Target values
+            predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape (n_experts=1, n_tracks, 4)
+            masks (np.array):       Masks for every expert
+            expert_names (list):    Names (String) of each expert
+            percentage_bin_size (double): The percentage size of the sliding window in the ENCE analysis [0, 1]
+        """
+        assert(len(expert_names)==predictions.shape[0])
+
+        for expert, expert_name in enumerate(expert_names):
+            assert(expert_name == self.get_separation_expert_names()[expert])
+            # Spatial calibration
+            predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 2])[0]
+            target_y = target[ np.where(masks[expert]), 0][0]
+            predicted_y = predictions[expert,  np.where(masks[expert]), 0][0]
+            self.separation_experts[expert].ence_calibration_separation(predicted_var = predicted_var, 
+                                                            target_y = target_y,
+                                                            predicted_y = predicted_y,
+                                                            percentage_bin_size = percentage_bin_size,
+                                                            domain = "spatial")
+            # Temporal calibration
+            predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 3])[0]
+            target_y = target[ np.where(masks[expert]), 1][0]
+            predicted_y = predictions[expert,  np.where(masks[expert]), 1][0]
+            self.separation_experts[expert].ence_calibration_separation(predicted_var = predicted_var, 
+                                                            target_y = target_y,
+                                                            predicted_y = predicted_y,
+                                                            percentage_bin_size = percentage_bin_size,
+                                                            domain = "temporal")
+
     def test_batch_separation_prediction(self,                     
                     seq2seq_inp = None, seq2seq_target = None, 
                     seq2seq_tracking_mask = None, seq2seq_separation_mask = None,

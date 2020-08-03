@@ -438,6 +438,7 @@ class RNN_Model(Expert):
         self.rnn_model = tf.keras.models.load_model(self.model_path)
         logging.info(self.rnn_model.summary())
         self.setup_model()
+        self.load_calibration()
 
     def setup_model(self):
         """Setup the model.
@@ -510,7 +511,38 @@ class RNN_Model(Expert):
         """
         if self.clear_state:
             self.rnn_model.reset_states()
-        return self.train_step_fn(inp, target, tracking_mask, separation_mask, train=False)
+        prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = self.train_step_fn(inp, target, tracking_mask, separation_mask, train=False)
+        prediction = self.correct_separation_prediction(np.array(prediction), separation_mask)
+        return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae
+
+    def correct_separation_prediction(self, prediction, separation_mask):
+        """Correct the uncertainty prediction of the expert with the ENCE calibration.
+
+        Args:
+            separation_mask (np.array): Indicates where the separation prediction entries are (end_track)
+            prediction (np.array): shape = n_tracks, n_timesteps, 6
+                Tracking entries:
+                    prediction[i, 0:end_track, 0:2] = [x_pred, y_pred]
+                Separation prediction entries:
+                    prediction[i, end_track, 2] = y_nozzle_pred    (Predicted y position at nozzle array)
+                    prediction[i, end_track, 3] = dt_nozzle_pred   (Predicted time to nozzle array)
+                    prediction[i, end_track, 4] = log(var_y)       (Predicted variance of spatial prediction)
+                    prediction[i, end_track, 5] = log(var_t)       (Predicted variance of temporal prediction)
+
+        Returns:
+            prediction (np.array)
+        """
+        for track in range(prediction.shape[0]):
+            sep_pos = np.where(separation_mask[track] == 1)
+            std_y = np.sqrt(np.exp(prediction[track, sep_pos, 4]))
+            # spatial correction
+            corrected_std_y = self.calibration_separation_regression_var_spatial[0] * std_y + self.calibration_separation_regression_var_spatial[1]
+            prediction[track, sep_pos, 4] = np.log(corrected_std_y**2)
+            std_t = np.sqrt(np.exp(prediction[track, sep_pos, 5]))
+            # temporal correction
+            corrected_std_t = self.calibration_separation_regression_var_temporal[0] * std_t + self.calibration_separation_regression_var_temporal[1]
+            prediction[track, sep_pos, 5] = np.log(corrected_std_t**2)
+        return prediction
 
     def predict_batch(self, inp):
         """Predict a batch of input data."""

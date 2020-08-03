@@ -674,6 +674,29 @@ class ModelManager(object):
         # Save all models
         self.expert_manager.save_separation_models()
 
+    def ence_calibrate_models_separation(self, seq2seq_dataset_train, mlp_dataset_train, percentage_bin_size = 0.25):
+        """Calibrate the separation uncertainty prediction of all experts with an ENCE calibration.
+
+        Args:
+            **_dataset_train (dict):        All training samples in the correct format for various models
+            percentage_bin_size (double):   Percentage of data to use in the sliding window of the ENCE analysis
+        """
+        assert(percentage_bin_size>0)
+        assert(percentage_bin_size<1)
+        # First, create predictions for entire training dataset
+        expert_names, all_inputs, all_s2s_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
+            seq2seq_dataset=seq2seq_dataset_train,
+            mlp_dataset = mlp_dataset_train,
+            create_weighted_output = False)
+
+        self.expert_manager.ence_calibrate_models_separation(target=all_targets, 
+                                    predictions=all_predictions, 
+                                    masks=all_masks, 
+                                    expert_names = expert_names,
+                                    percentage_bin_size = percentage_bin_size)
+        
+
+
     def test_models_separation_prediction(self, result_dir,
                     seq2seq_dataset_test = None, mlp_dataset_test = None,
                     normalization_constant = 1, time_normalization_constant = 22,
