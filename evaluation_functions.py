@@ -622,17 +622,32 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
     """
     # Create bins
     percentage_bin_size = 0.25
+    n_experts = predictions.shape[0]
+    spatial_ENCE = np.full(n_experts, np.nan); temporal_ENCE = np.full(n_experts, np.nan); 
+    spatial_C_v = np.full(n_experts, np.nan); temporal_C_v = np.full(n_experts, np.nan); 
     for expert in range(predictions.shape[0]):
         # Spatial analysis
-        predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 2])[0]
-        target_y = target[ np.where(masks[expert]), 0][0]
-        predicted_y = predictions[expert,  np.where(masks[expert]), 0][0]
-        advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir + "spatial_evaluations/", expert_names[expert], percentage_bin_size, "spatial", no_show)
+        predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 2])[0] * normalization_constant**2
+        target_y = target[ np.where(masks[expert]), 0][0] * normalization_constant
+        predicted_y = predictions[expert,  np.where(masks[expert]), 0][0] * normalization_constant
+        spatial_ENCE[expert], spatial_C_v[expert] = advanced_single_ence_analysis(
+                                        predicted_var, target_y, predicted_y, 
+                                        result_dir + "spatial_evaluations/", expert_names[expert], 
+                                        percentage_bin_size, "spatial", no_show)
         # Temporal analysis
-        predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 3])[0]
-        target_y = target[ np.where(masks[expert]), 1][0]
-        predicted_y = predictions[expert,  np.where(masks[expert]), 1][0]
-        advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir + "temporal_evaluations/", expert_names[expert], percentage_bin_size, "temporal", no_show)
+        predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 3])[0] * time_normalization_constant**2
+        target_t = target[ np.where(masks[expert]), 1][0] * time_normalization_constant
+        predicted_t = predictions[expert,  np.where(masks[expert]), 1][0] * time_normalization_constant
+        temporal_ENCE[expert], temporal_C_v[expert] = advanced_single_ence_analysis(
+                                        predicted_var, target_t, predicted_t, 
+                                        result_dir + "temporal_evaluations/", expert_names[expert], 
+                                        percentage_bin_size, "temporal", no_show)
+    ence_values = {}
+    ence_values["labels"] = expert_names
+    ence_values["spatial_ENCE"] = spatial_ENCE; ence_values["temporal_ENCE"] = temporal_ENCE
+    ence_values["spatial_C_v"] = spatial_C_v; ence_values["temporal_C_v"] = temporal_C_v
+    ence_df = pd.DataFrame(ence_values)
+    ence_df.to_csv('{}ENCE_values.csv'.format(result_dir), index=False)
 
 def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, percentage_bin_size=0.25, domain="spatial", no_show=False):
     """Create an advanced ence analysis with a sliding window for one expert in one domain.
@@ -646,6 +661,10 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
         percentage_bin_size (double): The percentage bin size [0, 1]
         domain (String):            Spatial or Temporal
         no_show (Boolean):          Don't show the images
+
+    Returns:
+        ENCE (double):  ENCE value
+        C_v (double):   STDs Coefficient of Variation
     """
     assert(percentage_bin_size>0)
     assert(percentage_bin_size<1)
@@ -664,6 +683,10 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
             RMV[start_id] = rmv
         bin_errors = target_y[bin_indices] - predicted_y[bin_indices]
         RMSE[start_id] = np.sqrt(np.mean(bin_errors**2))
+
+    ence_analysis_dict = {}
+    ence_analysis_dict["RMV"] = RMV
+    ence_analysis_dict["RMSE"] = RMSE
 
     # ENCE = 1/N * sum(|RMV(j)-RMSE(j)|/RMV(j))
     ENCE = np.mean(np.abs(RMV-RMSE)/RMV)
@@ -694,7 +717,10 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
     plt.savefig(result_dir + 'advanced_ence_analysis_{}_{}.pdf'.format(domain, expert_name))  
     if not no_show:
         plt.show()
+    ence_df = pd.DataFrame(ence_analysis_dict)
+    ence_df.to_csv('{}advanced_ence_analysis_{}_{}.csv'.format(result_dir, domain, expert_name), index=False)
     stop=0
+    return ENCE, C_v
 
 def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, n_bins=5, domain="spatial", no_show=False):
     """Create the ence analysis for one expert in one domain."""
