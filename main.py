@@ -266,7 +266,7 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
             model_path = "{}/cross_evaluations/{}_CE{}{}".format(head, os.path.splitext(tail)[0], cross_eval_set, os.path.splitext(tail)[1])
             model_config['experts'][expert_name]["model_path"] = model_path
         # Rename results path
-        result_path = global_config['result_path']
+        result_path = args.result_path
         result_path = "{}cross_evaluations/CE{}/".format(result_path, cross_eval_set)
         global_config['result_path'] = result_path
         # Rename gating network
@@ -464,7 +464,7 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
 if not global_config['run_hyperparameter_search']:
     if not global_config['test_noise_robustness']:
         # Run cross evaluation
-        if global_config['n_folded_cross_evaluation'] > 1 and not global_config['is_loaded']:
+        if global_config['n_folded_cross_evaluation'] > 1:
             for i in range(global_config['n_folded_cross_evaluation']):
                 score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config=global_config, cross_eval_set=i)
         else:
