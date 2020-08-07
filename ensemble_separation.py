@@ -20,6 +20,9 @@ class Simple_Ensemble_Separation(GatingNetwork):
         """Initialize a simple ensemble gating network."""
         super().__init__(n_experts, "Simple Ensemble", "")
 
+    def load_model(self):
+        self.load_calibration()
+
     def train_network(self, **kwargs):
         """Simple ensemble needs no training."""
         pass
@@ -72,6 +75,7 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
             self.weights = pickle.load(filehandler)
         except:
             logging.error("Could not load gating network from path {}".format(self.model_path))
+        self.load_calibration()
 
     def train_network(self, target, predictions, masks, **kwargs):
         """Train the ensemble.
@@ -85,23 +89,7 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
         masks = 1-masks
         n_experts = predictions.shape[0]
         for dim in range(2):
-            # Covariance matrix C
-            C = np.matrix(np.zeros([n_experts, n_experts]))
-            # Calculate covariance between all experts
-            for i in range(n_experts):
-                for j in range(n_experts):
-                    # Calculate error of expert i
-                    masked_prediction = np.ma.array(predictions[i,:,dim], mask=masks[i])
-                    masked_target = np.ma.array(target[:,dim], mask=masks[i])
-                    error_i = masked_target - masked_prediction
-                    # Calculate error of expert j
-                    masked_prediction = np.ma.array(predictions[j,:,dim], mask=masks[j])
-                    masked_target = np.ma.array(target[:,dim], mask=masks[j])
-                    error_j = masked_target - masked_prediction
-                    # Calculate error covariance in each direction (x and y) seperately
-                    # C_ij = mean(error_i * error_j)
-                    mult_errors = np.ma.multiply(error_i, error_j)
-                    C[i,j] = np.ma.mean(mult_errors)
+            C = np.matrix(self.C[dim])
             try:
                 inv_C = C.I
             except:
@@ -185,6 +173,7 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
             self.weights = pickle.load(filehandler)
         except:
             logging.error("Could not load gating network from path {}".format(self.model_path))
+        self.load_calibration()
 
     def train_network(self, target, predictions, masks, expert_types, **kwargs):
         """Train the ensemble.

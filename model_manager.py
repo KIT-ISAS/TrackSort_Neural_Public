@@ -467,7 +467,8 @@ class ModelManager(object):
     """ METHODS FOR SEPARATION PREDICTION MODELS """
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     def train_gating_network_separation(self, seq2seq_dataset_train = None, mlp_dataset_train = None,
-                                        seq2seq_dataset_eval = None, mlp_dataset_eval = None):
+                                        seq2seq_dataset_eval = None, mlp_dataset_eval = None,
+                                        is_uncertainty_prediction = False, ence_percentage_bin_size = 0.25):
         """Train the gating network for separation.
 
         The individual training information of the gating network should be provided in the configuration json.
@@ -477,31 +478,54 @@ class ModelManager(object):
         Args:
             **_dataset_train (Tf.Dataset):       All training samples in the correct format for various models
             **_dataset_eval (Tf.Dataset):        All evaluation samples in the correct format for various models
+            is_uncertainty_prediction (Boolean): If True, calibrate the gating network after training.
+            ence_percentage_bin_size (double):   The percentage bin size for ENCE calibration
         """
         # Create predictions for all training batches and save prediction and target values to one list.
-        expert_names, all_inputs_train,_, all_targets_train, all_predictions_train, all_masks_train, _ = \
+        expert_names, all_mlp_inputs_train, all_s2s_inputs_train, all_targets_train, all_predictions_train, all_masks_train, _ = \
             self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
                 seq2seq_dataset=seq2seq_dataset_train,
                 mlp_dataset = mlp_dataset_train,
                 create_weighted_output = False)
         # Create predictions for all testing batches and save prediction and target values to one list.
-        expert_names, all_inputs_eval,_, all_targets_eval, all_predictions_eval, all_masks_eval, _ = \
+        expert_names, all_mlp_inputs_eval, all_s2s_inputs_train, all_targets_eval, all_predictions_eval, all_masks_eval, _ = \
             self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
                 seq2seq_dataset=seq2seq_dataset_eval,
                 mlp_dataset = mlp_dataset_eval,
                 create_weighted_output = False)
-        # TODO: Incorporate uncertainty prediction into gating network
+        # Incorporate uncertainty prediction into gating network
+        self.gating_network_separation.train_covariance_matrix(
+                                          target = all_targets_train,
+                                          predictions = all_predictions_train, 
+                                          masks = all_masks_train)
         # Call training of gating network
         self.gating_network_separation.train_network(
-                                          inputs = all_inputs_train,
+                                          inputs = all_mlp_inputs_train,
                                           target = all_targets_train, 
                                           predictions = all_predictions_train, 
                                           masks = all_masks_train,
-                                          inputs_eval = all_inputs_eval,
+                                          inputs_eval = all_mlp_inputs_eval,
                                           target_eval = all_targets_eval, 
                                           predictions_eval = all_predictions_eval, 
                                           masks_eval = all_masks_eval,
                                           )
+        # ENCE Calibration if uncertatinty prediction is active
+        if is_uncertainty_prediction:
+            # First, create gating network prediction
+            weights = self.gating_network_separation.get_masked_weights(all_masks_train, all_mlp_inputs_train)
+            cov_matrix = self.gating_network_separation.get_covariance_matrix()
+            total_prediction = weighting_function_separation(all_predictions_train, weights, cov_matrix) 
+            for dim in range(2):
+                predicted_var = np.exp(total_prediction[:, 2+dim])
+                target_y = all_targets_train[:, dim]
+                predicted_y = total_prediction[:, dim]
+                domain = "spatial" if dim == 0 else "temporal"
+                self.gating_network_separation.ence_calibrate(predicted_var = predicted_var, 
+                                                                target_y = target_y,
+                                                                predicted_y = predicted_y,
+                                                                percentage_bin_size = ence_percentage_bin_size,
+                                                                domain = domain)
+            self.gating_network_separation.save_calibration()
         # Save gating network
         self.gating_network_separation.save_model()
 
@@ -842,8 +866,11 @@ class ModelManager(object):
             # Get weighting of experts
             if create_weighted_output:
                 weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), mlp_inp)
+                cov_matrix = None
+                if self.is_uncertainty_prediction:
+                    cov_matrix = self.gating_network_separation.get_covariance_matrix()
                 # Evaluation purposes  
-                total_prediction = weighting_function_separation(np.array(np_predictions), weights, self.is_uncertainty_prediction)
+                total_prediction = weighting_function_separation(np.array(np_predictions), weights, cov_matrix)
                 np_predictions.append(total_prediction)
                 # Create a total mask to add to list
                 masks.append(np_masks.append(np.ones(mlp_mask.shape)))

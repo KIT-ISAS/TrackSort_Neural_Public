@@ -84,6 +84,7 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         """Load a MLP model from its model path."""
         self.mlp_model = tf.keras.models.load_model(self.model_path)
         self.input_dim = self.mlp_model.input_shape[1]
+        self.load_calibration()
         logging.info(self.mlp_model.summary())
 
     def train_network(self, inputs, target, predictions, masks, inputs_eval, target_eval, predictions_eval, masks_eval, **kwargs):

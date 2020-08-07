@@ -85,7 +85,7 @@ class Expert(ABC):
         pass
 
     def ence_calibration_separation(self, predicted_var, target_y, predicted_y, percentage_bin_size = 0.25, domain = "spatial"):
-        """Calibrate the uncertainty predictionof the expert in the separation prediction with an ENCE calibration.
+        """Calibrate the uncertainty prediction of the expert in the separation prediction with an ENCE calibration.
 
         Saves the model after finding new calibration parameters.
 
@@ -118,11 +118,6 @@ class Expert(ABC):
             self.calibration_separation_regression_var_temporal = [reg.coef_[0], reg.intercept_]
         """ Test plot of calibration
         RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
-        corrected_ENCE = np.mean(np.abs(RMV_corrected-RMSE)/RMV_corrected)
-        # Logging output
-        logging.info("ENCE for expert {} in {} domain = {}".format(self.name, domain, ENCE))
-        logging.info("Corrected ENCE for expert {} in {} domain = {}".format(self.name, domain, corrected_ENCE))
-        logging.info("C_v for expert {} in {} domain = {}".format(self.name, domain, C_v))
         # Plot RMSE over RMV
         min_RMV = np.min([np.min(RMV),np.min(RMV_corrected)])
         max_RMV = np.max([np.max(RMV),np.max(RMV_corrected)])
@@ -138,7 +133,6 @@ class Expert(ABC):
         plt.title("Calibration analysis for {} prediction of expert {}".format(domain, self.name))
         plt.show()
         """
-        self.save_calibration()
 
     @abstractmethod
     def correct_separation_prediction(self, **kwargs):
