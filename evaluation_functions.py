@@ -109,6 +109,8 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     plt.savefig(result_dir + ('mse_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mse_box_plot.pdf')) 
     if not no_show:
         plt.show()
+    else:
+        plt.close()
     plt.figure(figsize=(19.20,10.80), dpi=100)
     if normalization_constant >= 100:
         plt.boxplot(mae_boxplot_inputs, sym='', labels=expert_names)
@@ -123,6 +125,8 @@ def create_boxplot_evaluation(target, predictions, masks, expert_names, result_d
     plt.savefig(result_dir + ('mae_box_plot_mlp_maks.pdf' if is_mlp_mask else 'mae_box_plot.pdf'))  
     if not no_show:
         plt.show()
+    else:
+        plt.close()
 
     # Save data to csv via pandas
     mse_df = pd.DataFrame(mse_box_values)
@@ -189,6 +193,8 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     plt.savefig(result_dir + 'temporal_error_box_plot.pdf') 
     if not no_show:
         plt.show()
+    else:
+        plt.close()
     # Show spatial plot
     fig = plt.figure(figsize=(19.20,10.80), dpi=100)
     if normalization_constant >= 100:
@@ -206,6 +212,8 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     plt.savefig(result_dir + 'spatial_error_box_plot.pdf') 
     if not no_show:
         plt.show()
+    else:
+        plt.close()
 
     # Save data to csv via pandas
     mse_df = pd.DataFrame(spatial_box_values)
@@ -264,6 +272,8 @@ def create_spatial_outlier_evaluation(seq2seq_inputs, target, predictions, masks
         plt.legend()
         if not no_show:
             plt.show()
+        else:
+            plt.close()
         stop=0
 
     stop=0
@@ -406,6 +416,8 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
         plt.savefig(result_dir + "median_mae_map_{}.pdf".format(expert_names[i].replace(" ", "_")))
         if not no_show:
             plt.show()
+        else:
+            plt.close()
         np.savetxt(result_dir + "median_mae_map_{}.csv".format(expert_names[i].replace(" ", "_")), median_error_map, delimiter=',')
 
 def create_weight_pos_evaluation(weights, expert_names, result_dir, no_show = False):
@@ -435,6 +447,8 @@ def create_weight_pos_evaluation(weights, expert_names, result_dir, no_show = Fa
     plt.savefig(result_dir + 'weight_plot.pdf')
     if not no_show:
         plt.show()
+    else:
+        plt.close()
 
     # Save data to csv via pandas
     weights_df = pd.DataFrame(weights_dict)
@@ -461,6 +475,8 @@ def create_mean_weight_evaluation(weights, masks, expert_names, result_dir, no_s
     plt.savefig(result_dir + 'mean_weights_plot.pdf')
     if not no_show:
         plt.show()
+    else:
+        plt.close()
     # Save data to csv via pandas
     weights_df = pd.DataFrame(result_dict)
     weights_df.to_csv(result_dir + "mean_weights.csv", index=False)
@@ -717,6 +733,8 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
     plt.savefig(result_dir + 'advanced_ence_analysis_{}_{}.pdf'.format(domain, expert_name))  
     if not no_show:
         plt.show()
+    else:
+        plt.close()
     ence_df = pd.DataFrame(ence_analysis_dict)
     ence_df.to_csv('{}advanced_ence_analysis_{}_{}.csv'.format(result_dir, domain, expert_name), index=False)
     stop=0
@@ -815,6 +833,8 @@ def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, exper
     plt.savefig(result_dir + 'emce_analysis_{}_{}.pdf'.format(domain, expert_name))  
     if not no_show:
         plt.show()
+    else:
+        plt.close()
     stop=0
 
 def single_ence_analysis_reverse(predicted_var, target_y, predicted_y, result_dir, expert_name, n_bins=5, domain="spatial", no_show=False):
@@ -854,6 +874,8 @@ def single_ence_analysis_reverse(predicted_var, target_y, predicted_y, result_di
     plt.savefig(result_dir + 'emce_analysis_{}_{}.pdf'.format(domain, expert_name))  
     if not no_show:
         plt.show()
+    else:
+        plt.close()
     stop=0  
 
 def create_chi_squared_evaluation(target, predictions, masks, expert_names, result_dir, 
@@ -896,6 +918,8 @@ def create_chi_squared_evaluation(target, predictions, masks, expert_names, resu
         plt.savefig(result_dir + 'chi_squared_analysis_{}.pdf'.format(expert_names[expert]))  
         if not no_show:
             plt.show()
+        else:
+            plt.close()
         # Chi squared test
         """
         plt.figure(figsize=[19.20, 10.80], dpi=100)

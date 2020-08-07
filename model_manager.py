@@ -776,10 +776,11 @@ class ModelManager(object):
                                 result_dir=result_dir,
                                 no_show = no_show)
         # Weight plot
-        create_mean_weight_evaluation(all_weights[:,:,1], all_masks[:-1], expert_names[:-1], temporal_result_path, no_show)
-        create_mean_weight_evaluation(all_weights[:,:,0], all_masks[:-1], expert_names[:-1], spatial_result_path, no_show)
+        #create_mean_weight_evaluation(all_weights[:,:,1], all_masks[:-1], expert_names[:-1], temporal_result_path, no_show)
+        #create_mean_weight_evaluation(all_weights[:,:,0], all_masks[:-1], expert_names[:-1], spatial_result_path, no_show)
         
         # Outlier evaluation
+        """
         create_spatial_outlier_evaluation(
                                 seq2seq_inputs = all_s2s_inputs,
                                 target=all_targets[:,0], 
@@ -792,7 +793,8 @@ class ModelManager(object):
                                 virtual_nozzle_array=virtual_nozzle_array, 
                                 n_errors = 10,
                                 no_show = no_show)
-        
+        """
+
     def get_full_input_target_prediction_mask_from_dataset_separation_prediction(self,
                     seq2seq_dataset, mlp_dataset, create_weighted_output = False):
         """Create separation predictions for all models on the given dataset.

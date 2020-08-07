@@ -40,7 +40,7 @@ cd ..
     --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
     --num_train_epochs 1000 \
     --batch_size 128 \
-    --evaluate_every_n_epochs 500 \
+    --evaluate_every_n_epochs 100 \
     --time_normalization_constant 15.71 \
     --result_path results/pepper_all/separation_prediction_rnn_uncertainty/ \
     --execute_evaluation True \
