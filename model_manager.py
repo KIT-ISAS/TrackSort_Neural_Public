@@ -87,7 +87,7 @@ class ModelManager(object):
         else:
             logging.warning("No gating network information in model config.")
         if "gating_separation" in model_config:
-            self.create_gating_network(model_config.get('gating_separation'), True)
+            self.create_gating_network(model_config.get('gating_separation'), True, is_uncertainty_prediction)
         else:
             logging.warning("No separation gating network information in model config.")
         self.overwriting_activated = overwriting_activated
@@ -110,7 +110,7 @@ class ModelManager(object):
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
     """ METHODS FOR TRACKING MODELS """
     """%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%"""
-    def create_gating_network(self, gating_config, is_separation=False):
+    def create_gating_network(self, gating_config, is_separation=False, is_uncertainty_prediction=False):
         """Create the gating network.
 
         Creates a gating network according to the given config
@@ -118,6 +118,7 @@ class ModelManager(object):
         Args:
             gating_config (dict):   Includes information about type and options of the gating network
             is_separation (Boolean):Should we create the NextStep or Separation Gating Network? 
+            is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
         """
         gating_type = gating_config.get("type")
         model_path = gating_config.get('model_path')
@@ -138,7 +139,7 @@ class ModelManager(object):
                 self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.get_n_experts(), model_path)
         elif gating_type == "Mixture_of_Experts":
             if is_separation:
-                self.gating_network_separation = MixtureOfExpertsSeparation(self.expert_manager.get_n_experts_separation(), model_path, gating_config.get('options'))
+                self.gating_network_separation = MixtureOfExpertsSeparation(self.expert_manager.get_n_experts_separation(), model_path, is_uncertainty_prediction, gating_config.get('options'))
             else:
                 self.gating_network = MixtureOfExperts(self.expert_manager.get_n_experts(), model_path, gating_config.get('options'))
         else:

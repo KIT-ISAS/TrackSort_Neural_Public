@@ -60,6 +60,10 @@ class GatingNetwork(ABC):
             target (np.array):      All target values of the given dataset, shape: [n_tracks, 4]
             predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, 4]
             masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
+
+        Trains:
+            self.C (np.array):  The prediction error covariance matrix of the experts.
+                                Shape: [n_dim (2), n_experts, n_experts]
         """
         # convert masks for numpy
         masks = 1-masks

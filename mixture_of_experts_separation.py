@@ -32,12 +32,13 @@ class MixtureOfExpertsSeparation(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts, model_path, network_options = {}):
+    def __init__(self, n_experts, model_path, is_uncertainty_prediction = False, network_options = {}):
         """Initialize a mixture of experts gating network for separation prediction.
         
         Args:
             n_experts (int):        Number of experts
             model_path (String):    Path to save/load the ME model
+            is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
             network_options (dict): Model training options
         """
         # Initialize with zero weights
@@ -50,7 +51,7 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         self.decay_rate = 0.96 if not "decay_rate" in network_options else network_options.get("decay_rate")
         self.n_inp_points = 7 if not "n_inp_points" in network_options else network_options.get("n_inp_points")
         self.evaluate_every_n_epochs = 20 if not "evaluate_every_n_epochs" in network_options else network_options.get("evaluate_every_n_epochs")
-
+        self.is_uncertainty_prediction = is_uncertainty_prediction
         # Set the input dimension based on the features
         input_dim = 0
         for feature in self.model_structure.get("features"):
@@ -69,7 +70,10 @@ class MixtureOfExpertsSeparation(GatingNetwork):
 
     def create_model(self):
         """Create a new MLP ME model based on the model structure defined in the config file."""
-        self.mlp_model = me_mlp_model_factory(input_dim=self.input_dim, n_experts=self.n_experts, **self.model_structure)
+        self.mlp_model = me_mlp_model_factory(input_dim=self.input_dim, 
+                                              n_experts=self.n_experts, 
+                                              is_uncertainty_prediction = self.is_uncertainty_prediction, 
+                                              **self.model_structure)
         
         logging.info(self.mlp_model.summary())
 
@@ -267,12 +271,13 @@ class MixtureOfExpertsSeparation(GatingNetwork):
 
 """Model creation and training functionality"""
 
-def me_mlp_model_factory(input_dim, n_experts, prediciton_input_dim=2, features=["pos"], layers=[16, 16, 16], activation='leakly_relu'):
+def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False, prediciton_input_dim=2, features=["pos"], layers=[16, 16, 16], activation='leakly_relu'):
     """Create a new keras MLP model
 
     Args:
         input_dim (int):            The number of inputs to the model
         n_experts (int):            The number of experts
+        is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
         prediciton_input_dim (int): Should be 2 for spatial and temporal position.
         features (list):            List of String. Features for MLP. Possibilities:
                                         "pos":  x and y position of current measurement.
@@ -330,7 +335,7 @@ def me_mlp_model_factory(input_dim, n_experts, prediciton_input_dim=2, features=
     model = tf.keras.Model(inputs=inputs, outputs=[spatial_weights, temporal_weights])
     return model
 
-def train_step_generator(model, optimizer):
+def train_step_generator(model, optimizer, is_uncertainty_prediction = False, cov_matrix = []):
     """Build a function which returns a computational graph for tensorflow.
 
     This function can be called to train the given model with the given optimizer.
@@ -338,8 +343,12 @@ def train_step_generator(model, optimizer):
     Args:
         model:      model according to estimator api
         optimizer:  tf estimator
+        is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
+        cov_matrix (tf.Tensor): The expert prediction error covariance matrix, 
+                                trained in gating_network.train_covariance_matrix(), converted to tf.Tensor,
+                                Shape: [n_dim (2), n_experts, n_experts]
 
-    Returns
+    Returns:
         function which can be called to train the given model with the given optimizer
     """
     @tf.function
@@ -350,7 +359,10 @@ def train_step_generator(model, optimizer):
             weights = model(inp, training=training) 
             # Mask the weights
             masked_weights = mask_weights(weights, mask)
-            loss = weighted_sum_mse_loss(masked_weights, expert_predictions, target, mlp_mask)
+            if not is_uncertainty_prediction:
+                loss = weighted_sum_mse_loss(masked_weights, expert_predictions, target, mlp_mask)
+            else:
+                loss = weighted_sum_nll_loss(masked_weights, expert_predictions, target, mlp_mask, cov_matrix)
         if training:
             grads = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -376,7 +388,7 @@ def mask_weights(weights, mask):
     masked_weights = tf.concat([tf.expand_dims(masked_weights_spatial, axis = -1), tf.expand_dims(masked_weights_temporal, axis = -1)], axis = -1)
     return masked_weights
 
-def weighted_sum_mse_loss(weights, expert_predictions, target, mask):
+def weighted_sum_mse_loss(weights, expert_predictions, target, mask, cov_matrix):
     """Return MSE for weighted expert predictions.
 
     Args:
@@ -390,3 +402,37 @@ def weighted_sum_mse_loss(weights, expert_predictions, target, mask):
     weighted_prediction = tf.einsum('ijk,ijk->ik', expert_predictions, weights)
     double_mask = tf.repeat(tf.expand_dims(mask, axis = -1), 2, axis = -1)
     return tf.reduce_sum(tf.pow(target-weighted_prediction,2)*double_mask)/tf.reduce_sum(double_mask)
+
+def weighted_sum_nll_loss(weights, expert_predictions, target, mask, cov_matrix):
+    """Return negative log likelihood loss for weighted expert predictions.
+
+    Args:
+        expert_predictions (tf.Tensor): The expert predictions, shape: [batch_size, n_experts, 4]
+        weights (tf.Tensor):            The outputs of the MLP network, shape: [batch_size, n_experts, 2]
+        target (tf.Tensor):             The target, shape: [batch_size, 2]
+        mask (tf.Tensor):               Mask entries that are valid, shape: [batch_size,]
+        cov_matrix (tf.Tensor):         The expert prediction error covariance matrix, 
+                                        trained in gating_network.train_covariance_matrix(), converted to tf.Tensor,
+                                        Shape: [n_dim (2), n_experts, n_experts]
+    Returns:
+        loss (float64)
+    """
+    # Mean prediction 
+    mean_predictions = expert_predictions[:,:,:2]
+    # Variance prediction
+    variance_predictions = tf.exp(expert_predictions[:,:,2:])
+    # Create prediction of means
+    weighted_prediction = tf.einsum('ijk,ijk->ik', mean_predictions, weights)
+    double_mask = tf.repeat(tf.expand_dims(mask, axis = -1), 4, axis = -1)
+    # Create prediction of uncertainties
+    # var[k,l] = sum_{i} sum_{j} (w[k,i,l]*cov[l,i,j]*w[k,j,l])
+    #       - sum_{i} (w[k,i,l]**2 * cov[l,i,i])
+    #       + sum_{j} (w[k,i,l]**2 * var_pred[k,i,l])
+    squared_weights = tf.pow(weights, 2)
+    combined_var = tf.einsum('kil,lij,kjl->kl', weights, cov_matrix, weights) - \
+                   tf.einsum('jik,kii->jk', squared_weights, cov_matrix) + \
+                   tf.einsum('jik,jik->jk', squared_weights, variance_predictions)
+    log_var = np.log(combined_var)
+    L = tf.pow(target-weighted_prediction,2) / combined_var + log_var
+    loss = tf.reduce_sum(L*double_mask) / tf.reduce_sum(double_mask)
+    return loss

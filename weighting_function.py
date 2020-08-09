@@ -44,7 +44,7 @@ def weighting_function_separation(predictions, weights, cov_matrix=None):
                                         predictions[:,:,0:2] = mean prediction (first moment)
                                         predictions[:,:,2:4] = log(sigma^2) (log of second central moment)
         weights (np.array):             The weights for each expert and instance, shape = [n_expert, batch_size, 2]
-        cov_matrix (np.array):          The prediction covariance matrix of the experts, shape=[n_expert, n_expert]  
+        cov_matrix (np.array):          The prediction covariance matrix of the experts, shape=[n_dim, n_expert, n_expert]  
 
     Returns
         (prediction array, variance array)
@@ -60,6 +60,15 @@ def weighting_function_separation(predictions, weights, cov_matrix=None):
         total_prediction = np.zeros(predictions.shape[1:])
         # Weighted mean = First moment of gaussian mixture
         total_prediction[:,:2] = np.sum(predictions[:,:,:2] * weights, axis=0)
+        variance_predictions = np.exp(predictions[:,:,2:])
+        # var[k,l] = sum_{i} sum_{j} (w[i,k,l]*cov[l,i,j]*w[j,k,l])
+        #       - sum_{i} (w[i,k,l]**2 * cov[l,i,i])
+        #       + sum_{j} (w[i,k,l]**2 * var_pred[i,k,l])
+        combined_var_einsum = np.einsum('ikl,lij,jkl->kl', weights, cov_matrix, weights) - \
+                                np.einsum('ijk,kii->jk', np.power(weights, 2), cov_matrix) + \
+                                np.einsum('ijk,ijk->jk', np.power(weights, 2), variance_predictions)
+        total_prediction[:,2:] = np.log(combined_var_einsum)
+        """ The Einstein sum can be calculated with this for loop (but that's less sexy.)
         for dim in range(2):
             # Calculate the combined variance
             # Can be sped up by Einstein sum convention
@@ -69,9 +78,7 @@ def weighting_function_separation(predictions, weights, cov_matrix=None):
                 for j in range(i+1,n_experts):
                     cov_add = 2 * weights[i,:,dim] * weights[j,:,dim] * cov_matrix[dim, i, j]
                     combined_var += cov_add
-            
-            total_prediction[:,2+dim] = np.log(combined_var)
-                      
+        """         
         # Error handling if every expert has weight = 0
         total_prediction[(np.sum(np.sum(weights, axis=-1),axis=0)==0),0:2]=np.mean(total_prediction[(np.sum(np.sum(weights, axis=-1),axis=0)>0),0:2],axis=0)
         # Very high uncertainty
