@@ -436,7 +436,9 @@ class MixtureOfExpertsSeparation(GatingNetwork):
 
 """Model creation and training functionality"""
 
-def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False, direct_uncertainty_output = False, prediciton_input_dim=2, features=["pos"], layers=[16, 16, 16], activation='leakly_relu'):
+def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False, direct_uncertainty_output = False,
+                         prediciton_input_dim=2, features=["pos"], layers=[16, 16, 16], activation='leakly_relu',
+                         l1_regularization=0, l2_regularization=0):
     """Create a new keras MLP model
 
     Args:
@@ -452,10 +454,14 @@ def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False
                                         "uncertainty_prediction": The uncertainty prediction of each expert
         layers (list):              List of int. Number of nodes and layers
         activation (String):        Activation function for layers
+        l1_regularization (double): L1 Regularization factor
+        l2_regularization (double): L2 Regularization factor
     
     Returns: 
         the model
     """
+    # Define regularization
+    regularization = tf.keras.regularizers.l1_l2(l1=l1_regularization, l2=l2_regularization)
     # The input layer
     inputs = tf.keras.Input(shape=(input_dim,), name='me_input')
 
@@ -474,9 +480,11 @@ def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False
             # We allow a split of the network in two for the spatial and temporal branch
             assert(len(n_Neurons)==2, "Only a split in 2 branches is allowed.")
             input_layer = x_spatial if is_doubled else input_layer
-            x_spatial = tf.keras.layers.Dense(n_Neurons[0], kernel_initializer='he_normal', name='dense_spatial_{}'.format(c))(input_layer)
+            x_spatial = tf.keras.layers.Dense(n_Neurons[0], kernel_initializer='he_normal', name='dense_spatial_{}'.format(c),
+                                              kernel_regularizer=regularization, bias_regularizer=regularization)(input_layer)
             input_layer = x_temporal if is_doubled else input_layer
-            x_temporal = tf.keras.layers.Dense(n_Neurons[1], kernel_initializer='he_normal', name='dense_temporal_{}'.format(c))(input_layer)
+            x_temporal = tf.keras.layers.Dense(n_Neurons[1], kernel_initializer='he_normal', name='dense_temporal_{}'.format(c),
+                                              kernel_regularizer=regularization, bias_regularizer=regularization)(input_layer)
             # Add activation function to layer
             if activation == 'leakly_relu':
                 x_spatial = tf.keras.layers.LeakyReLU(alpha=0.01)(x_spatial)
@@ -486,7 +494,8 @@ def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False
             is_doubled=True
         else:
             assert(is_doubled==False, "Once you split the branches, you shall not go back. (It would be possible but I was too lazy to implement it.)")
-            x = tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', name='dense_{}'.format(c))(input_layer)
+            x = tf.keras.layers.Dense(n_Neurons, kernel_initializer='he_normal', name='dense_{}'.format(c),
+                                      kernel_regularizer=regularization, bias_regularizer=regularization)(input_layer)
             # Add activation function to layer
             if activation == 'leakly_relu':
                 x = tf.keras.layers.LeakyReLU(alpha=0.01)(x)
@@ -495,16 +504,20 @@ def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False
         c+=1
     # Output layers = 2 Dense layers with seperate softmax activation functions
     input_layer = x_spatial if is_doubled else x
-    spatial_weights = tf.keras.layers.Dense(n_experts, name='spatial_weights')(input_layer)
+    spatial_weights = tf.keras.layers.Dense(n_experts, name='spatial_weights',
+                                            kernel_regularizer=regularization, bias_regularizer=regularization)(input_layer)
     spatial_weights = tf.keras.layers.Softmax()(spatial_weights)
     # If direct_uncertainty_output is activated, we need an additional output per dimension for the uncertainty
     if direct_uncertainty_output:
-        spatial_uncertainty = tf.keras.layers.Dense(1, name='spatial_uncertainty')(input_layer)
+        spatial_uncertainty = tf.keras.layers.Dense(1, name='spatial_uncertainty',
+                                                    kernel_regularizer=regularization, bias_regularizer=regularization)(input_layer)
     input_layer = x_temporal if is_doubled else x
-    temporal_weights = tf.keras.layers.Dense(n_experts, name='temporal_weights')(input_layer)
+    temporal_weights = tf.keras.layers.Dense(n_experts, name='temporal_weights',
+                                             kernel_regularizer=regularization, bias_regularizer=regularization)(input_layer)
     temporal_weights = tf.keras.layers.Softmax()(temporal_weights)
     if direct_uncertainty_output:
-        temporal_uncertainty = tf.keras.layers.Dense(1, name='temporal_uncertainty')(input_layer)
+        temporal_uncertainty = tf.keras.layers.Dense(1, name='temporal_uncertainty',
+                                                     kernel_regularizer=regularization, bias_regularizer=regularization)(input_layer)
         model = tf.keras.Model(inputs=inputs, outputs=[spatial_weights, temporal_weights, spatial_uncertainty, temporal_uncertainty])
     else:
         model = tf.keras.Model(inputs=inputs, outputs=[spatial_weights, temporal_weights])
