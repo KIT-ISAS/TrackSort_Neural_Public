@@ -36,9 +36,10 @@ class GatingNetwork(ABC):
         self.name = name
         self.model_path = model_path
         self.calibration_path = os.path.splitext(model_path)[0] + "_calibration.pkl"
-        # Covariance matrix of experts
+        # Covariance and correlation matrix of experts
         # Two dimensions: Either (x,y) for tracking or (spatial, temporal) for seperation prediction
         self.C = np.zeros([2, n_experts, n_experts])
+        self.corr = np.zeros([2, n_experts, n_experts])
         # ENCE calibration variables
         self.calibration_separation_regression_var_spatial = [1, 0]
         self.calibration_separation_regression_var_temporal = [1, 0]
@@ -51,8 +52,8 @@ class GatingNetwork(ABC):
         """Load the model from the model path given in the config file."""
         pass
 
-    def train_covariance_matrix(self, target, predictions, masks):
-        """Train the covariance matrix of expert prediction error.
+    def train_correlations(self, target, predictions, masks):
+        """Train the correlations between the expert prediction errors.
 
         This is needed to perform the weighting with uncertainty.
 
@@ -62,13 +63,14 @@ class GatingNetwork(ABC):
             masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
 
         Trains:
-            self.C (np.array):  The prediction error covariance matrix of the experts.
-                                Shape: [n_dim (2), n_experts, n_experts]
+            self.corr (np.array):  The correlation between each experts prediction error.
+                                    Shape: [n_dim (2), n_experts, n_experts]
         """
         # convert masks for numpy
         masks = 1-masks
         for dim in range(2):
             # Calculate covariance between all experts
+            # Create covariance matrix
             for i in range(self.n_experts):
                 for j in range(self.n_experts):
                     # Calculate error of expert i
@@ -83,6 +85,10 @@ class GatingNetwork(ABC):
                     # C_ij = mean(error_i * error_j)
                     mult_errors = np.ma.multiply(error_i, error_j)
                     self.C[dim, i, j] = np.ma.mean(mult_errors)
+            # Create correlations
+            for i in range(self.n_experts):
+                for j in range(self.n_experts):
+                    self.corr[dim, i, j] = self.C[dim, i, j]/(np.sqrt(self.C[dim, i, i]) * np.sqrt(self.C[dim, j, j]))
 
     def ence_calibrate(self, predicted_var, target_y, predicted_y, percentage_bin_size = 0.25, domain = "spatial"):
         """Calibrate the uncertainty prediction of the gating network in the separation prediction with an ENCE calibration.
@@ -133,13 +139,37 @@ class GatingNetwork(ABC):
         """
 
     def save_calibration(self):
+        """Save calibration data to a file.
+
+        This saves the ENCE variables and the covariance / correlation matrices.
+
+        Saves:
+            self.calibration_separation_regression_var_spatial
+            self.calibration_separation_regression_var_temporal
+            self.C
+            self.corr
+        """
         with open(self.calibration_path, 'wb') as f:
-            pickle.dump([self.calibration_separation_regression_var_spatial, self.calibration_separation_regression_var_temporal], f)
+            pickle.dump([self.calibration_separation_regression_var_spatial, 
+                        self.calibration_separation_regression_var_temporal,
+                        self.C, self.corr], f)
 
     def load_calibration(self):
+        """Load calibration data from file.
+
+        This loads the ENCE variables and the covariance / correlation matrices.
+
+        Loads:
+            self.calibration_separation_regression_var_spatial
+            self.calibration_separation_regression_var_temporal
+            self.C
+            self.corr
+        """
         if os.path.exists(self.calibration_path):
             with open(self.calibration_path, 'rb') as f:
-                self.calibration_separation_regression_var_spatial, self.calibration_separation_regression_var_temporal = pickle.load(f)
+                self.calibration_separation_regression_var_spatial, \
+                    self.calibration_separation_regression_var_temporal, \
+                    self.C, self.corr = pickle.load(f)
         else:
             logging.warning("Calibration file for Kalman filter model '{}' does not exist at {}.".format(self.name, self.calibration_path))
 
@@ -159,6 +189,34 @@ class GatingNetwork(ABC):
         """Return a weight vector for all non masked experts."""
         pass
 
+    def get_masked_weights_and_uncertainty(self, masks, log_variance_predictions, inputs=None):
+        """Return an equal weights vector for all non-masked experts and the combined uncertainty.
+
+        The weights sum to 1.
+        All Weights are > 0 if the expert is non masked at an instance.
+        If the mask value at an instance is 0, the experts weight is 0
+
+        Args:
+            masks (np.array):                       Masks of experts, shape: [n_experts, n_tracks]
+            log_variance_predictions (np.array):    Log of variances of expert predictions, shape: [n_experts, n_tracks, n_dim]
+        Uses:
+            self.corr (np.array):                   Correlation between expert predictions, shape: [n_dim, n_experts, n_experts]
+
+        Returns:
+            weights: np.array with weights, shape: [n_experts, n_tracks, n_dim]
+            uncertainty: np.array containing log(variance), shape: [n_tracks, n_dim]
+        """
+        weights = self.get_masked_weights(masks)
+        variance_predictions = np.exp(log_variance_predictions)
+        # var[k,l] = sum_{i} sum_{j} (w[i,k,l]*cov[l,i,j]*w[j,k,l])
+        #       - sum_{i} (w[i,k,l]**2 * cov[l,i,i])
+        #       + sum_{j} (w[i,k,l]**2 * var_pred[i,k,l])
+        combined_var_einsum = np.einsum('ikl,jkl,lij,ikl,jkl->kl', weights, weights, self.corr, np.sqrt(variance_predictions), np.sqrt(variance_predictions))
+        combined_log_var = np.log(combined_var_einsum)
+        # Error handling if every expert has weight = 0 ==> Very high uncertainty
+        combined_log_var[(np.sum(np.sum(weights, axis=-1),axis=0)==0),:]=1e8
+        return weights, combined_log_var
+
     def get_name(self):
         """Return name of gating function."""
         return self.name
@@ -166,3 +224,7 @@ class GatingNetwork(ABC):
     def get_covariance_matrix(self):
         """Return the trained covariance matrix."""
         return self.C
+
+    def get_correlation_matrix(self):
+        """Return the trained correlation matrxi."""
+        return self.corr

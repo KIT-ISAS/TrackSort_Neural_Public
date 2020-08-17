@@ -495,7 +495,7 @@ class ModelManager(object):
                 mlp_dataset = mlp_dataset_eval,
                 create_weighted_output = False)
         # Incorporate uncertainty prediction into gating network
-        self.gating_network_separation.train_covariance_matrix(
+        self.gating_network_separation.train_correlations(
                                           target = all_targets_train,
                                           predictions = all_predictions_train, 
                                           masks = all_masks_train)
@@ -513,9 +513,12 @@ class ModelManager(object):
         # ENCE Calibration if uncertatinty prediction is active
         if is_uncertainty_prediction:
             # First, create gating network prediction
-            weights = self.gating_network_separation.get_masked_weights(all_masks_train, all_mlp_inputs_train)
-            cov_matrix = self.gating_network_separation.get_covariance_matrix()
-            total_prediction = weighting_function_separation(all_predictions_train, weights, cov_matrix) 
+            weights, combined_log_var = self.gating_network_separation.get_masked_weights_and_uncertainty(
+                masks = all_masks_train, 
+                log_variance_predictions = all_predictions_train[:,:,2:],
+                inputs = all_mlp_inputs_train)
+            total_prediction = weighting_function_separation(all_predictions_train, weights)
+            total_prediction = np.concatenate((total_prediction, combined_log_var), axis=-1)
             for dim in range(2):
                 predicted_var = np.exp(total_prediction[:, 2+dim])
                 target_y = all_targets_train[:, dim]
@@ -805,6 +808,7 @@ class ModelManager(object):
         create_mean_weight_evaluation(all_weights[:,:,0], all_masks[:-1], expert_names[:-1], spatial_result_path, no_show)
         
         # Outlier evaluation
+        """
         create_spatial_outlier_evaluation(
                                 seq2seq_inputs = all_s2s_inputs,
                                 target=all_targets[:,0], 
@@ -817,7 +821,8 @@ class ModelManager(object):
                                 virtual_nozzle_array=virtual_nozzle_array, 
                                 n_errors = 10,
                                 no_show = no_show)
-        
+        """
+
     def get_full_input_target_prediction_mask_from_dataset_separation_prediction(self,
                     seq2seq_dataset, mlp_dataset, create_weighted_output = False):
         """Create separation predictions for all models on the given dataset.
@@ -866,12 +871,23 @@ class ModelManager(object):
 
             # Get weighting of experts
             if create_weighted_output:
-                weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), mlp_inp)
+                if self.is_uncertainty_prediction:
+                    log_var_predictions = np.array(np_predictions)[:,:,2:]
+                    weights, combined_log_var = self.gating_network_separation.get_masked_weights_and_uncertainty(
+                        masks=np.array(np_masks), 
+                        log_variance_predictions=log_var_predictions,
+                        inputs=mlp_inp)
+                else:
+                    weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), mlp_inp)
+                """
+                weights = self.gating_network_separation.get_masked_weights(np.array(np_masks), mlp_inp, np.array(np_predictions))
                 cov_matrix = None
                 if self.is_uncertainty_prediction:
                     cov_matrix = self.gating_network_separation.get_covariance_matrix()
                 # Evaluation purposes  
-                total_prediction = weighting_function_separation(np.array(np_predictions), weights, cov_matrix)
+                """
+                total_prediction = weighting_function_separation(np.array(np_predictions), weights)
+                total_prediction = np.concatenate((total_prediction, combined_log_var), axis=-1)
                 np_predictions.append(total_prediction)
                 # Create a total mask to add to list
                 masks.append(np_masks.append(np.ones(mlp_mask.shape)))
