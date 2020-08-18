@@ -124,22 +124,22 @@ class ModelManager(object):
         model_path = gating_config.get('model_path')
         if gating_type == "Simple_Ensemble":
             if is_separation:
-                self.gating_network_separation = Simple_Ensemble_Separation(self.expert_manager.get_n_experts_separation())
+                self.gating_network_separation = Simple_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), is_uncertainty_prediction, model_path)
             else:
-                self.gating_network = Simple_Ensemble(self.expert_manager.get_n_experts())
+                self.gating_network = Simple_Ensemble(self.expert_manager.get_n_experts(), model_path)
         elif gating_type == "Covariance_Weighting":
             if is_separation:
-                self.gating_network_separation = Covariance_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), model_path)
+                self.gating_network_separation = Covariance_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), is_uncertainty_prediction, model_path)
             else:
                 self.gating_network = Covariance_Weighting_Ensemble(self.expert_manager.get_n_experts(), model_path)
         elif gating_type == "SMAPE_Weighting":
             if is_separation:
-                self.gating_network_separation = SMAPE_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), model_path)
+                self.gating_network_separation = SMAPE_Weighting_Ensemble_Separation(self.expert_manager.get_n_experts_separation(), is_uncertainty_prediction, model_path)
             else:
                 self.gating_network = SMAPE_Weighting_Ensemble(self.expert_manager.get_n_experts(), model_path)
         elif gating_type == "Mixture_of_Experts":
             if is_separation:
-                self.gating_network_separation = MixtureOfExpertsSeparation(self.expert_manager.get_n_experts_separation(), model_path, is_uncertainty_prediction, gating_config.get('options'))
+                self.gating_network_separation = MixtureOfExpertsSeparation(self.expert_manager.get_n_experts_separation(), is_uncertainty_prediction, model_path, gating_config.get('options'))
             else:
                 self.gating_network = MixtureOfExperts(self.expert_manager.get_n_experts(), model_path, gating_config.get('options'))
         else:

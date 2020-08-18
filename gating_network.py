@@ -20,19 +20,28 @@ class GatingNetwork(ABC):
     Implementations can vary from simple ensemble methods to complex Mixture of Experts (ME) methods.
 
     Attributes:
-        n_experts (int):    Number of experts
-        name (String):      Name of gating network
+        n_experts (int):                     Number of experts
+        is_uncertainty_prediction (Boolean): Whether uncertainty prediction is active
+        name (String):                       Name of gating network
+        model_path (String):                 Path to save the model
+        calibration_path (String):           Path to save the calibration
+        C (np.array):                        Covariance matrix, shape: [n_dim, n_experts, n_experts]
+        corr (np.array):                     Correlation matrix, shape: [n_dim, n_experts, n_experts]
+        calibration_separation_regression_var_spatial (list): Intercept and increment for linear regression of ENCE calibration in spatial domain
+        calibration_separation_regression_var_temporal (list)
     """
 
-    def __init__(self, n_experts, name, model_path):
+    def __init__(self, n_experts, is_uncertainty_prediction, name, model_path):
         """Initialize a gating network.
 
         Args: 
             n_experts (int): Number of experts in expert net
+            is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
             name (String):   Name of gating network
             model_path (String): Path to save or load model
         """
         self.n_experts = n_experts
+        self.is_uncertainty_prediction = is_uncertainty_prediction
         self.name = name
         self.model_path = model_path
         self.calibration_path = os.path.splitext(model_path)[0] + "_calibration.pkl"
@@ -85,10 +94,11 @@ class GatingNetwork(ABC):
                     # C_ij = mean(error_i * error_j)
                     mult_errors = np.ma.multiply(error_i, error_j)
                     self.C[dim, i, j] = np.ma.mean(mult_errors)
-            # Create correlations
-            for i in range(self.n_experts):
-                for j in range(self.n_experts):
-                    self.corr[dim, i, j] = self.C[dim, i, j]/(np.sqrt(self.C[dim, i, i]) * np.sqrt(self.C[dim, j, j]))
+            if self.is_uncertainty_prediction:
+                # Create correlations
+                for i in range(self.n_experts):
+                    for j in range(self.n_experts):
+                        self.corr[dim, i, j] = self.C[dim, i, j]/(np.sqrt(self.C[dim, i, i]) * np.sqrt(self.C[dim, j, j]))
 
     def ence_calibrate(self, predicted_var, target_y, predicted_y, percentage_bin_size = 0.25, domain = "spatial"):
         """Calibrate the uncertainty prediction of the gating network in the separation prediction with an ENCE calibration.
@@ -101,7 +111,11 @@ class GatingNetwork(ABC):
             domain (String):            spatial or temporal
         """
         assert(domain == "spatial" or domain == "temporal")
-        sorted_indices = np.argsort(predicted_var)
+        mask = np.isnan(predicted_var)
+        predicted_var_ma = np.ma.array(predicted_var, mask=mask)
+        sorted_indices = np.ma.argsort(predicted_var_ma, fill_value=np.inf)
+        if np.sum(mask)>0:
+            sorted_indices = sorted_indices[:-np.sum(mask)]
         n_instances = sorted_indices.shape[0]
         bin_size = int(np.floor(n_instances*percentage_bin_size))
         start_ids = np.arange(start=0, stop=n_instances-bin_size, step=1)
@@ -185,7 +199,7 @@ class GatingNetwork(ABC):
         pass
 
     @abstractmethod
-    def get_masked_weights(self, mask, *args):
+    def get_masked_weights(self, masks, *args):
         """Return a weight vector for all non masked experts."""
         pass
 
@@ -206,7 +220,7 @@ class GatingNetwork(ABC):
             weights: np.array with weights, shape: [n_experts, n_tracks, n_dim]
             uncertainty: np.array containing log(variance), shape: [n_tracks, n_dim]
         """
-        weights = self.get_masked_weights(masks)
+        weights = self.get_masked_weights(masks, log_variance_predictions)
         variance_predictions = np.exp(log_variance_predictions)
         # var[k,l] = sum_{i} sum_{j} (w[i,k,l]*cov[l,i,j]*w[j,k,l])
         #       - sum_{i} (w[i,k,l]**2 * cov[l,i,i])

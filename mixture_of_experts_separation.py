@@ -32,7 +32,7 @@ class MixtureOfExpertsSeparation(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts, model_path, is_uncertainty_prediction = False, network_options = {}):
+    def __init__(self, n_experts, is_uncertainty_prediction, model_path, network_options = {}):
         """Initialize a mixture of experts gating network for separation prediction.
         
         Args:
@@ -55,7 +55,6 @@ class MixtureOfExpertsSeparation(GatingNetwork):
             logging.warning("1 out of n selector does not work currently. What you would need to do is change the network structure. The last layer would need to be a categorical output layer.")
         self.is_one_out_of_n_selector = False
         #self.is_one_out_of_n_selector = False if not "is_one_out_of_n_selector" in network_options else network_options["is_one_out_of_n_selector"]
-        self.is_uncertainty_prediction = is_uncertainty_prediction
         self.direct_uncertainty_output = False if not "direct_uncertainty_output" in network_options else network_options.get("direct_uncertainty_output")
         # Set the input dimension based on the features
         self.use_uncertainty_prediction_as_input = False
@@ -78,7 +77,7 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         self.input_dim = input_dim
         # Output dimensions
         self.n_experts = n_experts
-        super().__init__(n_experts, "ME weighting", model_path)
+        super().__init__(n_experts, is_uncertainty_prediction, "ME weighting", model_path)
 
     def create_model(self):
         """Create a new MLP ME model based on the model structure defined in the config file."""
