@@ -146,7 +146,8 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
             # We build our own C matrix with the uncertainty predictions and the precalculated correlations.
             assert(log_variance_predictions is not None)
             weights = np.zeros(log_variance_predictions.shape)
-            C_dyn = np.einsum('ikl,jkl,lij->ijkl', log_variance_predictions, log_variance_predictions, self.corr)
+            std_predictions = np.sqrt(np.exp(log_variance_predictions))
+            C_dyn = np.einsum('ikl,jkl,lij->ijkl', std_predictions, std_predictions, self.corr)
             for dim in range(2):
                 # We have to invert C_dyn for each track. 
                 # This could be very time consuming. Took a few seconds for ~5000 tracks.
@@ -159,7 +160,8 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
                     for expert in range(self.n_experts):
                         weights[expert, track, dim] = np.sum(inv_C[expert])/np.sum(inv_C)
                     # We need some error handling to prevent ridiculously high weights
-                    if np.any(np.abs(weights[:, track, dim]) > self.n_experts/2):
+                    if np.any(np.abs(weights[:, track, dim]) > 1) or \
+                        (np.sum(weights[:,track,dim]<0.95) or np.sum(weights[:,track,dim]>1.05)):
                         weights[:, track, dim] = 1/self.n_experts
         return weights
 
@@ -194,7 +196,7 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
             logging.error("Could not load gating network from path {}".format(self.model_path))
         self.load_calibration()
 
-    def train_network(self, target, predictions, masks, expert_types, **kwargs):
+    def train_network(self, target, predictions, masks, **kwargs):
         """Train the ensemble.
 
         Calculate the symetric mean percentage error (SMAPE) for every expert.
@@ -204,7 +206,6 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
             targets (np.array):     All target values of the given dataset, shape: [n_tracks, 2]
             predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, 2]
             masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
-            expert_types (list):    List of Expert_Types
         """
         n_experts = predictions.shape[0]
         # convert masks for numpy

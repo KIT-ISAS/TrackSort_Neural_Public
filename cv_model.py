@@ -8,6 +8,7 @@ import numpy as np
 import logging
 import matplotlib
 plt = matplotlib.pyplot
+import pandas as pd
 
 from sklearn.linear_model import LinearRegression
 from enum import Enum, auto
@@ -284,6 +285,7 @@ class CV_Model(KF_Model):
                 if self.temporal_prediction == CV_Temporal_Separation_Type.VBC:
                     v_err = np.array(self.temporal_training_list)
                     reg = LinearRegression().fit(np.expand_dims(v_err[:, 0], -1), v_err[:, 1])
+                    # This can be used to visualize the regression. Please deactivate as default.
                     """
                     x = np.arange(np.min(v_err[:,0]), np.max(v_err[:,0]), 0.1)
                     plt.figure(figsize=[19.20, 10.80], dpi=100)
@@ -293,6 +295,12 @@ class CV_Model(KF_Model):
                     plt.ylabel("Error [frames]")
                     plt.legend()
                     plt.show()
+                    plot_output_dict = {}
+                    plot_output_dict["v"] = v_err[:,0]
+                    plot_output_dict["err"] = v_err[:,1]
+                    output_df = pd.DataFrame(plot_output_dict)
+                    output_df.to_csv('{}x_velocity_temporal_error_regression_VBC.csv'.format(
+                        "plot_functions/results/vbc_model/"), index=False)
                     """
                     self.temporal_variable = [reg.coef_[0], reg.intercept_]
                 else:

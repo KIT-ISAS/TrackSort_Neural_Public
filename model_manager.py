@@ -761,6 +761,15 @@ class ModelManager(object):
             os.makedirs(save_path)
         
         if self.is_uncertainty_prediction:
+            # There are cases, where extremely high uncertainties are predicted. 
+            # In reality, we would need to handle these cases separately as edge cases. So we take these out of the equation here.
+            # Filter out all predictions with an uncertainty prediction that lies over mean+5*sigma 
+            for expert in range(len(expert_names)):
+                for dim in range(2):
+                    variance = np.exp(all_predictions[expert, np.where(all_masks[expert])[0], 2+dim])
+                    fault_pos = np.where(variance > np.mean(variance) + 5*np.std(variance))[0]
+                    if fault_pos.shape[0] > 0:
+                        all_masks[expert, fault_pos] = 0
             # ENCE evaluation
             create_ence_evaluation(target=all_targets, 
                                     predictions=all_predictions, 
