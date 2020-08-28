@@ -116,12 +116,12 @@ class Expert(ABC):
             self.calibration_separation_regression_var_spatial = [reg.coef_[0], reg.intercept_]
         else:
             self.calibration_separation_regression_var_temporal = [reg.coef_[0], reg.intercept_]
-        """ Test plot of calibration
+        """
+        # Test plot of calibration. Only for test reasons. This should be deactivated as default.
         RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
-        # Plot RMSE over RMV
         min_RMV = np.min([np.min(RMV),np.min(RMV_corrected)])
         max_RMV = np.max([np.max(RMV),np.max(RMV_corrected)])
-        plot_RMV = np.arange(min_RMV, max_RMV, (max_RMV-min_RMV)/1000)
+        plot_RMV = np.arange(min_RMV, max_RMV, (max_RMV-min_RMV)/RMV.shape[0])
         plt.figure(figsize=[19.20, 10.80], dpi=100)
         plt.plot(RMV, RMSE, '-b', label="ENCE analysis")
         plt.plot(plot_RMV, reg.predict(np.expand_dims(plot_RMV, -1)), '-.b', label="Linear regression of ENCE analysis")
@@ -132,8 +132,18 @@ class Expert(ABC):
         plt.legend()
         plt.title("Calibration analysis for {} prediction of expert {}".format(domain, self.name))
         plt.show()
+        # Print values to csv for thesis.
+        plot_output_dict = {}
+        plot_output_dict["RMV"] = RMV[::5]
+        plot_output_dict["RMSE"] = RMSE[::5]
+        plot_output_dict["plot_RMV"] = plot_RMV[::5]
+        plot_output_dict["lin_reg"] = reg.predict(np.expand_dims(plot_RMV, -1))[::5]
+        plot_output_dict["RMV_corrected"] = RMV_corrected[::5]
+        output_df = pd.DataFrame(plot_output_dict)
+        output_df.to_csv('{}ENCE_calibration_{}.csv'.format(
+            "plot_functions/results/vbc_model/", domain), index=False)
         """
-
+        
     @abstractmethod
     def correct_separation_prediction(self, **kwargs):
         """Correct the uncertainty prediction of the expert with the ENCE calibration."""
