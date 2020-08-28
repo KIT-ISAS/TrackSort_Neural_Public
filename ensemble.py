@@ -16,9 +16,9 @@ class Simple_Ensemble(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts):
+    def __init__(self, n_experts, model_path):
         """Initialize a simple ensemble gating network."""
-        super().__init__(n_experts, "Simple Ensemble", "")
+        super().__init__(n_experts, False, "Simple Ensemble", model_path)
 
     def train_network(self, **kwargs):
         """Simple ensemble needs no training."""
@@ -72,7 +72,7 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
     def __init__(self, n_experts, model_path):
         """Initialize a covariance weighting ensemble gating network."""
         self.weights = np.zeros(n_experts)
-        super().__init__(n_experts, "Covariance Weighting Ensemble", model_path)
+        super().__init__(n_experts, False, "Covariance Weighting Ensemble", model_path)
 
     def save_model(self):
         folder_path = os.path.dirname(self.model_path)
@@ -178,7 +178,7 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
     def __init__(self, n_experts, model_path):
         """Initialize a SMAPE weighting ensemble gating network."""
         self.weights = np.zeros(n_experts)
-        super().__init__(n_experts, "SMAPE Weighting Ensemble", model_path)
+        super().__init__(n_experts, False, "SMAPE Weighting Ensemble", model_path)
 
     def save_model(self):
         folder_path = os.path.dirname(self.model_path)

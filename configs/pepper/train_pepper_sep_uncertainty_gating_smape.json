@@ -169,8 +169,8 @@
     }
   },
   "gating_separation": {
-    "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating_sep.pkl",
+    "type": "SMAPE_Weighting",
+    "model_path": "models/pepper/smape_gating_sep_uncertainty.pkl",
     "options": {
 
     }

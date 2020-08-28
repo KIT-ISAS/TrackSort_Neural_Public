@@ -382,7 +382,9 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
             model_manager.train_gating_network_separation(seq2seq_dataset_train = seq2seq_dataset_train_sp,
                                                           mlp_dataset_train = mlp_dataset_train_sp,
                                                           seq2seq_dataset_eval = seq2seq_dataset_eval_sp, 
-                                                          mlp_dataset_eval = mlp_dataset_eval_sp)
+                                                          mlp_dataset_eval = mlp_dataset_eval_sp,
+                                                          is_uncertainty_prediction = global_config["uncertainty_prediction"],
+                                                          ence_percentage_bin_size = 0.25)
 
     ## Test models
     # Set the plotting options

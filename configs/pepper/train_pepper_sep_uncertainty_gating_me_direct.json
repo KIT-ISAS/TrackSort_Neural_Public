@@ -169,10 +169,23 @@
     }
   },
   "gating_separation": {
-    "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating_sep.pkl",
+    "type": "Mixture_of_Experts",
+    "model_path": "models/pepper/me_gating_separation_uncertainty_direct.h5",
     "options": {
-
+      "batch_size": 128,
+      "n_epochs": 500,
+      "base_learning_rate": 0.005,
+      "decay_steps": 500,
+      "decay_rate": 0.99,
+      "evaluate_every_n_epochs": 20,
+      "direct_uncertainty_output": true,
+      "model_structure": {
+        "features": ["pos", "uncertainty_prediction"],
+        "layers": [16, 16, 16],
+        "activation": "leakly_relu",
+        "l1_regularization": 1,
+        "l2_regularization": 1
+      }
     }
   },
   "data_association": {

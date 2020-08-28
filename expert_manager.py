@@ -252,6 +252,7 @@ class Expert_Manager(object):
                                                             predicted_y = predicted_y,
                                                             percentage_bin_size = percentage_bin_size,
                                                             domain = "temporal")
+            self.separation_experts[expert].save_calibration()
 
     def test_batch_separation_prediction(self,                     
                     seq2seq_inp = None, seq2seq_target = None, 

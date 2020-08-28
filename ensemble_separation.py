@@ -16,9 +16,12 @@ class Simple_Ensemble_Separation(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts):
+    def __init__(self, n_experts, is_uncertainty_prediction, model_path):
         """Initialize a simple ensemble gating network."""
-        super().__init__(n_experts, "Simple Ensemble", "")
+        super().__init__(n_experts, is_uncertainty_prediction, "Simple Ensemble", model_path)
+
+    def load_model(self):
+        self.load_calibration()
 
     def train_network(self, **kwargs):
         """Simple ensemble needs no training."""
@@ -28,8 +31,8 @@ class Simple_Ensemble_Separation(GatingNetwork):
         """Not needed for separation prediction."""
         pass
 
-    def get_masked_weights(self, mask, *args):
-        """Return an equal weights vector for all non masked experts.
+    def get_masked_weights(self, masks, *args):
+        """Return an equal weights vector for all non-masked experts.
         
         The weights sum to 1.
         All Weights are > 0 if the expert is non masked at an instance.
@@ -37,10 +40,10 @@ class Simple_Ensemble_Separation(GatingNetwork):
         If the mask value at an instance is 0, the experts weight is 0
         
         Returns:
-            np.array with weights of shape [mask.shape, 2] -> 2 standing for the two dimensions spatial and temporal
+            np.array with weights of shape [masks.shape, 2] -> 2 standing for the two dimensions spatial and temporal
         """
         epsilon = 1e-30
-        weights = mask / (np.sum(mask, axis=0) + epsilon)
+        weights = masks / (np.sum(masks, axis=0) + epsilon)
         weights = np.concatenate((weights[...,np.newaxis], weights[...,np.newaxis]), axis=-1)
         return weights
 
@@ -54,10 +57,10 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts, model_path):
+    def __init__(self, n_experts, is_uncertainty_prediction, model_path):
         """Initialize a covariance weighting ensemble gating network."""
         self.weights = np.zeros([n_experts, 2])
-        super().__init__(n_experts, "Covariance Weighting Ensemble", model_path)
+        super().__init__(n_experts, is_uncertainty_prediction, "Covariance Weighting Ensemble", model_path)
 
     def save_model(self):
         folder_path = os.path.dirname(self.model_path)
@@ -72,8 +75,9 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
             self.weights = pickle.load(filehandler)
         except:
             logging.error("Could not load gating network from path {}".format(self.model_path))
+        self.load_calibration()
 
-    def train_network(self, target, predictions, masks, **kwargs):
+    def train_network(self, **kwargs):
         """Train the ensemble.
         
         Args:
@@ -81,35 +85,16 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
             predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, 2]
             masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
         """
-        # convert masks for numpy
-        masks = 1-masks
-        n_experts = predictions.shape[0]
         for dim in range(2):
-            # Covariance matrix C
-            C = np.matrix(np.zeros([n_experts, n_experts]))
-            # Calculate covariance between all experts
-            for i in range(n_experts):
-                for j in range(n_experts):
-                    # Calculate error of expert i
-                    masked_prediction = np.ma.array(predictions[i,:,dim], mask=masks[i])
-                    masked_target = np.ma.array(target[:,dim], mask=masks[i])
-                    error_i = masked_target - masked_prediction
-                    # Calculate error of expert j
-                    masked_prediction = np.ma.array(predictions[j,:,dim], mask=masks[j])
-                    masked_target = np.ma.array(target[:,dim], mask=masks[j])
-                    error_j = masked_target - masked_prediction
-                    # Calculate error covariance in each direction (x and y) seperately
-                    # C_ij = mean(error_i * error_j)
-                    mult_errors = np.ma.multiply(error_i, error_j)
-                    C[i,j] = np.ma.mean(mult_errors)
+            C = np.matrix(self.C[dim])
             try:
                 inv_C = C.I
             except:
                 inv_C = np.linalg.pinv(C)
-            for i in range(n_experts):
+            for i in range(self.n_experts):
                 self.weights[i, dim] = np.sum(inv_C[i])/np.sum(inv_C)
             logging.info("Trained covariance weighting gating network for separation. \
-                 The resulting weights for dimenstion {} are: {}".format(dim, self.weights))
+                 The resulting weights for dimenstion {} are: {}".format(dim, self.weights[:, dim]))
 
     def get_weights(self, batch_size):
         """Return a weight vector.
@@ -124,7 +109,7 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
         return weights"""
         pass
 
-    def get_masked_weights(self, mask, *args):
+    def get_masked_weights(self, masks, log_variance_predictions=None, *args):
         """Return a weights vector for all non masked experts.
         
         The weights sum to 1.
@@ -142,18 +127,42 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
         --> Expert 6 is only active at position 0.
         
         Args:
-            mask (tf.Tensor): Mask array with shape [n_experts, n_tracks]
+            masks (tf.Tensor/np.array):                     Mask array, shape: [n_experts, n_tracks]
+            log_variance_predictions (tf.Tensor/np.array):  log of uncertainty prediction of experts, shape: [n_experts, n_tracks, 2]
 
         Returns:
-            np.array with weights of shape mask.shape
+            np.array with weights, shape: [n_experts, n_tracks, 2]
         """
-        assert(mask.shape[0] == self.n_experts)
-        batch_weight = np.repeat(np.swapaxes(np.expand_dims(self.weights, -1), 1, 2), mask.shape[1], axis=1)
-        #weights = mask / (np.sum(mask, axis=0) + epsilon)
-        double_mask = np.concatenate((mask[...,np.newaxis], mask[...,np.newaxis]), axis=-1)
-        masked_batch_weight = np.multiply(double_mask, batch_weight)
-        epsilon = 1e-30
-        weights = masked_batch_weight / (np.sum(masked_batch_weight, axis=0) + epsilon)
+        assert(masks.shape[0] == self.n_experts)
+        if not self.is_uncertainty_prediction:
+            batch_weight = np.repeat(np.swapaxes(np.expand_dims(self.weights, -1), 1, 2), masks.shape[1], axis=1)
+            #weights = masks / (np.sum(masks, axis=0) + epsilon)
+            double_masks = np.concatenate((masks[...,np.newaxis], masks[...,np.newaxis]), axis=-1)
+            masked_batch_weight = np.multiply(double_masks, batch_weight)
+            epsilon = 1e-30
+            weights = masked_batch_weight / (np.sum(masked_batch_weight, axis=0) + epsilon)
+        else:
+            # We don't use the fix C matrix here.
+            # We build our own C matrix with the uncertainty predictions and the precalculated correlations.
+            assert(log_variance_predictions is not None)
+            weights = np.zeros(log_variance_predictions.shape)
+            std_predictions = np.sqrt(np.exp(log_variance_predictions))
+            C_dyn = np.einsum('ikl,jkl,lij->ijkl', std_predictions, std_predictions, self.corr)
+            for dim in range(2):
+                # We have to invert C_dyn for each track. 
+                # This could be very time consuming. Took a few seconds for ~5000 tracks.
+                for track in range(log_variance_predictions.shape[1]):
+                    C_dyn_track = np.matrix(C_dyn[:,:, track, dim])
+                    try:
+                        inv_C = C_dyn_track.I
+                    except:
+                        inv_C = np.linalg.pinv(C_dyn_track)
+                    for expert in range(self.n_experts):
+                        weights[expert, track, dim] = np.sum(inv_C[expert])/np.sum(inv_C)
+                    # We need some error handling to prevent ridiculously high weights
+                    if np.any(np.abs(weights[:, track, dim]) > 1) or \
+                        (np.sum(weights[:,track,dim]<0.95) or np.sum(weights[:,track,dim]>1.05)):
+                        weights[:, track, dim] = 1/self.n_experts
         return weights
 
 
@@ -167,10 +176,10 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
     
     __metaclass__ = GatingNetwork
 
-    def __init__(self, n_experts, model_path):
+    def __init__(self, n_experts, is_uncertainty_prediction, model_path):
         """Initialize a SMAPE weighting ensemble gating network."""
         self.weights = np.zeros([n_experts, 2])
-        super().__init__(n_experts, "SMAPE Weighting Ensemble", model_path)
+        super().__init__(n_experts, is_uncertainty_prediction, "SMAPE Weighting Ensemble", model_path)
 
     def save_model(self):
         folder_path = os.path.dirname(self.model_path)
@@ -185,8 +194,9 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
             self.weights = pickle.load(filehandler)
         except:
             logging.error("Could not load gating network from path {}".format(self.model_path))
+        self.load_calibration()
 
-    def train_network(self, target, predictions, masks, expert_types, **kwargs):
+    def train_network(self, target, predictions, masks, **kwargs):
         """Train the ensemble.
 
         Calculate the symetric mean percentage error (SMAPE) for every expert.
@@ -196,7 +206,6 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
             targets (np.array):     All target values of the given dataset, shape: [n_tracks, 2]
             predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, 2]
             masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
-            expert_types (list):    List of Expert_Types
         """
         n_experts = predictions.shape[0]
         # convert masks for numpy
@@ -236,7 +245,7 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
         """
         pass
 
-    def get_masked_weights(self, mask, *args):
+    def get_masked_weights(self, masks, *args):
         """Return a weights vector for all non masked experts.
         
         The weights sum to 1.
@@ -254,15 +263,15 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
         --> Expert 6 is only active at position 0.
         
         Args:
-            mask (tf.Tensor): Mask array with shape [n_experts, n_tracks, track_length]
+            masks (tf.Tensor): Mask array with shape [n_experts, n_tracks, track_length]
 
         Returns:
-            np.array with weights of shape mask.shape
+            np.array with weights of shape masks.shape
         """
-        assert(mask.shape[0] == self.n_experts)
-        batch_weight = np.repeat(np.swapaxes(np.expand_dims(self.weights, -1), 1, 2), mask.shape[1], axis=1)
-        double_mask = np.concatenate((mask[...,np.newaxis], mask[...,np.newaxis]), axis=-1)
-        masked_batch_weight = np.multiply(double_mask, batch_weight)
+        assert(masks.shape[0] == self.n_experts)
+        batch_weight = np.repeat(np.swapaxes(np.expand_dims(self.weights, -1), 1, 2), masks.shape[1], axis=1)
+        double_masks = np.concatenate((masks[...,np.newaxis], masks[...,np.newaxis]), axis=-1)
+        masked_batch_weight = np.multiply(double_masks, batch_weight)
         epsilon = 1e-30
         weights = masked_batch_weight / (np.sum(masked_batch_weight, axis=0) + epsilon)
         return weights
