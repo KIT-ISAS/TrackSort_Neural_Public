@@ -65,7 +65,10 @@ class MixtureOfExperts(GatingNetwork):
         self.input_dim = input_dim
         # Output dimensions
         self._label_dim = n_experts
-        super().__init__(n_experts, "ME weighting", model_path)
+        super().__init__(n_experts=n_experts,
+                         is_uncertainty_prediction=False,
+                         name="ME weighting", 
+                         model_path=model_path)
 
     def create_model(self):
         """Create a new MLP ME model based on the model structure defined in the config file."""
@@ -107,7 +110,7 @@ class MixtureOfExperts(GatingNetwork):
             decay_rate=self.decay_rate,
             staircase=True)
         optimizer = tf.keras.optimizers.Adam(lr_schedule)
-        train_step_fn = train_step_generator(self.mlp_model, optimizer)
+        train_step_fn = train_step_generator(model = self.mlp_model, optimizer = optimizer)
 
         ## Create Dataset
         # Transform the data to the desired data format
@@ -170,7 +173,7 @@ class MixtureOfExperts(GatingNetwork):
                 test_iter = iter(test_dataset)
                 for ((test_inputs, test_expert_predictions, test_mask), test_targets) in test_iter:
                     # Predict weights for experts
-                    weights = self.mlp_model(test_inputs)
+                    weights = self.mlp_model(test_inputs, training=False)
                     masked_weights = mask_weights(weights, test_mask)
                     loss = weighted_sum_mse_loss(masked_weights, test_expert_predictions, test_targets)
                     # Evaluate mae
@@ -494,7 +497,8 @@ def mask_weights(weights, mask):
 
 def weighted_sum_mse_loss(weights, expert_predictions, target):
     """Return MSE for weighted expert predictions."""
-    return tf.reduce_sum(tf.pow(target-tf.einsum('ijk,ij->ik', expert_predictions, weights),2),axis=1)
+    # tf.reduce_sum(tf.pow(target-tf.einsum('ijk,ij->ik', expert_predictions, weights),2),axis=1)
+    return tf.reduce_sum(tf.pow(target-tf.einsum('ijk,ij->ik', expert_predictions, weights),2))
 
 def weighted_sum_mae_loss(weights, expert_predictions, target):
     """Return MAE for weighted expert predictions."""
