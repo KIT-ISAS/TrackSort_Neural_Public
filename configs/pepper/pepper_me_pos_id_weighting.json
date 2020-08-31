@@ -31,9 +31,25 @@
         }
       }
     },
+    "KF CV": {
+      "type": "KF",
+      "model_path": "models/pepper/KF_CV.pkl",
+      "sub_type": "CV",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7
+      },
+      "state_options": {
+        "velocity_guess": 6.5,
+        "velo_var_x": 1.8,
+        "velo_var_y": 180,
+        "pos_var": 3.6E-7
+      }
+    },
     "KF CA": {
       "type": "KF",
-      "model_path": "models/pepper/KF_sep_CA_CA_CA.pkl",
+      "model_path": "models/pepper/KF_CA.pkl",
       "sub_type": "CA",
       "model_options": {
         "dt": 0.005,
@@ -59,7 +75,7 @@
       "decay_steps":200,
       "decay_rate":0.96,
       "batch_size": 1000,
-      "n_epochs": 300,
+      "n_epochs": 1000,
       "evaluate_every_n_epochs": 20,
       "model_structure": {
         "features": ["pos", "id"],

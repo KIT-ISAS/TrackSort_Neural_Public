@@ -2,6 +2,39 @@
 
 cd ..
 
+./main.py \
+  --is_loaded False \
+  --is_loaded_gating_network True \
+  --config_path configs/DEM_cylinder/train_cylinder_kf_cv.json \
+  --dataset_dir 'data/DEM_Data/csv_converted_FOV/Cylinders_115_200Hz.csv' \
+  --data_is_aligned False \
+  --rotate_columns True \
+  --normalization_constant 1.0 \
+  --additive_noise_stddev 4e-4 \
+  --num_train_epochs 1 \
+  --batch_size 128 \
+  --evaluate_every_n_epochs 20 \
+  --result_path results/DEM_cylinder/MTT_kf_cv/ \
+  --execute_evaluation True \
+  --execute_multi_target_tracking True \
+  --no_show True
+
+./main.py \
+  --is_loaded False \
+  --is_loaded_gating_network True \
+  --config_path configs/DEM_cylinder/train_cylinder_kf_ca.json \
+  --dataset_dir 'data/DEM_Data/csv_converted_FOV/Cylinders_115_200Hz.csv' \
+  --data_is_aligned False \
+  --rotate_columns True \
+  --normalization_constant 1.0 \
+  --additive_noise_stddev 4e-4 \
+  --num_train_epochs 1 \
+  --batch_size 128 \
+  --evaluate_every_n_epochs 20 \
+  --result_path results/DEM_cylinder/MTT_kf_ca/ \
+  --execute_evaluation True \
+  --execute_multi_target_tracking True \
+  --no_show True
 
 ./main.py \
   --is_loaded False \
@@ -11,11 +44,11 @@ cd ..
   --data_is_aligned False \
   --rotate_columns True \
   --normalization_constant 1.0 \
-  --additive_noise_stddev 1.12e-4 \
+  --additive_noise_stddev 4e-4 \
   --num_train_epochs 3000 \
-  --batch_size 64 \
+  --batch_size 128 \
   --evaluate_every_n_epochs 20 \
-  --result_path results/DEM_cylinder/ \
+  --result_path results/DEM_cylinder/MTT_mlp/ \
   --execute_evaluation False \
   --execute_multi_target_tracking False \
   --no_show True
@@ -28,13 +61,13 @@ cd ..
   --data_is_aligned False \
   --rotate_columns True \
   --normalization_constant 1.0 \
-  --additive_noise_stddev 1.12e-4 \
-  --num_train_epochs 700 \
-  --batch_size 64 \
+  --additive_noise_stddev 4e-4 \
+  --num_train_epochs 1000 \
+  --batch_size 128 \
   --evaluate_every_n_epochs 20 \
-  --result_path results/DEM_cylinder/ \
-  --execute_evaluation False \
-  --execute_multi_target_tracking False \
+  --result_path results/DEM_cylinder/MTT_lstm/ \
+  --execute_evaluation True \
+  --execute_multi_target_tracking True \
   --no_show True
 
 ./main.py \
@@ -45,11 +78,11 @@ cd ..
   --data_is_aligned False \
   --rotate_columns True \
   --normalization_constant 1.0 \
-  --additive_noise_stddev 1.12e-4 \
+  --additive_noise_stddev 4e-4 \
   --num_train_epochs 3000 \
-  --batch_size 64 \
+  --batch_size 128 \
   --evaluate_every_n_epochs 20 \
-  --result_path results/DEM_cylinder/ \
-  --execute_evaluation False \
-  --execute_multi_target_tracking False \
+  --result_path results/DEM_cylinder/MTT_me_pos_id/ \
+  --execute_evaluation True \
+  --execute_multi_target_tracking True \
   --no_show True

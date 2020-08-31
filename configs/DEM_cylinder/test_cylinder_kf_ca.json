@@ -1,10 +1,10 @@
 {
-  "batch_size": 64,
+  "batch_size": 128,
   "experts": {
     "KF CA": {
       "type": "KF",
       "sub_type": "CA",
-      "model_path": "models/DEM_cylinder/KF_sep_CA_CA_CA.pkl",
+      "model_path": "models/DEM_cylinder/KF_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
