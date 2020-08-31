@@ -51,7 +51,7 @@ class AbstractDataSet(ABC):
     def get_nan_value_ary(self):
         return [self.nan_value, self.nan_value]
         
-    def get_seq2seq_data(self, nan_value=0):
+    def get_seq2seq_data_tracking(self, nan_value=0):
         """
         Return a numpy array which can be used for RNN training.
         All trajectories start at timestep 0 and end at timestep max_timestep.
@@ -60,7 +60,9 @@ class AbstractDataSet(ABC):
 
         shape: [number_tracks, max_timestep, point_dimension * 2]
         """
-        return self.seq2seq_data
+        seq2seq_data = self.seq2seq_data
+        seq2seq_data[np.any(self.seq2seq_data==self.nan_value, axis=-1), :] = self.nan_value
+        return seq2seq_data
 
     def get_mlp_data(self):
         """
@@ -378,7 +380,9 @@ class AbstractDataSet(ABC):
         """
         assert( 1 - (evaluation_ratio + test_ratio) > max([evaluation_ratio, test_ratio]), \
             "The train set should be greater than the evaluation and test set.")
-        tracks = self.get_seq2seq_data()
+        tracks = self.get_seq2seq_data_tracking()
+        # We need to delete rows that contain one or more NaN values. 
+        # This is usually the last measurement of the track. Here, the input is existent but the target is not.
         if normalized:
             tracks = self.normalize_tracks(tracks, is_seq2seq_data=True)
         
@@ -783,18 +787,41 @@ class AbstractDataSet(ABC):
         """
         assert self.longest_track is not None, "self.longest_track not set"
         logging.info("longest_track={}".format(self.longest_track))
+        """
         n_tracks = aligned_track_data.shape[0]
         track_length = aligned_track_data.shape[1]
-        seq2seq_data = np.full([n_tracks, track_length, 4], self.nan_value)
+        new_seq2seq_data = np.full([n_tracks, track_length, 4], self.nan_value)
         # Fill in start positions
-        seq2seq_data[:,:,:2] = aligned_track_data[:, 0:track_length]
+        new_seq2seq_data[:,:,:2] = aligned_track_data[:, 0:track_length]
         # Fill in end positions
-        seq2seq_data[:,:-1,2:] = aligned_track_data[:, 1:track_length]
+        new_seq2seq_data[:,:-1,2:] = aligned_track_data[:, 1:track_length]
         # Delete the point where there is only a start but not and end position
         # ---> We don't do this anymore so there is the last measurement available for the separation prediction.
         #correct_pos = np.bitwise_and(seq2seq_data[:,:,0] != self.nan_value, seq2seq_data[:,:,3] == self.nan_value)
         #seq2seq_data[correct_pos,:2] = self.nan_value
         # Return it :)
+        new_seq2seq_data[np.any(new_seq2seq_data==self.nan_value, axis=-1), :] = self.nan_value
+        """
+        seq2seq_data = []
+
+        # for every track we create:
+        #  x, y, x_target, y_target nan_value-padded
+        max_track_length = aligned_track_data.shape[1]
+        for track_number in range(aligned_track_data.shape[0]):
+            last_index = self.get_last_timestep_of_track(aligned_track_data[track_number])
+            input_array = aligned_track_data[track_number, 0:last_index]
+            if last_index < max_track_length:
+                output_array = aligned_track_data[track_number, 1:last_index+1]
+            else:
+                output_array = np.full([max_track_length, 2], self.nan_value)
+                output_array[:-1] = aligned_track_data[track_number, 1:last_index]
+            seq2seq_array = np.hstack((input_array, output_array))
+            # make sure the last entry of the arrays are nan-values
+            n_nan = self.longest_track - last_index
+            seq2seq_array = np.concatenate((seq2seq_array, np.full((n_nan, 4), self.nan_value)))
+
+            seq2seq_data.append(seq2seq_array)
+        
         return np.array(seq2seq_data)
 
     def _convert_aligned_tracks_to_mlp_data(self, aligned_track_data, n_inp_points = 5):
