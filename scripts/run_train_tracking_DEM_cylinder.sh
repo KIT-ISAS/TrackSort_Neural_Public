@@ -17,7 +17,8 @@ cd ..
   --result_path results/DEM_cylinder/MTT_kf_cv/ \
   --execute_evaluation True \
   --execute_multi_target_tracking True \
-  --no_show True
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_tracking_DEM_cylinder.log
 
 ./main.py \
   --is_loaded False \
@@ -34,7 +35,8 @@ cd ..
   --result_path results/DEM_cylinder/MTT_kf_ca/ \
   --execute_evaluation True \
   --execute_multi_target_tracking True \
-  --no_show True
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_tracking_DEM_cylinder.log
 
 ./main.py \
   --is_loaded False \
@@ -51,7 +53,8 @@ cd ..
   --result_path results/DEM_cylinder/MTT_mlp/ \
   --execute_evaluation False \
   --execute_multi_target_tracking False \
-  --no_show True
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_tracking_DEM_cylinder.log
 
 ./main.py \
   --is_loaded False \
@@ -68,7 +71,8 @@ cd ..
   --result_path results/DEM_cylinder/MTT_lstm/ \
   --execute_evaluation True \
   --execute_multi_target_tracking True \
-  --no_show True
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_tracking_DEM_cylinder.log
 
 ./main.py \
   --is_loaded True \
@@ -85,4 +89,5 @@ cd ..
   --result_path results/DEM_cylinder/MTT_me_pos_id/ \
   --execute_evaluation True \
   --execute_multi_target_tracking True \
-  --no_show True
+  --no_show True \
+  --logfile logs/terminal_logs/run_train_tracking_DEM_cylinder.log
