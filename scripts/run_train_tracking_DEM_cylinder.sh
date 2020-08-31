@@ -77,7 +77,7 @@ cd ..
 ./main.py \
   --is_loaded True \
   --is_loaded_gating_network False \
-  --config_path configs/DEM_cylinder/test_cylinder_me_pos_id.json \
+  --config_path configs/DEM_cylinder/train_cylinder_me_pos_id.json \
   --dataset_dir 'data/DEM_Data/csv_converted_FOV/Cylinders_115_200Hz.csv' \
   --data_is_aligned False \
   --rotate_columns True \
