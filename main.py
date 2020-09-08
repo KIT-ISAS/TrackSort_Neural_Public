@@ -363,10 +363,10 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
                                     evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
                                     improvement_break_condition = global_config.get("improvement_break_condition"))
             # Calibrate the uncertainty prediction with an ENCE analysis
-            #if global_config["uncertainty_prediction"]:
-                #model_manager.ence_calibrate_models_separation(seq2seq_dataset_train = seq2seq_dataset_train_sp,
-                #                    mlp_dataset_train = mlp_dataset_train_sp,
-                #                    percentage_bin_size = 0.25)
+            if global_config["uncertainty_prediction"]:
+                model_manager.ence_calibrate_models_separation(seq2seq_dataset_train = seq2seq_dataset_train_sp,
+                                    mlp_dataset_train = mlp_dataset_train_sp,
+                                    percentage_bin_size = 0.25)
     ## Train gating network     
     if global_config["tracking"]:                           
         if global_config["is_loaded_gating_network"]:
@@ -472,7 +472,6 @@ if not global_config['run_hyperparameter_search']:
         # Run cross evaluation
         if global_config['n_folded_cross_evaluation'] > 1:
             for i in range(global_config['n_folded_cross_evaluation']):
-                if i==2:
                     score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config=global_config, cross_eval_set=i)
         else:
             score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
