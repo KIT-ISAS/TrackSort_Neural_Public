@@ -875,8 +875,10 @@ class ModelManager(object):
                     np_masks.append(np.ones(mlp_mask.shape))
                 else:
                     np_masks.append(mlp_mask.numpy())
-                
-                np_predictions.append(np_prediction)
+                if self.is_uncertainty_prediction:
+                    np_predictions.append(np_prediction)
+                else:
+                    np_predictions.append(np_prediction[:,:2])
 
             # Get weighting of experts
             if create_weighted_output:
@@ -896,7 +898,8 @@ class ModelManager(object):
                 # Evaluation purposes  
                 """
                 total_prediction = weighting_function_separation(np.array(np_predictions), weights)
-                total_prediction = np.concatenate((total_prediction, combined_log_var), axis=-1)
+                if self.is_uncertainty_prediction:
+                    total_prediction = np.concatenate((total_prediction, combined_log_var), axis=-1)
                 np_predictions.append(total_prediction)
                 # Create a total mask to add to list
                 masks.append(np_masks.append(np.ones(mlp_mask.shape)))

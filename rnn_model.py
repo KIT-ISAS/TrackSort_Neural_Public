@@ -512,7 +512,8 @@ class RNN_Model(Expert):
         if self.clear_state:
             self.rnn_model.reset_states()
         prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = self.train_step_fn(inp, target, tracking_mask, separation_mask, train=False)
-        prediction = self.correct_separation_prediction(np.array(prediction), separation_mask)
+        if self.is_uncertainty_prediction:
+            prediction = self.correct_separation_prediction(np.array(prediction), separation_mask)
         return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae
 
     def correct_separation_prediction(self, prediction, separation_mask):

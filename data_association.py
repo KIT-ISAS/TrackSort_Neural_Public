@@ -74,6 +74,7 @@ class DataAssociation(object):
         start_phase = belt_limits[0,0] + self.delta_start_end_phase
         end_phase = belt_limits[0,1] - self.delta_start_end_phase
         # Iterate over timesteps
+        all_particle_ids = dict()
         for time_step in range(self.num_timesteps):
             logging.info('step {} / {}'.format(time_step, self.num_timesteps))
 
@@ -88,7 +89,8 @@ class DataAssociation(object):
             particles = particle_time_list[time_step]
             measurements = particles[:,1:]
             particle_ids = particles[:,0]
-            
+            for p_id in particle_ids:
+                all_particle_ids[int(p_id)]=True
             ## Predict new belt position for each track
             predictions = track_manager.get_predictions(model_manager)
             prediction_ids = list(predictions.keys())
@@ -225,4 +227,4 @@ class DataAssociation(object):
                 plt.savefig(os.path.join(self.visualization_path, '{:05d}'.format(time_step)))
                 plt.clf()
         #
-        return track_manager.get_tracks()
+        return track_manager.get_tracks(), all_particle_ids

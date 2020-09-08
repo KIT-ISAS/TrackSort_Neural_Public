@@ -63,7 +63,7 @@ parser.add_argument('--config_path', default="configs/default_config.json",
                     help='Path to config file including information about experts, gating network and weighting function.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--evaluation_ratio', type=float, default=0.15, help='The ratio of data used for evaluation.')
-parser.add_argument('--test_ratio', type=float, default=0.1, help='The ratio of data used for the final unbiased test.')
+parser.add_argument('--test_ratio', type=float, default=0.15, help='The ratio of data used for the final unbiased test.')
 parser.add_argument('--num_timesteps', type=int, default=350,
                     help='The number of timesteps of the dataset. Necessary for FakeDataset.')
 parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only necessary, when model is trained.')
@@ -76,7 +76,7 @@ parser.add_argument('--birth_rate_std', type=float, default=2.0,
                     help='The birth_rate_std value, that is used by the DataManager')
 parser.add_argument('--normalization_constant', type=float, default=None, help='Normalization value')
 parser.add_argument('--evaluate_every_n_epochs', type=int, default=50)
-parser.add_argument('--time_normalization_constant', type=float, default=22.0, help='Normalization for time prediction')
+parser.add_argument('--time_normalization_constant', type=float, default=15.71, help='Normalization for time prediction')
 parser.add_argument('--input_dim', type=int, default=2, help='The input_dim value, that is used by the DataManager')
 parser.add_argument('--mlp_input_dim', type=int, default=5, help='The dimension of input points for the MLP')
 parser.add_argument('--separation_mlp_input_dim', type=int, default=7, help='The dimension of input points for the separation MLP')
@@ -363,10 +363,10 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
                                     evaluate_every_n_epochs = global_config.get("evaluate_every_n_epochs"),
                                     improvement_break_condition = global_config.get("improvement_break_condition"))
             # Calibrate the uncertainty prediction with an ENCE analysis
-            if global_config["uncertainty_prediction"]:
-                model_manager.ence_calibrate_models_separation(seq2seq_dataset_train = seq2seq_dataset_train_sp,
-                                    mlp_dataset_train = mlp_dataset_train_sp,
-                                    percentage_bin_size = 0.25)
+            #if global_config["uncertainty_prediction"]:
+                #model_manager.ence_calibrate_models_separation(seq2seq_dataset_train = seq2seq_dataset_train_sp,
+                #                    mlp_dataset_train = mlp_dataset_train_sp,
+                #                    percentage_bin_size = 0.25)
     ## Train gating network     
     if global_config["tracking"]:                           
         if global_config["is_loaded_gating_network"]:
@@ -398,18 +398,24 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
     
     if global_config["tracking"]:
         if global_config.get('execute_evaluation'):
+            if global_config['n_folded_cross_evaluation'] > 1:
+                seq2seq_dataset_test = seq2seq_dataset_eval
+                mlp_dataset_test = mlp_dataset_eval
             model_manager.test_models(mlp_conversion_func = data_source.mlp_target_to_track_format,
                                     result_dir = global_config['result_path'],
-                                    seq2seq_dataset_test = seq2seq_dataset_eval, 
-                                    mlp_dataset_test = mlp_dataset_eval,
+                                    seq2seq_dataset_test = seq2seq_dataset_test, 
+                                    mlp_dataset_test = mlp_dataset_test,
                                     normalization_constant = data_source.normalization_constant,
                                     evaluate_mlp_mask = global_config['evaluate_mlp_mask'],
                                     no_show = global_config['no_show'])
     if global_config["separation_prediction"]:
         if global_config.get('execute_evaluation'):
+            if global_config['n_folded_cross_evaluation'] > 1:
+                seq2seq_dataset_test_sp = seq2seq_dataset_eval_sp
+                mlp_dataset_test_sp = mlp_dataset_eval_sp
             model_manager.test_models_separation_prediction(result_dir = global_config['result_path'],
-                                    seq2seq_dataset_test = seq2seq_dataset_eval_sp, 
-                                    mlp_dataset_test = mlp_dataset_eval_sp,
+                                    seq2seq_dataset_test = seq2seq_dataset_test_sp, 
+                                    mlp_dataset_test = mlp_dataset_test_sp,
                                     normalization_constant = data_source.normalization_constant,
                                     time_normalization_constant=global_config['time_normalization_constant'],
                                     virtual_belt_edge = global_config['virtual_belt_edge_x_position'],
@@ -430,16 +436,14 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
                                         global_config.get("visualization_path"), global_config.get("visualize"),
                                         **model_config.get('data_association').get('association_config'))
 
-        tracks = data_association.associate_data(particle_time_list, track_manager, model_manager, data_source.get_belt_limits())
+        tracks, all_particle_ids = data_association.associate_data(particle_time_list, track_manager, model_manager, data_source.get_belt_limits())
 
         if global_config['visualize']:
             shutil.rmtree(global_config['visualization_video_path'], ignore_errors=True)
             clip = ImageSequenceClip(global_config['visualization_path'], fps=4)
             clip.write_videofile(global_config['visualization_video_path'], fps=4)
 
-        # No ids are skipped, so this is can be used.
-        particle_ids = np.arange(0, len(particle_time_list), 1)
-        error_of_first_kind, error_of_second_kind = calculate_error_first_and_second_kind(tracks, particle_ids)
+        error_of_first_kind, error_of_second_kind = calculate_error_first_and_second_kind(tracks, all_particle_ids)
         accuracy_of_the_first_kind = 1.0 - error_of_first_kind
         accuracy_of_the_second_kind = 1.0 - error_of_second_kind
         score = 2 * accuracy_of_the_first_kind * accuracy_of_the_second_kind / (
@@ -468,7 +472,8 @@ if not global_config['run_hyperparameter_search']:
         # Run cross evaluation
         if global_config['n_folded_cross_evaluation'] > 1:
             for i in range(global_config['n_folded_cross_evaluation']):
-                score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config=global_config, cross_eval_set=i)
+                if i==2:
+                    score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config=global_config, cross_eval_set=i)
         else:
             score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
         logging.info('data association finished!')

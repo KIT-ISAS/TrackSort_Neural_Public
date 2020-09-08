@@ -15,7 +15,7 @@ import pandas as pd
 plt = matplotlib.pyplot
 from sklearn.linear_model import LinearRegression
 
-def calculate_error_first_and_second_kind(tracks, particle_ids):
+def calculate_error_first_and_second_kind(tracks, all_particle_ids):
     """Calculate the error of first and second kind of the MTT.
 
     Error of first kind:
@@ -25,7 +25,7 @@ def calculate_error_first_and_second_kind(tracks, particle_ids):
     
     Args:
         tracks (list):           List of Track objects
-        particle_ids (np.array): Array of particle ids
+        all_particle_ids (dict): Dict that contains all particles as a key (Value True for all. Stupid python has no sets...)
 
     Returns:
         Error of first kind:  Value between 1 (100%) and 0
@@ -35,23 +35,32 @@ def calculate_error_first_and_second_kind(tracks, particle_ids):
     sum_second = 0 
     particle_id_dict = dict()
     for _, track in tracks.items():
+        # For each track, get all particles that were associated to it (Hopefully just one)
         unique_particles = track.get_unique_particle_ids()
         if unique_particles.shape[0] > 1:
+            # If there were more than one particle associated
+            #  -> Add one to the counter of error of first kind
             sum_first += 1
+        # For each particle, check if it was already added to the particle set
         for p_id in unique_particles:
+            # If yes, that means this particle was falsly associated to another track already.
             if p_id in particle_id_dict:
-                sum_second += 1
+                # Check, if this was the first time.
+                if particle_id_dict[p_id]:
+                    sum_second += 1
+                    # Deactivate this entry, so it does not count more than once per particle
+                    particle_id_dict[p_id] = False
             else:
                 particle_id_dict[p_id] = True
     # Check if a particle got no track
-    for p_id in particle_ids:
+    for p_id in all_particle_ids:
         if p_id not in particle_id_dict:
             logging.warning("Particle with id {} was not associated to any track.".format(p_id))
             # Is this correct???
             sum_second += 1
     error_of_first_kind = sum_first/len(tracks)
     logging.info("Error of first kind: {}".format(error_of_first_kind))
-    error_of_second_kind = sum_second/len(particle_ids)
+    error_of_second_kind = sum_second/len(all_particle_ids)
     logging.info("Error of second kind: {}".format(error_of_second_kind))
     return error_of_first_kind, error_of_second_kind
 
@@ -699,7 +708,30 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
             RMV[start_id] = rmv
         bin_errors = target_y[bin_indices] - predicted_y[bin_indices]
         RMSE[start_id] = np.sqrt(np.mean(bin_errors**2))
-
+        # Histogram plot of a single window. Only for test reasons.
+        stop=0
+        """
+        plt.figure(figsize=[19.20, 10.80], dpi=100)
+        plt.hist(-bin_errors*5, bins=20, density=True)
+        plt.xlabel("Error: prediction-target in ms")
+        max_abs_err = np.max(np.abs(-bin_errors*5))
+        x_vals = np.arange(-max_abs_err, max_abs_err, 2*max_abs_err/100)
+        pdf_pred = 1/np.sqrt(2*np.pi*(rmv*5)**2)*np.exp(-1/2*(x_vals-0)**2/(rmv*5)**2)
+        plt.plot(x_vals, pdf_pred)
+        plt.show()
+        hist, bin_edges = np.histogram(-bin_errors*5, bins=20, density=True)
+        hist_dict = dict()
+        hist_dict["bin_edges"] = bin_edges
+        hist = np.append(hist, 0)
+        hist_dict["hist"]=hist
+        hist_df = pd.DataFrame(hist_dict)
+        hist_df.to_csv(result_dir + "spatial_prediction_hist_CV_" + str(start_id) + ".csv", index=False)
+        plot_dict = dict()
+        plot_dict["x"]=x_vals
+        plot_dict["pdf"]=pdf_pred
+        plot_df = pd.DataFrame(plot_dict)
+        plot_df.to_csv(result_dir + "spatial_prediction_data_CV_" + str(start_id) + ".csv", index=False)
+        """
     ence_analysis_dict = {}
     ence_analysis_dict["RMV"] = RMV
     ence_analysis_dict["RMSE"] = RMSE

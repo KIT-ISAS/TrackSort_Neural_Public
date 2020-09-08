@@ -149,7 +149,8 @@ class MLP_Model(Expert):
             spacial_mae, temporal_mae:  MAE --""--
         """
         prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae = self.train_step_fn(inp, target, mask, training=False)
-        prediction = self.correct_separation_prediction(np.array(prediction), mask)
+        if self.is_uncertainty_prediction:
+            prediction = self.correct_separation_prediction(np.array(prediction), mask)
         return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae
  
     def correct_separation_prediction(self, prediction, mask):
