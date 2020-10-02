@@ -1,0 +1,73 @@
+{
+  "batch_size": 128,
+  "experts": {
+    "KF_CV_VBC_CV_low": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/pepper/KF_sep_CV_VBC_CV_low.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 0.2,
+        "s_v": 3.6E-7,
+        "temporal_separator": "VBC",
+        "spatial_separator": "default"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_VBC_CV_high": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/pepper/KF_sep_CV_VBC_CV_high.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 0.8,
+        "s_v": 3.6E-7,
+        "temporal_separator": "VBC",
+        "spatial_separator": "default"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "gating_separation": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/pepper/simple_gating_sep.pkl",
+    "options": {
+
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "matching_algorithm": "global",
+      "delta_start_end_phase":0.025,
+      "no_change_dist":0.005,
+      "new_track_at_beginning_dist":0.005,
+      "new_track_middle_dist":0.02,
+      "track_disappear_at_end_dist":0.005,
+      "track_disappear_at_middle_dist":0.02
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}

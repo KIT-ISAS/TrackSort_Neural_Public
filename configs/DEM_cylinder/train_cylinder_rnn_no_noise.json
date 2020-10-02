@@ -1,23 +1,26 @@
 {
   "batch_size": 128,
   "experts": {
-    "KF CA": {
-      "type": "KF",
-      "sub_type": "CA",
-      "model_path": "models/DEM_cylinder/KF_CA_no_noise.pkl",
-      "model_options": {
-        "dt": 0.005,
-        "s_w": 1.8E3,
-        "s_v": 3.6E-7
-      },
-      "state_options": {
-        "velocity_guess": 1.8,
-        "velo_var_x": 0.13,
-        "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
+    "LSTM": {
+      "type": "RNN",
+      "model_path": "models/DEM_cylinder/LSTM_64_16_no_noise.h5",
+      "options": {
+        "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":200,
+        "decay_rate":0.95,
+        "model_structure": {
+          "num_units_first_rnn": 64,
+          "num_units_second_rnn": 16,
+          "num_units_third_rnn": 0,
+          "num_units_fourth_rnn": 0,
+          "num_units_first_dense": 0,
+          "num_units_second_dense": 0,
+          "num_units_third_dense": 0,
+          "num_units_fourth_dense": 0,
+          "rnn_model_name": "lstm",
+          "use_batchnorm_on_dense": true
+        }
       }
     }
   },

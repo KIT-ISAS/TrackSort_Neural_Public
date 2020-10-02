@@ -389,7 +389,8 @@ def run_global_config(global_config, experiment_series_names='', cross_eval_set 
     ## Test models
     # Set the plotting options
     params = {'legend.fontsize': 'x-large',
-            'figure.figsize': (19.20, 10.80),
+            #'figure.figsize': (19.20, 10.80),
+            'figure.figsize': (12.80, 7.20),
             'axes.labelsize': 'x-large',
             'axes.titlesize':'x-large',
             'xtick.labelsize':'x-large',
@@ -472,7 +473,7 @@ if not global_config['run_hyperparameter_search']:
         # Run cross evaluation
         if global_config['n_folded_cross_evaluation'] > 1:
             for i in range(global_config['n_folded_cross_evaluation']):
-                    score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config=global_config, cross_eval_set=i)
+                score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config=global_config, cross_eval_set=i)
         else:
             score, accuracy_of_the_first_kind, accuracy_of_the_second_kind = run_global_config(global_config)
         logging.info('data association finished!')

@@ -1,23 +1,20 @@
 {
   "batch_size": 128,
   "experts": {
-    "KF CA": {
+    "KF CV": {
       "type": "KF",
-      "sub_type": "CA",
-      "model_path": "models/DEM_cylinder/KF_CA_no_noise.pkl",
+      "sub_type": "CV",
+      "model_path": "models/DEM_cylinder/KF_CV_no_noise.pkl",
       "model_options": {
         "dt": 0.005,
-        "s_w": 1.8E3,
+        "s_w": 1.8E1,
         "s_v": 3.6E-7
       },
       "state_options": {
         "velocity_guess": 1.8,
         "velo_var_x": 0.13,
         "velo_var_y": 0.5,
-        "pos_var": 3.6E-7,
-        "accel_guess": 0.0,
-        "accel_var_x": 1800,
-        "accel_var_y": 18000
+        "pos_var": 3.6E-7
       }
     }
   },

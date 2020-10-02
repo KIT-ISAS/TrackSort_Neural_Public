@@ -116,8 +116,9 @@ class Expert(ABC):
             self.calibration_separation_regression_var_spatial = [reg.coef_[0], reg.intercept_]
         else:
             self.calibration_separation_regression_var_temporal = [reg.coef_[0], reg.intercept_]
-        """
+        
         # Test plot of calibration. Only for test reasons. This should be deactivated as default.
+        """
         RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
         min_RMV = np.min([np.min(RMV),np.min(RMV_corrected)])
         max_RMV = np.max([np.max(RMV),np.max(RMV_corrected)])
@@ -140,9 +141,11 @@ class Expert(ABC):
         plot_output_dict["lin_reg"] = reg.predict(np.expand_dims(plot_RMV, -1))[::5]
         plot_output_dict["RMV_corrected"] = RMV_corrected[::5]
         output_df = pd.DataFrame(plot_output_dict)
-        output_df.to_csv('{}ENCE_calibration_{}.csv'.format(
-            "plot_functions/results/vbc_model/", domain), index=False)
+        output_df.to_csv('{}ENCE_calibration_{}_{}.csv'.format(
+            "plot_functions/results/vbc_model/", domain, self.name), index=False)
+        stop=0
         """
+        
         
     @abstractmethod
     def correct_separation_prediction(self, **kwargs):
