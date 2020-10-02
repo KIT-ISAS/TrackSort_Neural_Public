@@ -1,9 +1,13 @@
-# data.py
-# -------
-# - AbstractDataSet: Abstract class which defines the necessary interface for every data set
-#    - FakeDataSet: Randomly created lines with noise
-#    - CsvDataSet: Loads (real) tracks from a glob pattern of *.csv files
+"""Data manager class and functions.
 
+AbstractDataSet: Abstract class which defines the necessary interface for every data set
+                - FakeDataSet: Randomly created lines with noise
+                - CsvDataSet: Loads (real) tracks from a glob pattern of *.csv files
+
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Daniel Pollithy
+    * Jakob Thumm (jakob.thumm@student.kit.edu) 2.10.2020:    Added documentation to main functionality.
+"""
 import io
 import glob
 import random
@@ -20,6 +24,7 @@ from sklearn.model_selection import train_test_split
 
 
 class AbstractDataSet(ABC):
+    """Abstract class for a data set."""
     # dimensions of the belt in pixels
     # ToDo: Currently this has to be the same value
     #       assert belt_width == belt_height

@@ -1,7 +1,8 @@
 """Abstract Expert and Expert Type.
 
-Todo:
-    * 
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 
 import numpy as np
@@ -85,14 +86,14 @@ class Expert(ABC):
         pass
 
     def ence_calibration_separation(self, predicted_var, target_y, predicted_y, percentage_bin_size = 0.25, domain = "spatial"):
-        """Calibrate the uncertainty prediction of the expert in the separation prediction with an ENCE calibration.
+        """Calibrate the uncertainty prediction of the expert in the separation prediction with an SENCE calibration.
 
         Saves the model after finding new calibration parameters.
 
         Args:
-            predicted_var (np.array):   The predicted variances of the expert
-            target_y (np.array):        The target vector
-            predicted_y (np.array):     The prediction vector of the expert
+            predicted_var (np.array):   The predicted variances of the expert, shape = [n_tracks]
+            target_y (np.array):        The target vector, shape = [n_tracks]
+            predicted_y (np.array):     The prediction vector of the expert, shape = [n_tracks]
             percentage_bin_size (double): The percentage bin size [0, 1]
             domain (String):            spatial or temporal
         """
@@ -163,10 +164,12 @@ class Expert(ABC):
         pass
 
     def save_calibration(self):
+        """Save the linear regression values of the uncertainty calibration to the calibration path."""
         with open(self.calibration_path, 'wb') as f:
             pickle.dump([self.calibration_separation_regression_var_spatial, self.calibration_separation_regression_var_temporal], f)
 
     def load_calibration(self):
+        """Load the linear regression values of the uncertainty calibration from the calibration path."""
         if os.path.exists(self.calibration_path):
             with open(self.calibration_path, 'rb') as f:
                 self.calibration_separation_regression_var_spatial, self.calibration_separation_regression_var_temporal = pickle.load(f)
@@ -188,7 +191,6 @@ class Expert(ABC):
 
 class Expert_Type(Enum):
     """Simple enumeration class for expert types."""
-    
     RNN = auto()
     KF = auto()
     MLP = auto()

@@ -1,3 +1,8 @@
+"""This is only a test function!
+
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+"""
 import numpy as np
 from cv_model import *
 from ca_model import *

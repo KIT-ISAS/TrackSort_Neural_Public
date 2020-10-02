@@ -1,7 +1,8 @@
 """CA Kalman filter model and CA State.
 
-Todo:
-    * (Convert np representation to tensor representation for mixture of experts)
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 
 import numpy as np
@@ -70,6 +71,7 @@ class CA_Model(KF_Model):
             temporal_separator (String):    Temporal separation prediction type ("CA", "CVBC", "IA", "LV")
             spatial_separator (String):     Spatial separation prediction type ("CA", "CV", "ratio", "DSC")
             belt_velocity (double):         The velocity of the belt. Only needed for temporal prediction type limited velocity "LV".
+            default_state_options (dict):   Default options for a new CA state
         """
         self.dt = dt        
         self.s_w = s_w
@@ -128,23 +130,23 @@ class CA_Model(KF_Model):
         super().__init__(name, model_path, F, C_w, H, C_v, default_state_options)
 
     def train_batch(self, inp, target):
-        """Train the cv model on a batch of data."""
+        """Train the CA model on a batch of data."""
         return self.predict_batch(inp)
 
     def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask, no_train_mode=False):
-        """Train the cv model for separation prediction on a batch of data.
+        """Train the CA model for separation prediction on a batch of data.
 
-        The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
+        The CA algorithm will perform tracking and then predict the time and position at the nozzle array.
 
         Args:
-            inp (tf.Tensor):            Batch of track measurements
-            target (tf.Tensor):         Batch of track target measurements
-            tracking_mask (tf.Tensor):  Batch of tracking masks
-            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+            inp (tf.Tensor):            Batch of track measurements, [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor):         Batch of track target measurements, [x, y, y_nozzle, dt_nozzle, vx_nozzle], shape = [n_tracks, track_length, 5]
+            tracking_mask (tf.Tensor):  Batch of tracking masks, shape = [n_tracks, track_length]
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction, shape = [n_tracks, track_length]
             no_train_mode (Boolean):    Option to disable training of spatial and temporal variable
 
         Returns:
-            prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle]
+            prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle], shape = [n_tracks, track_length, 4]
             spatial_loss (tf.Tensor):   mean((y_nozzle_pred - y_nozzle_target)^2)
             temporal_loss (tf.Tensor):  mean((dt_nozzle_pred - dt_nozzle_target)^2)
             spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
@@ -160,7 +162,14 @@ class CA_Model(KF_Model):
         return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae 
 
     def predict_batch(self, inp):
-        """Predict a batch of data with the cv model."""
+        """Predict a batch of data for tracking with the CA model.
+        
+        Args:
+            inp (tf.Tensor):            Batch of track measurements, [x, y], shape = [n_tracks, track_length, 2]
+        
+        Returns:
+            predictions (np.array):     Batch of track predictions, [x, y], shape = [n_tracks, track_length, 2]
+        """
         np_inp = inp.numpy()
         predictions = np.zeros(np_inp.shape)
         
@@ -182,7 +191,17 @@ class CA_Model(KF_Model):
         return predictions
 
     def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
-        """Predict a batch of data with the ca model.
+        """Predict a batch of data for separation prediction with the CA model.
+
+        Right now always outputs an uncertainty prediction. May be changed later.
+
+        Training is enabled by passing is_training=True and giving a target array
+
+        Args:
+            inp (tf.Tensor):            Batch of track measurements, [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor):         Batch of track target measurements, [x, y, y_nozzle, dt_nozzle, v_nozzle], shape = [n_tracks, track_length, 5]
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction, shape = [n_tracks, track_length]   
+            is_training (Boolean):      Activate training 
         
         Returns:
             prediction (np.array): shape = n_tracks, n_timesteps, 6
@@ -190,7 +209,7 @@ class CA_Model(KF_Model):
                     prediction[i, 0:end_track, 0:2] = [x_pred, y_pred]
                 Separation prediction entries:
                     prediction[i, end_track, 2] = y_nozzle_pred    (Predicted y position at nozzle array)
-                    prediction[i, end_track, 3] = dt_nozzle_pred   (Predicted time to nozzle array)
+                    prediction[i, end_track, 3] = t_nozzle_pred   (Predicted time to nozzle array)
                     prediction[i, end_track, 4] = log(var_y)       (Predicted variance of spatial prediction)
                     prediction[i, end_track, 5] = log(var_t)       (Predicted variance of temporal prediction)
         """
@@ -387,7 +406,7 @@ class CA_Model(KF_Model):
         return predictions
 
     def get_zero_state(self, batch_size):
-        """Return a list of dummy CV_States."""
+        """Return a list of dummy CA_States."""
         dummy_list = []
         for i in range(batch_size):
             dummy_list.append(CA_State([0.0, 0.0], 0))
@@ -443,13 +462,13 @@ class CA_State(KF_State):
         super().__init__(state, C_p, C_e)
 
     def get_pos(self):
-        """Return the x,y position of the state."""
+        """Return the [x, y] position of the state."""
         return self.state[[0,3],0]
 
     def get_v(self):
-        """Return the velocity of the state."""
+        """Return the [x, y] velocity of the state."""
         return self.state[[1,4],0]
 
     def get_a(self):
-        """Return the acceleration of the state."""
+        """Return the [x, y] acceleration of the state."""
         return self.state[[2,5],0]

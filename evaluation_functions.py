@@ -1,7 +1,8 @@
 """Functions for evaluating models and creating plots.
 
-TODO:
-    * Pick n worst predictions instead of dependent on std value.
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 
 import logging
@@ -66,23 +67,23 @@ def calculate_error_first_and_second_kind(tracks, all_particle_ids):
 
 def create_boxplot_evaluation(target, predictions, masks, expert_names, result_dir, 
                               normalization_constant = 1, is_mlp_mask=False, no_show = False):
-    """Create the data for MSE and MAE boxplots.
+    """Create the data for MSE and MAE tracking boxplots.
     
-    Create box plots and data of plots.
+    Create tracking box plots and data of plots.
     Save plots and data to result directory.
     The normalization_constant changes the plot in y axis.
         If the n_c is >= 100 we assume that you work with pixel data
         If the n_c is < 100 we assume that you work with data in metric units where 1=1m
 
     Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values
-        masks (np.array):       Masks for every expert
-        expert_names (list):    Names (String) of each expert
-        result_dir (String):    Directory to save the created plot data to
-        normalization_constant (double): Value for denormalization
-        is_mlp_mask (Boolean):  Is this evaluation with mlp masks or standard?
-        no_show (Boolean):      Do not show the figures. The figures will still be saved.
+        target (np.array):                  Target values, shape = [n_tracks, track_length, 2]
+        predictions (np.array):             Predicted values, shape = [n_experts, n_tracks, track_length, 2]
+        masks (np.array):                   Masks for every expert, shape = [n_experts, n_tracks, track_length]
+        expert_names (list):                Names (String) of each expert
+        result_dir (String):                Directory to save the created plot data to
+        normalization_constant (double):    Value for denormalization
+        is_mlp_mask (Boolean):              Is this evaluation with mlp masks or standard?
+        no_show (Boolean):                  Do not show the figures. The figures will still be saved.
     """
     n_experts = predictions.shape[0]
     assert(len(expert_names) == n_experts)
@@ -154,14 +155,14 @@ def create_boxplot_evaluation_separation_prediction(target, predictions, masks, 
     Save the data to the result dir.
 
     Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values
-        masks (np.array):       Masks for every expert
-        expert_names (list):    Names (String) of each expert
-        result_dir (String):    Directory to save the created plot data to
-        normalization_constant (double): Value for denormalization the y_nozzle value
+        target (np.array):                  Target values, shape = [n_tracks, 2]
+        predictions (np.array):             Predicted values, shape = [n_experts, n_tracks, 2]
+        masks (np.array):                   Masks for every expert, shape = [n_experts, n_tracks]
+        expert_names (list):                Names (String) of each expert
+        result_dir (String):                Directory to save the created plot data to
+        normalization_constant (double):    Value for denormalization the y_nozzle value
         time_normalization_constant (double): Value for denormalization the dt_nozzle value
-        no_show (Boolean):      Do not show the figures. The figures will still be saved.
+        no_show (Boolean):                  Do not show the figures. The figures will still be saved.
     """
     n_experts = predictions.shape[0]
     assert(len(expert_names) == n_experts)
@@ -236,14 +237,14 @@ def create_spatial_outlier_evaluation(seq2seq_inputs, target, predictions, masks
     """Create an evaluation of the biggest outliers in spatial dimension.
 
     Args:
-        seq2seq_inputs (np.array):      Input data in seq2seq format, shape = [n_tracks, track_length, 2] 
-        target (np.array):              Target values, shape = [n_tracks]
-        predictions (np.array):         Predicted values. The last entry should be the gating network prediction!, shape = [n_experts, n_tracks]
-        masks (np.array):               Masks for every expert, shape = [n_experts, n_tracks]
-        expert_names (list):            Names (String) of each expert
-        result_dir (String):            Directory to save the created plot data to
-        virtual_belt_edge (double):     x-Position of virtual belt edge
-        virtual_nozzle_array (double):  x-Position of virtual nozzle array
+        seq2seq_inputs (np.array):              Input data in seq2seq format, shape = [n_tracks, track_length, 2] 
+        target (np.array):                      Target values, shape = [n_tracks]
+        predictions (np.array):                 Predicted values. The last entry should be the gating network prediction!, shape = [n_experts, n_tracks]
+        masks (np.array):                       Masks for every expert, shape = [n_experts, n_tracks]
+        expert_names (list):                    Names (String) of each expert
+        result_dir (String):                    Directory to save the created plot data to
+        virtual_belt_edge (double):             x-Position of virtual belt edge
+        virtual_nozzle_array (double):          x-Position of virtual nozzle array
         normalization_constant (double):        Value for denormalization the y_nozzle value
         time_normalization_constant (double):   Value for denormalization the dt_nozzle value
         n_errors (int):                         Number of errors to plot
@@ -293,9 +294,9 @@ def create_diversity_evaluation(target, predictions, masks, expert_names, result
     Save data to result directory.
 
     Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values
-        masks (np.array):       Masks for every expert
+        target (np.array):      Target values, shape = [n_tracks, (track_length), 2]
+        predictions (np.array): Predicted values, shape = [n_experts, n_tracks, (track_length), 2]
+        masks (np.array):       Masks for every expert, shape = [n_experts, n_tracks, (track_length)]
         expert_names (list):    Names (String) of each expert
         result_dir (String):    Directory to save the created plot data to
         is_mlp_mask (Boolean):  Is this evaluation with mlp masks or standard?
@@ -361,9 +362,9 @@ def create_error_region_evaluation(target, predictions, masks, expert_names, res
         If the n_c is < 100 we assume that you work with data in metric units where 1=1m
 
     Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values
-        masks (np.array):       Masks for every expert
+        target (np.array):      Target values, shape = [n_tracks, track_length, 2]
+        predictions (np.array): Predicted values, shape = [n_experts, n_tracks, track_length, 2]
+        masks (np.array):       Masks for every expert, shape = [n_experts, n_tracks, track_length]
         expert_names (list):    Names (String) of each expert
         result_dir (String):    Directory to save the created plot data to
         normalization_constant (double): Value for denormalization
@@ -467,8 +468,8 @@ def create_mean_weight_evaluation(weights, masks, expert_names, result_dir, no_s
     """Create a plot that shows the mean weight for each expert.
 
     Args:
-        weights (np.array):  Weights for each track for each expert. Shape: [n_experts, n_tracks]
-        masks (np.array):    Indicate where the expert was valid. Shape: [n_experts, n_tracks]
+        weights (np.array):  Weights for each track for each expert, shape = [n_experts, n_tracks]
+        masks (np.array):    Indicate where the expert was valid, shape = [n_experts, n_tracks]
         expert_names (list): List of expert names (Strings)
         result_dir (String): Directory to save the results
         no_show (Boolean):   Disable figure pop-up
@@ -494,7 +495,7 @@ def get_box_values(data):
     """Obtain all box plot values from a set of numpy data.
     
     Args:
-        data: numpy array
+        data (np.array): Any shape.
 
     Returns
         [median, upper_quartile, lower_quartile, upper_whisker, lower_whisker]
@@ -510,9 +511,9 @@ def calculate_mse_mae(target, predictions, masks):
     """Calculate the Mean Squared Error and Mean Absolut Error for each expert.
 
     Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values
-        masks (np.array):       Masks for every expert
+        target (np.array):      Target values, shape = [n_tracks, (track_length), 2]
+        predictions (np.array): Predicted values, shape = [n_experts, n_tracks, (track_length), 2]
+        masks (np.array):       Masks for every expert, shape = [n_experts, n_tracks, (track_length)]
 
     Returns:
         MSE (np.array): One mse value per expert prediction (Same size as masks)
@@ -553,9 +554,9 @@ def calculate_correlation_coefficient(target, prediction_1, prediction_2, mask_1
     The total correlation is rho = sqrt(1/2 * (rho_x^2 + rho_y^2))
 
     Args: 
-        target (np.array):      Target values
-        prediction_1, prediction_2 (np.array): Predicted values
-        mask_1, mask_2 (np.array): Masks for predictions
+        target (np.array):                      Target values, shape = [n_tracks, track_length, 2] / = [n_tracks]
+        prediction_1, prediction_2 (np.array):  Predicted values, shape = [n_tracks, track_length, 2] / = [n_tracks]
+        mask_1, mask_2 (np.array): Masks for predictions, shape = [n_tracks, track_length] / = [n_tracks]
 
     Returns:
         Correlation coefficient (double)
@@ -633,12 +634,14 @@ def find_worst_predictions(target, predictions, mask_value):
 
 def create_ence_evaluation(target, predictions, masks, expert_names, result_dir, 
                               normalization_constant = 1, time_normalization_constant = 22, no_show = False):
-    """Create an evaluation of the predicted error variances with an Expected Normalized Calibration Error analysis.
+    """Create an evaluation of the predicted error variances with a Sliding Window Expected Normalized Calibration Error (SENCE) analysis.
+
+    Create two SENCE evaluations: One temporal and one spatial.
 
     Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape (n_experts=1, n_tracks, 4)
-        masks (np.array):       Masks for every expert
+        target (np.array):      Target values, shape = [n_tracks, 2]
+        predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape = [n_experts, n_tracks, 4]
+        masks (np.array):       Masks for every expert, shape = [n_experts, n_tracks]
         expert_names (list):    Names (String) of each expert
         result_dir (String):    Directory to save the created plot data to
         normalization_constant (double): Value for denormalization the y_nozzle value
@@ -655,7 +658,7 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
         predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 2])[0] * normalization_constant**2
         target_y = target[ np.where(masks[expert]), 0][0] * normalization_constant
         predicted_y = predictions[expert,  np.where(masks[expert]), 0][0] * normalization_constant
-        spatial_ENCE[expert], spatial_C_v[expert] = advanced_single_ence_analysis(
+        spatial_ENCE[expert], spatial_C_v[expert] = single_SENCE_analysis(
                                         predicted_var, target_y, predicted_y, 
                                         result_dir + "spatial_evaluations/", expert_names[expert], 
                                         percentage_bin_size, "spatial", no_show)
@@ -663,7 +666,7 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
         predicted_var = np.exp(predictions[expert, np.where(masks[expert]), 3])[0] * time_normalization_constant**2
         target_t = target[ np.where(masks[expert]), 1][0] * time_normalization_constant
         predicted_t = predictions[expert,  np.where(masks[expert]), 1][0] * time_normalization_constant
-        temporal_ENCE[expert], temporal_C_v[expert] = advanced_single_ence_analysis(
+        temporal_ENCE[expert], temporal_C_v[expert] = single_SENCE_analysis(
                                         predicted_var, target_t, predicted_t, 
                                         result_dir + "temporal_evaluations/", expert_names[expert], 
                                         percentage_bin_size, "temporal", no_show)
@@ -674,12 +677,12 @@ def create_ence_evaluation(target, predictions, masks, expert_names, result_dir,
     ence_df = pd.DataFrame(ence_values)
     ence_df.to_csv('{}ENCE_values.csv'.format(result_dir), index=False)
 
-def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, percentage_bin_size=0.25, domain="spatial", no_show=False):
-    """Create an advanced ence analysis with a sliding window for one expert in one domain.
+def single_SENCE_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, percentage_bin_size=0.25, domain="spatial", no_show=False):
+    """Create an SENCE analysis with a sliding window for one expert in one domain.
 
     Args:
-        predicted_var (np.array):   The predicted variances of an expert
-        target_y (np.array):        The target vector
+        predicted_var (np.array):   The predicted variances of an expert, shape = [n_tracks]
+        target_y (np.array):        The target vector, shape = [n_tracks]
         predicted_y (np.array):     The prediction vector of an expert
         result_dir (String):        Directory to save the created plot data to
         expert_name (String):       Name of the expert
@@ -688,7 +691,7 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
         no_show (Boolean):          Don't show the images
 
     Returns:
-        ENCE (double):  ENCE value
+        SENCE (double):  SENCE value
         C_v (double):   STDs Coefficient of Variation
     """
     assert(percentage_bin_size>0)
@@ -709,7 +712,6 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
         bin_errors = target_y[bin_indices] - predicted_y[bin_indices]
         RMSE[start_id] = np.sqrt(np.mean(bin_errors**2))
         # Histogram plot of a single window. Only for test reasons.
-        stop=0
         """
         plt.figure(figsize=[19.20, 10.80], dpi=100)
         plt.hist(-bin_errors*5, bins=20, density=True)
@@ -736,8 +738,8 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
     ence_analysis_dict["RMV"] = RMV
     ence_analysis_dict["RMSE"] = RMSE
 
-    # ENCE = 1/N * sum(|RMV(j)-RMSE(j)|/RMV(j))
-    ENCE = np.mean(np.abs(RMV-RMSE)/RMV)
+    # SENCE = 1/N * sum(|RMV(j)-RMSE(j)|/RMV(j))
+    SENCE = np.mean(np.abs(RMV-RMSE)/RMV)
     # STDs Coefficient of Variation
     mu_sigma = np.mean(predicted_var)
     C_v = np.sqrt(np.sum((predicted_var-mu_sigma)**2)/(n_instances-1))/mu_sigma
@@ -746,7 +748,7 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
     #RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
     #corrected_ENCE = np.mean(np.abs(RMV_corrected-RMSE)/RMV_corrected)
     # Logging output
-    logging.info("ENCE for expert {} in {} domain = {}".format(expert_name, domain, ENCE))
+    logging.info("SENCE for expert {} in {} domain = {}".format(expert_name, domain, ENCE))
     #logging.info("Corrected ENCE for expert {} in {} domain = {}".format(expert_name, domain, corrected_ENCE))
     logging.info("C_v for expert {} in {} domain = {}".format(expert_name, domain, C_v))
     # Plot RMSE over RMV
@@ -770,11 +772,26 @@ def advanced_single_ence_analysis(predicted_var, target_y, predicted_y, result_d
     ence_df = pd.DataFrame(ence_analysis_dict)
     ence_df.to_csv('{}advanced_ence_analysis_{}_{}.csv'.format(result_dir, domain, expert_name), index=False)
     stop=0
-    return ENCE, C_v
+    return SENCE, C_v
 
 def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, expert_name, n_bins=5, domain="spatial", no_show=False):
-    """Create the ence analysis for one expert in one domain."""
-    # Temp Hist Test
+    """Create the simple ENCE analysis for one expert in one domain (WIHTOUT SLIDING WINDOW).
+    
+    Args:
+        predicted_var (np.array):   The predicted variances of an expert, shape = [n_tracks]
+        target_y (np.array):        The target vector, shape = [n_tracks]
+        predicted_y (np.array):     The prediction vector of an expert
+        result_dir (String):        Directory to save the created plot data to
+        expert_name (String):       Name of the expert
+        n_bins (int):               Number of bins
+        domain (String):            Spatial or Temporal
+        no_show (Boolean):          Don't show the images
+
+    Returns:
+        ENCE (double):  SENCE value
+        C_v (double):   STDs Coefficient of Variation
+    """
+    # Error Histogram test plot
     """
     errors = target_y-predicted_y
     plt.figure(figsize=[19.20, 10.80], dpi=100)
@@ -867,56 +884,18 @@ def single_ence_analysis(predicted_var, target_y, predicted_y, result_dir, exper
         plt.show()
     else:
         plt.close()
-    stop=0
-
-def single_ence_analysis_reverse(predicted_var, target_y, predicted_y, result_dir, expert_name, n_bins=5, domain="spatial", no_show=False):
-    """Create the ence analysis for one expert in one domain."""
-    sorted_indices = np.argsort((target_y-predicted_y)**2)
-    n_instances = sorted_indices.shape[0]
-    bin_size = int(np.floor(n_instances/n_bins))
-    # Create RMV and RMSE for every bin
-    RMV = np.zeros(n_bins)
-    RMSE = np.zeros(n_bins)
-    for j in range(n_bins):
-        if j < n_bins-1:
-            bin_indices = sorted_indices[j*bin_size:(j+1)*bin_size-1]
-        else:
-            # The last bin may be larger
-            bin_indices = sorted_indices[j*bin_size:]
-        # RMV = sqrt(1/n * sum(sigma^2))
-        RMV[j] = np.sqrt(np.mean(predicted_var[bin_indices]))
-        # RMSE = sqrt(1/n * sum((y-y_pred)^2))
-        RMSE[j] = np.sqrt(np.mean((target_y[bin_indices] - predicted_y[bin_indices])**2))
-        stop=0
-    # ENCE = 1/N * sum(|RMV(j)-RMSE(j)|/RMV(j))
-    ENCE = np.mean(np.abs(RMV-RMSE)/RMV)
-    # STDs Coefficient of Variation
-    mu_sigma = np.mean(predicted_var)
-    C_v = np.sqrt(np.sum((predicted_var-mu_sigma)**2)/(n_instances-1))/mu_sigma
-    # Logging output
-    logging.info("ENCE for expert {} in {} domain = {}".format(expert_name, domain, ENCE))
-    logging.info("C_v for expert {} in {} domain = {}".format(expert_name, domain, C_v))
-    # Plot RMSE over RMV
-    plt.figure(figsize=[19.20, 10.80], dpi=100)
-    plt.plot(RMSE, RMV)
-    plt.plot(RMSE, RMSE, '--k')
-    plt.xlabel("RMSE")
-    plt.ylabel("RMV")
-    plt.title("Calibration analysis for {} prediction of expert {}".format(domain, expert_name))
-    plt.savefig(result_dir + 'emce_analysis_{}_{}.pdf'.format(domain, expert_name))  
-    if not no_show:
-        plt.show()
-    else:
-        plt.close()
-    stop=0  
+    return ENCE, C_v
 
 def create_chi_squared_evaluation(target, predictions, masks, expert_names, result_dir, 
                               normalization_constant = 1, time_normalization_constant = 22, no_show = False):
     """Create an evaluation of the predicted error variances.
+
+    This evaluation method is outdated. You should use the SENCE analysis.
+
     Args:
-        target (np.array):      Target values
-        predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape (n_experts=1, n_tracks, 4)
-        masks (np.array):       Masks for every expert
+        target (np.array):      Target values, shape = [n_tracks, 2]
+        predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape = [n_experts, n_tracks, 4]
+        masks (np.array):       Masks for every expert, shape = [n_experts, n_tracks]
         expert_names (list):    Names (String) of each expert
         result_dir (String):    Directory to save the created plot data to
         normalization_constant (double): Value for denormalization the y_nozzle value

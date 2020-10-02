@@ -1,7 +1,8 @@
 """CV Kalman filter model and CV State.
 
-Todo:
-    * (Convert np representation to tensor representation for mixture of experts)
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 
 import numpy as np
@@ -22,6 +23,7 @@ class CV_Temporal_Separation_Type(Enum):
         * Default:  The CV motion model
         * BC:       Bias Corrected CV model. Bias is learned on training data. Prediction will be corrected with bias.
         * IA:       Identically Acceleration model. The median acceleration is learned on training data. CA model with the median acc is applied.
+        * VBC:      Velocity based Bias Correction. Correct the temporal bias with a linear regression of the bias in dependecy of the x-velocity
     """
     Default = auto()
     BC = auto()
@@ -43,7 +45,6 @@ class CV_Model(KF_Model):
 
     Inherites from Kalman filter model.
     """
-
     __metaclass__ = KF_Model
 
     def __init__(self, name, model_path = "", x_pred_to = 1550, time_normalization = 22., dt=0.005, s_w=10E7, s_v=2, 
@@ -62,6 +63,7 @@ class CV_Model(KF_Model):
             s_v=2 (double):                 Measurement noise variance (2 is default if input is in pixel)
             temporal_separator (String):    Temporal separation prediction type ("default", "BC", "IA")
             spatial_separator (String):     Spatial separation prediction type ("default", "ratio")
+            default_state_options (dict):   Default options for a new CV state
         """
         self.dt = dt
         self.s_w = s_w
@@ -108,23 +110,31 @@ class CV_Model(KF_Model):
         super().__init__(name, model_path, F, C_w, H, C_v, default_state_options)
 
     def train_batch(self, inp, target):
-        """Train the cv model on a batch of data."""
+        """Train the CV model on a batch of data.
+        
+        Args:
+            inp (tf.Tensor):    Batch of track measurements as inputs, [x, y], shape = [n_tracks, track_length, 2]
+            target (Not needed.)
+
+        Returns:
+            predictions (tf.Tensor): Batch of track predictions, [x, y], shape = [n_tracks, track_length, 2]
+        """
         return self.predict_batch(inp)
 
     def train_batch_separation_prediction(self, inp, target, tracking_mask, separation_mask, no_train_mode=False):
-        """Train the cv model for separation prediction on a batch of data.
+        """Train the CV model for separation prediction on a batch of data.
 
-        The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
+        The CV algorithm will perform tracking and then predict the time and position at the nozzle array.
 
         Args:
-            inp (tf.Tensor):            Batch of track measurements
-            target (tf.Tensor):         Batch of track target measurements
-            tracking_mask (tf.Tensor):  Batch of tracking masks
-            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+            inp (tf.Tensor):            Batch of track measurements as inputs, [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor):         Batch of track target measurements, [x, y, y_nozzle, dt_nozzle, vx_nozzle], shape = [n_tracks, track_length, 5]
+            tracking_mask (tf.Tensor):  Batch of tracking masks, shape = [n_tracks, track_length]
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction, shape = [n_tracks, track_length]
             no_train_mode (Boolean):    Option to disable training of spatial and temporal variable
 
         Returns:
-            prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle]
+            prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle], shape = [n_tracks, track_length, 4]
             spatial_loss (tf.Tensor):   mean((y_nozzle_pred - y_nozzle_target)^2)
             temporal_loss (tf.Tensor):  mean((dt_nozzle_pred - dt_nozzle_target)^2)
             spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
@@ -141,7 +151,14 @@ class CV_Model(KF_Model):
         return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae 
 
     def predict_batch(self, inp):
-        """Predict a batch of data with the cv model."""
+        """Predict a batch of data with the CV model.
+        
+        Args:
+            inp (tf.Tensor):    Batch of track measurements as inputs, [x, y], shape = [n_tracks, track_length, 2]
+
+        Returns:
+            predictions (tf.Tensor): Batch of track predictions, [x, y], shape = [n_tracks, track_length, 2]
+        """
         np_inp = inp.numpy()
         predictions = np.zeros(np_inp.shape)
         
@@ -163,7 +180,17 @@ class CV_Model(KF_Model):
         return predictions
 
     def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
-        """Predict a batch of data with the cv model.
+        """Predict a batch of data with the CV model.
+
+        Right now always outputs an uncertainty prediction. May be changed later.
+
+        Training is enabled by passing is_training=True and giving a target array
+
+        Args:
+            inp (tf.Tensor):            Batch of track measurements, [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor):         Batch of track target measurements, [x, y, y_nozzle, dt_nozzle, v_nozzle], shape = [n_tracks, track_length, 5]
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction, shape = [n_tracks, track_length]   
+            is_training (Boolean):      Activate training 
         
         Returns:
             prediction (np.array): shape = n_tracks, n_timesteps, 6
@@ -171,7 +198,7 @@ class CV_Model(KF_Model):
                     prediction[i, 0:end_track, 0:2] = [x_pred, y_pred]
                 Separation prediction entries:
                     prediction[i, end_track, 2] = y_nozzle_pred    (Predicted y position at nozzle array)
-                    prediction[i, end_track, 3] = dt_nozzle_pred   (Predicted time to nozzle array)
+                    prediction[i, end_track, 3] = t_nozzle_pred    (Predicted time to nozzle array)
                     prediction[i, end_track, 4] = log(var_y)       (Predicted variance of spatial prediction)
                     prediction[i, end_track, 5] = log(var_t)       (Predicted variance of temporal prediction)
         """
@@ -357,9 +384,9 @@ class CV_State(KF_State):
         super().__init__(state, C_p, C_e)
 
     def get_pos(self):
-        """Return the x,y position of the state."""
+        """Return the [x, y] position of the state."""
         return self.state[[0,2],0]
 
     def get_v(self):
-        """Return the velocity of the state."""
+        """Return the [x, y] velocity of the state."""
         return self.state[[1,3],0]

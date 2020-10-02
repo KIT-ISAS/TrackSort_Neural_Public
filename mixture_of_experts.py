@@ -1,8 +1,8 @@
 """Mixture of expert approach for gating structure.
 
-TODO:
-    * Right now the input training data is split into train and test data for the gating network.
-        You may want to change this into passing the test data directly to the training function.
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 import numpy as np
 import logging
@@ -96,9 +96,9 @@ class MixtureOfExperts(GatingNetwork):
         Transform the data to fit the network architecture.
 
         Args:
-            targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
-            predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
-            masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks, track_length]
+            targets (np.array):     All target values of the given dataset, shape = [n_tracks, track_length, 2]
+            predictions (np.array): All predictions for all experts, shape = [n_experts, n_tracks, track_length, 2]
+            masks (np.array):       Masks for each expert, shape = [n_experts, n_tracks, track_length]
             expert_types (list):    List of expert types
         """
         ## Create Model
@@ -196,10 +196,10 @@ class MixtureOfExperts(GatingNetwork):
         """Transform the given data to match the input and output data of the MLP.
 
         Args:
-            input_data (np.array):      The current input to the experts, shape: [n_tracks, track_length, 2]
-            target_data (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
-            predictions_data (np.array):All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
-            masks (np.array):           Mask to mask total prediction, shape: [n_experts, n_tracks, track_length]
+            input_data (np.array):      The current input to the experts, shape = [n_tracks, track_length, 2]
+            target_data (np.array):     All target values of the given dataset, shape = [n_tracks, track_length, 2]
+            predictions_data (np.array):All predictions for all experts, shape = [n_experts, n_tracks, track_length, 2]
+            masks (np.array):           Mask to mask total prediction, shape = [n_experts, n_tracks, track_length]
             features (list[String]):    Features to create. Possibilities:
                                             "pos":  x and y position of current measurement.
                                             "id":   Current track id - Number of measurements in track
@@ -207,10 +207,10 @@ class MixtureOfExperts(GatingNetwork):
             input_dim (int):            Input dimension for MLP (could be calculated from features)
 
         Returns: 
-            inputs (np.array):      Inputs to the MLP based on features, shape: [n_tracks * track_length, input_dim]
-            targets (np.array):     Target values, shape: [n_tracks * track_length, 2]
-            predictions (np.array): Predictions of the experts as input to the MLP, shape: [n_tracks * track_length, n_experts, 2]
-            mask (np.array):        Mask to mask total prediction, shape: [n_tracks * track_length]
+            inputs (np.array):      Inputs to the MLP based on features, shape = [n_tracks * track_length, input_dim]
+            targets (np.array):     Target values, shape = [n_tracks * track_length, 2]
+            predictions (np.array): Predictions of the experts as input to the MLP, shape = [n_tracks * track_length, n_experts, 2]
+            mask (np.array):        Mask to mask total prediction, shape = [n_tracks * track_length]
         """
         n_tracks = input_data.shape[0]
         track_length = input_data.shape[1]
@@ -251,22 +251,22 @@ class MixtureOfExperts(GatingNetwork):
         """Create input data from track format.
 
         Args:
-            input_data (np.array):          The current input to the experts, shape: [n_tracks, track_length, 2]
-                                             OR shape: [n_tracks, 2] if predicting a single time step
+            input_data (np.array):          The current input to the experts, shape = [n_tracks, track_length, 2]
+                                             OR shape = [n_tracks, 2] if predicting a single time step
             features (list[String]):        Features to create. Possibilities:
                                                 "pos":  x and y position of current measurement.
                                                 "id":   Current track id - Number of measurements in track
                                                 "prev_pred_err": Previous prediction error of all experts
             input_dim (int):                Input dimension to neural network
-            track_predictions (np.array):   Optional track predictions for experts if you chose to use the prev_pred_err feature, shape: [n_experts, n_tracks, track_length, 2]
-            track_target (np.array):        Optional track target if you chose to use the prev_pred_err feature, shape: [n_tracks, track_length, 2]
+            track_predictions (np.array):   Optional track predictions for experts if you chose to use the prev_pred_err feature, shape = [n_experts, n_tracks, track_length, 2]
+            track_target (np.array):        Optional track target if you chose to use the prev_pred_err feature, shape = [n_tracks, track_length, 2]
             track_ids (np.array):           Switch to multi-target tracking mode if this value is not None.
                                             In this mode, we only get one instance of a track. 
                                             Therefore the track length is 1 and the track_length dimension in the track_input is omitted.
                                             The track ids hold the position of the instance in its track.
-                                            Shape: [n_tracks]
+                                            shape = [n_tracks]
         Returns: 
-            inputs (np.array):      Inputs to the MLP, shape: [n_tracks * track_length, 3]
+            inputs (np.array):      Inputs to the MLP, shape = [n_tracks * track_length, 3]
         """
         n_tracks = input_data.shape[0]
         # In case of live multi-target tracking, the track length is always 1.
@@ -299,11 +299,11 @@ class MixtureOfExperts(GatingNetwork):
         """Create masks from track format.
 
         Args:
-            masks (np.array): Mask to mask total prediction, shape: [n_experts, n_tracks, track_length] 
-                                OR shape: [n_experts, n_tracks] if predicting a single time step
+            masks (np.array): Mask to mask total prediction, shape = [n_experts, n_tracks, track_length] 
+                                OR shape = [n_experts, n_tracks] if predicting a single time step
 
         Returns: 
-            mask (np.array): Mask to mask total prediction, shape: [n_tracks * track_length, n_experts]
+            mask (np.array): Mask to mask total prediction, shape = [n_tracks * track_length, n_experts]
         """
         n_tracks = mask.shape[1]
         # In case of live multi-target tracking, the track length is always 1.
@@ -324,10 +324,10 @@ class MixtureOfExperts(GatingNetwork):
         Asserts weights.shape[0] % track_length == 0
 
         Args:
-            weights (np.array): The predicted weights, shape: [n_tracks * track_length, n_experts]
+            weights (np.array): The predicted weights, shape = [n_tracks * track_length, n_experts]
 
         Returns: 
-            track_weights (np.array): The predicted weights in track format, shape: [n_experts, n_tracks, track_length]
+            track_weights (np.array): The predicted weights in track format, shape = [n_experts, n_tracks, track_length]
         """
         assert(weights.shape[0] % track_length == 0)
         if track_length > 1:
@@ -367,14 +367,14 @@ class MixtureOfExperts(GatingNetwork):
         
         Args:
             mask (np.array): Mask array with shape [n_experts, n_tracks, track_length]
-            track_input (np.array): Data input in track format, shape: [n_tracks, track_length, 2]
+            track_input (np.array): Data input in track format, shape = [n_tracks, track_length, 2]
             track_predictions (np.array): Optional track predictions for experts if you chose to use the prev_pred_err feature
             track_target (np.array): Optional track target if you chose to use the prev_pred_err feature
             track_ids (np.array):   Switch to multi-target tracking mode if this value is not None.
                                     In this mode, we only get one instance of a track. 
                                     Therefore the track length is 1 and the track_length dimension in the track_input is omitted.
                                     The track ids hold the position of the instance in its track.
-                                    Shape: [n_tracks]
+                                    shape = [n_tracks]
 
         Returns:
             np.array with weights of shape mask.shape
@@ -453,6 +453,18 @@ def train_step_generator(model, optimizer):
     """
     @tf.function
     def train_step(inp, target, expert_predictions, mask):
+        """Train step function.
+
+        Args:
+            inp (tf.Tensor):                    Inputs, shape = [n_samples, input_shape]
+            target (tf.Tensor):                 Targets, shape = [n_samples, 2]
+            expert_predictions (tf.Tensor):     Predictions of all experts, shape = [n_samples, n_experts, 2]
+            mask (tf.Tensor):                   Masks for all experts, shape = [n_samples, n_experts]
+        
+        Returns:
+            weights (tf.Tensor):                Weights for all experts, shape = [n_samples, n_experts]
+            loss (tf.Tensor):                   The MSE loss of this training step
+        """
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
             weights = model(inp, training=True) 
@@ -485,21 +497,32 @@ def mask_weights(weights, mask):
     ...
 
     Args:
-        weights (tf.Tensor): The outputs of the MLP network, shape: [n_output, n_experts]
-        mask (tf.Tensor):    The mask for all experts, shape: [n_output, n_experts]
+        weights (tf.Tensor):        The outputs of the MLP network, shape = [n_output, n_experts]
+        mask (tf.Tensor):           The mask for all experts, shape = [n_output, n_experts]
 
     Returns:
-        masked_weights (tf.Tensor): Same shape as weights
+        masked_weights (tf.Tensor): Updated weights, shape = [n_output, n_experts]
     """
     masked_weights = tf.multiply(weights, mask)
     masked_weights, _ = tf.linalg.normalize(masked_weights, ord=1, axis=1)
     return masked_weights
 
 def weighted_sum_mse_loss(weights, expert_predictions, target):
-    """Return MSE for weighted expert predictions."""
-    # tf.reduce_sum(tf.pow(target-tf.einsum('ijk,ij->ik', expert_predictions, weights),2),axis=1)
+    """Return MSE for weighted expert predictions.
+    
+    Args:
+        weights (tf.Tensor):            Maksed weights, shape = [n_output, n_experts]
+        expert_predictions (tf.Tensor): Predictions of all experts, shape = [n_samples, n_experts, 2]
+        target (tf.Tensor):             Targets, shape = [n_samples, 2]
+    """
     return tf.reduce_sum(tf.pow(target-tf.einsum('ijk,ij->ik', expert_predictions, weights),2))
 
 def weighted_sum_mae_loss(weights, expert_predictions, target):
-    """Return MAE for weighted expert predictions."""
+    """Return MAE for weighted expert predictions.
+        
+    Args:
+        weights (tf.Tensor):            Maksed weights, shape = [n_output, n_experts]
+        expert_predictions (tf.Tensor): Predictions of all experts, shape = [n_samples, n_experts, 2]
+        target (tf.Tensor):             Targets, shape = [n_samples, 2]
+    """
     return tf.reduce_sum(tf.abs(target-tf.einsum('ijk,ij->ik', expert_predictions, weights)),axis=1)

@@ -1,3 +1,7 @@
+"""This is a test plot. 
+
+Plot the average velocity of the particles over the belt length.
+"""
 import numpy as np 
 import matplotlib
 plt = matplotlib.pyplot

@@ -1,10 +1,9 @@
 """Model Manager.
 
-Todo:
-    * Add train and test method
-    * Convert np representation to tensor representation for mixture of experts
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
-
 import logging
 import tensorflow as tf
 import numpy as np
@@ -62,13 +61,15 @@ class ModelManager(object):
         Initializes attributes.
 
         Args:
-            model_config (dict):                    The json tree containing all information about the experts, gating network and weighting function
-            is_loaded (Boolean):                    Load pretrained experts
-            num_time_steps (int):                   The number of timesteps in the longest track
-            is_uncertainty_prediction (Boolean):    Also predict the uncertainty of the prediction
-            overwriting_activated (Boolean):        Should expired tracks in batches be overwritten with new tracks
-            x_pred_to (double):                     The x position of the nozzle array (only needed for kf separation prediction)
-            time_normalization (double):            Time normalization constant (only needed for kf separation prediction)
+            model_config (dict):                        The json tree containing all information about the experts, gating network and weighting function
+            is_loaded (Boolean):                        Load pretrained experts
+            num_time_steps (int):                       The number of timesteps in the longest track
+            is_uncertainty_prediction (Boolean):        Also predict the uncertainty of the prediction
+            n_mlp_features (int):                       Number of measurements as inputs for tracking MLP and ME
+            n_mlp_features_separation_prediction (int): Number of measurements as inputs for separation prediction MLP and ME
+            overwriting_activated (Boolean):            Should expired tracks in batches be overwritten with new tracks
+            x_pred_to (double):                         The x position of the nozzle array (only needed for kf separation prediction)
+            time_normalization (double):                Time normalization constant (only needed for kf separation prediction)
         """
         # The manager of all the models
         self.expert_manager = Expert_Manager(expert_config = model_config.get('experts'), 
@@ -116,9 +117,9 @@ class ModelManager(object):
         Creates a gating network according to the given config
 
         Args:
-            gating_config (dict):   Includes information about type and options of the gating network
-            is_separation (Boolean):Should we create the NextStep or Separation Gating Network? 
-            is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
+            gating_config (dict):                   Includes information about type and options of the gating network
+            is_separation (Boolean):                Should we create the NextStep or Separation Gating Network? 
+            is_uncertainty_prediction (Boolean):    Predict uncertainty of predictions. 
         """
         gating_type = gating_config.get("type")
         model_path = gating_config.get('model_path')
@@ -155,12 +156,12 @@ class ModelManager(object):
         The training information of each model should be provided in the configuration json.
 
         Args:
-            mlp_conversion_func:            Function to convert MLP format to track format
-            **_dataset_train (dict):        All training samples in the correct format for various models
-            **_dataset_test (dict):         All testing samples for evaluating the trained models
-            num_train_epochs (int):         Number of epochs for training
-            evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
-            improvement_break_condition (double): Break training if test loss on every expert does not improve by more than this value.
+            mlp_conversion_func:                    Function to convert MLP format to track format
+            **_dataset_train (dict):                All training samples in the correct format for various models
+            **_dataset_test (dict):                 All testing samples for evaluating the trained models
+            num_train_epochs (int):                 Number of epochs for training
+            evaluate_every_n_epochs (int):          Evaluate the trained models every n epochs on the test data
+            improvement_break_condition (double):   Break training if test loss on every expert does not improve by more than this value.
         """
         train_losses = []
         
@@ -405,12 +406,12 @@ class ModelManager(object):
 
         Returns:
             expert_names (list):        List of expert names
-            all_inputs (np.array):      All input values of the given dataset, shape: [n_tracks, track_length, 2]
-            all_targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
-            all_predictions (np.array): All predictions for all experts, shape: [n_experts (+1), n_tracks, track_length, 2]
-            all_masks (np.array):       Masks for each expert, shape: [n_experts (+1), n_tracks, track_length]
-            all_mlp_maks  (np.array):   MLP masks for each expert (first n instances are masked out), shape: [n_experts (+1), n_tracks, track_length]
-            all_weights (np.array):     [Optional -> create_weighted_output] weights for the expert predictions, shape: [n_experts, n_tracks, track_length]
+            all_inputs (np.array):      All input values of the given dataset, shape = [n_tracks, track_length, 2]
+            all_targets (np.array):     All target values of the given dataset, shape = [n_tracks, track_length, 2]
+            all_predictions (np.array): All predictions for all experts, shape = [n_experts (+1), n_tracks, track_length, 2]
+            all_masks (np.array):       Masks for each expert, shape = [n_experts (+1), n_tracks, track_length]
+            all_mlp_maks  (np.array):   MLP masks for each expert (first n instances are masked out), shape = [n_experts (+1), n_tracks, track_length]
+            all_weights (np.array):     [Optional -> create_weighted_output] weights for the expert predictions, shape = [n_experts, n_tracks, track_length]
         """
         k_mask_value = K.variable(self.mask_value, dtype=tf.float64)
         seq2seq_iter = iter(seq2seq_dataset)
@@ -554,11 +555,11 @@ class ModelManager(object):
         The training information of each model should be provided in the configuration json.
 
         Args:
-            **_dataset_train (dict):        All training samples in the correct format for various models
-            **_dataset_test (dict):         All testing samples for evaluating the trained models
-            num_train_epochs (int):         Number of epochs for training
-            evaluate_every_n_epochs (int):  Evaluate the trained models every n epochs on the test data
-            improvement_break_condition (double): Break training if test loss on every expert does not improve by more than this value.
+            **_dataset_train (dict):                All training samples in the correct format for various models
+            **_dataset_test (dict):                 All testing samples for evaluating the trained models
+            num_train_epochs (int):                 Number of epochs for training
+            evaluate_every_n_epochs (int):          Evaluate the trained models every n epochs on the test data
+            improvement_break_condition (double):   Break training if test loss on every expert does not improve by more than this value.
         """
         current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         # Create a tensorboard folder and writer for every expert
@@ -703,11 +704,11 @@ class ModelManager(object):
         self.expert_manager.save_separation_models()
 
     def ence_calibrate_models_separation(self, seq2seq_dataset_train, mlp_dataset_train, percentage_bin_size = 0.25):
-        """Calibrate the separation uncertainty prediction of all experts with an ENCE calibration.
+        """Calibrate the separation uncertainty prediction of all experts with an SENCE calibration.
 
         Args:
             **_dataset_train (dict):        All training samples in the correct format for various models
-            percentage_bin_size (double):   Percentage of data to use in the sliding window of the ENCE analysis
+            percentage_bin_size (double):   Percentage of data to use in the sliding window of the SENCE analysis
         """
         assert(percentage_bin_size>0)
         assert(percentage_bin_size<1)
@@ -716,7 +717,7 @@ class ModelManager(object):
             seq2seq_dataset=seq2seq_dataset_train,
             mlp_dataset = mlp_dataset_train,
             create_weighted_output = False)
-
+        # Second, we calibrate all models with the given predictions and targets
         self.expert_manager.ence_calibrate_models_separation(target=all_targets, 
                                     predictions=all_predictions, 
                                     masks=all_masks, 
@@ -733,13 +734,13 @@ class ModelManager(object):
         """Test model performance on test dataset and create evaluations.
 
         Args:
-            result_dir (String):                Directory to save plots and data in
-            **_dataset_test (tf.Tensor):        Batches of test data
-            normalization_constant (double):    Belt size in pixel
-            time_normalization_constant (double): Time normalization
-            virtual_belt_edge (double):         x-Position of virtual belt edge
-            virtual_nozzle_array (double):      x-Position of virtual nozzle array
-            no_show (Boolean):                  Do not show the figures. The figures will still be saved.
+            result_dir (String):                    Directory to save plots and data in
+            **_dataset_test (tf.Tensor):            Batches of test data
+            normalization_constant (double):        Belt size in pixel
+            time_normalization_constant (double):   Time normalization
+            virtual_belt_edge (double):             x-Position of virtual belt edge
+            virtual_nozzle_array (double):          x-Position of virtual nozzle array
+            no_show (Boolean):                      Do not show the figures. The figures will still be saved.
         """
         # Create predictions for all testing batches and save prediction and target values to one list.
         expert_names, all_inputs, all_s2s_inputs, all_targets, all_predictions, all_masks, all_weights = self.get_full_input_target_prediction_mask_from_dataset_separation_prediction(
@@ -846,12 +847,12 @@ class ModelManager(object):
 
         Returns:
             expert_names (list):        List of expert names
-            all_inputs (np.array):      All MLP input values of the given dataset, shape: [n_tracks, 2*mlp_inp_points]
-            all_targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
-            all_predictions (np.array): All predictions for all experts, shape: [n_experts (+1), n_tracks, track_length, 2]
-            all_masks (np.array):       Masks for each expert, shape: [n_experts (+1), n_tracks, track_length]
-            all_mlp_maks  (np.array):   MLP masks for each expert (first n instances are masked out), shape: [n_experts (+1), n_tracks, track_length]
-            all_weights (np.array):     [Optional -> create_weighted_output] weights for the expert predictions, shape: [n_experts, n_tracks, track_length]
+            all_inputs (np.array):      All MLP input values of the given dataset, shape = [n_tracks, 2*mlp_inp_points]
+            all_targets (np.array):     All target values of the given dataset, shape = [n_tracks, track_length, 2]
+            all_predictions (np.array): All predictions for all experts, shape = [n_experts (+1), n_tracks, track_length, 2]
+            all_masks (np.array):       Masks for each expert, shape = [n_experts (+1), n_tracks, track_length]
+            all_mlp_maks  (np.array):   MLP masks for each expert (first n instances are masked out), shape = [n_experts (+1), n_tracks, track_length]
+            all_weights (np.array):     [Optional -> create_weighted_output] weights for the expert predictions, shape = [n_experts, n_tracks, track_length]
         """
         seq2seq_iter = iter(seq2seq_dataset)
         mlp_iter = iter(mlp_dataset)
@@ -937,7 +938,7 @@ class ModelManager(object):
         Predict a whole batch of particles at a time.
 
         Returns:
-            Predictions for all alive tracks from all models
+            prediction_dict (dict):  prediction_dict[global_track_id] = prediction
         """
         prediction_dict = {}
         for batch_nr in range(len(self.current_ids)):

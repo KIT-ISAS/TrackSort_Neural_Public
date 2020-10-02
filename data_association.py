@@ -1,3 +1,9 @@
+"""Data association class and NN function.
+
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Daniel Pollithy
+    * Jakob Thumm (jakob.thumm@student.kit.edu) 2.10.2020:    Completed documentation.
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
@@ -10,9 +16,15 @@ import logging
 from track_manager import TrackManager
 from data_manager import FakeDataSet, CsvDataSet
 
-
-# definition of my own nearest neighbour method
 def nearest_neighbour(weight_matrix):
+    """Local Nearest neighbour algorithm.
+
+    Args:
+        weight_matrix (np.array):   Matrix containing the distance between each (virtual) measurement and (virtual) prediction
+
+    Returns:
+        measurement_idxs (list), prediction_idxs (list)
+    """
     num_rows = weight_matrix.shape[0]
     num_cols = weight_matrix.shape[1]
     measurement_idxs = []
@@ -26,7 +38,7 @@ def nearest_neighbour(weight_matrix):
             prediction_idxs.append(col)
             if len(measurement_idxs) == num_rows or len(prediction_idxs) == num_cols:
                 return measurement_idxs, prediction_idxs
-    logging.error('something went wrong in nearest_neighbour!')
+    logging.error('something went wrong in local nearest_neighbour!')
     code.interact(local=dict(globals(), **locals()))
 
 
@@ -34,6 +46,23 @@ class DataAssociation(object):
     def __init__(self, num_timesteps, rotate_columns, visualization_path, visualize, matching_algorithm,
                 delta_start_end_phase=0.025, no_change_dist=0.02, new_track_at_beginning_dist=0.005, 
                 new_track_middle_dist=0.02, track_disappear_at_end_dist=0.005, track_disappear_at_middle_dist=0.02):
+        """Create a new data association object.
+
+        See Florian Pfaff. Multitarget Tracking Using Orientation Estimation for Optical Belt Sorting. Chapter 3.
+
+        Args:
+            num_timesteps (int):                    Maximal number of measurements in a track
+            rotate_columns (Boolean):               Not in use anymore.
+            visualization_path (String):            Path for MTT visualization
+            visualize (Boolean):                    Create a visualization of the MTT (time expensive!)
+            matching_algorithm (String):            'local' or 'global' -- Matching algorithm
+            delta_start_end_phase (double):         Length of start_ and end_phase
+            no_change_dist (double):                1/2 Lower right distance entries for "no change"
+            new_track_at_beginning_dist (double):   Distance value for additional rows if x-value of measurement < start_phase
+            new_track_middle_dist (double):         Distance value for additional rows if x-value of measurement >= start_phase
+            track_disappear_at_end_dist (double):   Distance value for additional columns if x-value of measurement > end_phase
+            track_disappear_at_middle_dist (double): Distance value for additional columns if x-value of measurement <= end_phase
+            """    
         self.num_timesteps = num_timesteps
         self.rotate_columns = rotate_columns
 
@@ -56,14 +85,15 @@ class DataAssociation(object):
         See Florian Pfaff. Multitarget Tracking Using Orientation Estimation for Optical Belt Sorting. Chapter 3.
 
         Args:
-            particle_time_list (list): List of np arrays. One entry for every timestep. Has multiple particles in each timestep.
+            particle_time_list (list):  List of np arrays. One entry for every timestep. Has multiple particles in each timestep.
                                         Each particle has [id, x, y].
-            track_manager:  TrackManager object
-            model_manager:  ModelManager object
+            track_manager:              TrackManager object
+            model_manager:              ModelManager object
             belt_limits (np.array):     Limits of the belt [[x_min, x_max],[y_min, y_max]]
 
         Returns:
-            All tracks with associated particles
+            All tracks from track_manager.get_tracks()
+            All particle ids
         """
         old_measurements = None
         # Make directory for visualization

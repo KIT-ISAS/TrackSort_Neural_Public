@@ -1,7 +1,8 @@
 """The gating network.
 
-Todo:
-    * Implement ME approaches
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 import numpy as np
 import matplotlib
@@ -25,8 +26,8 @@ class GatingNetwork(ABC):
         name (String):                       Name of gating network
         model_path (String):                 Path to save the model
         calibration_path (String):           Path to save the calibration
-        C (np.array):                        Covariance matrix, shape: [n_dim, n_experts, n_experts]
-        corr (np.array):                     Correlation matrix, shape: [n_dim, n_experts, n_experts]
+        C (np.array):                        Covariance matrix, shape = [n_dim, n_experts, n_experts]
+        corr (np.array):                     Correlation matrix, shape = [n_dim, n_experts, n_experts]
         calibration_separation_regression_var_spatial (list): Intercept and increment for linear regression of ENCE calibration in spatial domain
         calibration_separation_regression_var_temporal (list)
     """
@@ -35,10 +36,10 @@ class GatingNetwork(ABC):
         """Initialize a gating network.
 
         Args: 
-            n_experts (int): Number of experts in expert net
-            is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
-            name (String):   Name of gating network
-            model_path (String): Path to save or load model
+            n_experts (int):                        Number of experts in expert net
+            is_uncertainty_prediction (Boolean):    Predict uncertainty of predictions. 
+            name (String):                          Name of gating network
+            model_path (String):                    Path to save or load model
         """
         self.n_experts = n_experts
         self.is_uncertainty_prediction = is_uncertainty_prediction
@@ -67,13 +68,12 @@ class GatingNetwork(ABC):
         This is needed to perform the weighting with uncertainty.
 
         Args:
-            target (np.array):      All target values of the given dataset, shape: [n_tracks, 4]
-            predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, 4]
-            masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
+            target (np.array):      All target values of the given dataset, shape = [n_tracks, 4]
+            predictions (np.array): All predictions for all experts, shape = [n_experts, n_tracks, 4]
+            masks (np.array):       Masks for each expert, shape = [n_experts, n_tracks]
 
         Trains:
-            self.corr (np.array):  The correlation between each experts prediction error.
-                                    Shape: [n_dim (2), n_experts, n_experts]
+            self.corr (np.array):   The correlation between each experts prediction error, shape = [n_dim (2), n_experts, n_experts]
         """
         # convert masks for numpy
         masks = 1-masks
@@ -101,14 +101,14 @@ class GatingNetwork(ABC):
                         self.corr[dim, i, j] = self.C[dim, i, j]/(np.sqrt(self.C[dim, i, i]) * np.sqrt(self.C[dim, j, j]))
 
     def ence_calibrate(self, predicted_var, target_y, predicted_y, percentage_bin_size = 0.25, domain = "spatial"):
-        """Calibrate the uncertainty prediction of the gating network in the separation prediction with an ENCE calibration.
+        """Calibrate the uncertainty prediction of the gating network in the separation prediction with an SENCE calibration.
 
         Args:
-            predicted_var (np.array):   The predicted variances of the expert
-            target_y (np.array):        The target vector
-            predicted_y (np.array):     The prediction vector of the expert
-            percentage_bin_size (double): The percentage bin size [0, 1]
-            domain (String):            spatial or temporal
+            predicted_var (np.array):       The predicted variances of the expert, shape = [n_tracks]
+            target_y (np.array):            The target vector, shape = [n_tracks]
+            predicted_y (np.array):         The prediction vector of the expert, shape = [n_tracks]
+            percentage_bin_size (double):   The percentage bin size [0, 1]
+            domain (String):                "spatial" or "temporal"
         """
         assert(domain == "spatial" or domain == "temporal")
         mask = np.isnan(predicted_var)
@@ -211,14 +211,14 @@ class GatingNetwork(ABC):
         If the mask value at an instance is 0, the experts weight is 0
 
         Args:
-            masks (np.array):                       Masks of experts, shape: [n_experts, n_tracks]
-            log_variance_predictions (np.array):    Log of variances of expert predictions, shape: [n_experts, n_tracks, n_dim]
+            masks (np.array):                       Masks of experts, shape = [n_experts, n_tracks]
+            log_variance_predictions (np.array):    Log of variances of expert predictions, shape = [n_experts, n_tracks, n_dim]
         Uses:
-            self.corr (np.array):                   Correlation between expert predictions, shape: [n_dim, n_experts, n_experts]
+            self.corr (np.array):                   Correlation between expert predictions, shape = [n_dim, n_experts, n_experts]
 
         Returns:
-            weights: np.array with weights, shape: [n_experts, n_tracks, n_dim]
-            uncertainty: np.array containing log(variance), shape: [n_tracks, n_dim]
+            weights: np.array with weights, shape = [n_experts, n_tracks, n_dim]
+            uncertainty: np.array containing log(variance), shape = [n_tracks, n_dim]
         """
         weights = self.get_masked_weights(masks, log_variance_predictions)
         variance_predictions = np.exp(log_variance_predictions)

@@ -1,7 +1,13 @@
-"""DQ model
+"""DQ model.
 
-Todo:
-    * (Convert np representation to tensor representation for mixture of experts)
+The DQ model does not track particles and is only for separation prediction.
+The velocity and acceleration are built with the last two or three measurements.
+Florian Pfaff used this model in his PhD thesis for the separation prediction.
+If you use this model with on simulation data without additional noise, you will get his results.
+
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 
 import numpy as np
@@ -42,7 +48,7 @@ class DQ_Spatial_Separation_Type(Enum):
 class DQ_Model(KF_Model):
     """Difference quotientmodel.
 
-    Inherites from Kalman filter model.
+    Inherites from Kalman filter model. (Yeah, does not really fit in but who cares.)
     """
 
     __metaclass__ = KF_Model
@@ -50,8 +56,6 @@ class DQ_Model(KF_Model):
     def __init__(self, name, model_path="", x_pred_to = 1550, time_normalization = 22., dt=0.005, 
                  temporal_separator = "default", spatial_separator = "default", belt_velocity = 1.5):
         """Initialize a new model to track particles with the DQ model.
-
-        Default values are for pixel representation if 1 Pixel = 0.056 mm
 
         Args:
             name (String):                  The name of the expert
@@ -94,6 +98,7 @@ class DQ_Model(KF_Model):
         
         self.temporal_training_list = []
         self.spatial_training_list = []
+        ## F and C_w are only created for the super() call
         # Transition matrix
         F = np.matrix([[1, dt, dt**2/2, 0, 0, 0],
                        [0, 1, dt, 0, 0, 0],
@@ -127,14 +132,14 @@ class DQ_Model(KF_Model):
         The cv algorithm will perform tracking and then predict the time and position at the nozzle array.
 
         Args:
-            inp (tf.Tensor):            Batch of track measurements
-            target (tf.Tensor):         Batch of track target measurements
-            tracking_mask (tf.Tensor):  Batch of tracking masks
-            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction.
+            inp (tf.Tensor):            Batch of track measurements, [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor):         Batch of track target measurements, [x, y, y_nozzle, dt_nozzle, vx_nozzle], shape = [n_tracks, track_length, 5]
+            tracking_mask (tf.Tensor):  Batch of tracking masks, shape = [n_tracks, track_length]
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction, shape = [n_tracks, track_length]
             no_train_mode (Boolean):    Option to disable training of spatial and temporal variable
 
         Returns:
-            prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle]
+            prediction (tf.Tensor):     [x_p, y_p, y_nozzle, dt_nozzle], shape = [n_tracks, track_length, 4]
             spatial_loss (tf.Tensor):   mean((y_nozzle_pred - y_nozzle_target)^2)
             temporal_loss (tf.Tensor):  mean((dt_nozzle_pred - dt_nozzle_target)^2)
             spatial_mae (tf.Tensor):    mean(abs(y_nozzle_pred - y_nozzle_target))
@@ -150,12 +155,29 @@ class DQ_Model(KF_Model):
         return prediction, spatial_loss, temporal_loss, spatial_mae, temporal_mae 
 
     def predict_batch(self, inp):
-        """Predict a batch of data with the cv model."""
+        """Not valid for DQ."""
         logging.error("The DQ model is only for separation prediction. Sooorry.")
         pass
 
     def predict_batch_separation(self, inp, separation_mask, is_training=False, target=None):
-        """Predict a batch of data with the DQ model."""
+        """Predict a batch of data for separation prediction with the DQ model.
+
+        Training is enabled by passing is_training=True and giving a target array
+
+        Args:
+            inp (tf.Tensor):            Batch of track measurements, [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor):         Batch of track target measurements, [x, y, y_nozzle, dt_nozzle, v_nozzle], shape = [n_tracks, track_length, 5]
+            separation_mask (tf.Tensor):Batch of separation masks. Indicates where to start the separation prediction, shape = [n_tracks, track_length]   
+            is_training (Boolean):      Activate training 
+        
+        Returns:
+            prediction (np.array): shape = n_tracks, n_timesteps, 4
+                Tracking entries:
+                    prediction[i, 0:end_track, 0:2] = [0, 0]
+                Separation prediction entries:
+                    prediction[i, end_track, 2] = y_nozzle_pred   (Predicted y position at nozzle array)
+                    prediction[i, end_track, 3] = t_nozzle_pred   (Predicted time to nozzle array)
+        """
         np_inp = inp.numpy()
         np_separation_mask = separation_mask.numpy()
         if target is not None:
@@ -276,7 +298,7 @@ class DQ_Model(KF_Model):
         return predictions
 
     def get_zero_state(self, batch_size):
-        """Return a list of dummy CV_States."""
+        """Not valid for DQ."""
         logging.error("The DQ model is only for separation prediction. Sooorry.")
         pass
 

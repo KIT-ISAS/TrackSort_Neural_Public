@@ -1,9 +1,8 @@
 """Expert Manager.
 
-Todo:
-    * Add train and test method
-    * Convert np representation to tensor representation for mixture of experts
-    * Understand state buffering for RNN
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 
 import logging
@@ -46,16 +45,16 @@ class Expert_Manager(object):
         Initializes attributes.
 
         Args:
-            expert_config (dict): The configuration dictionary of all experts
-            is_loaded (Boolean):  True for loading models, False for creating new models
-            model_path (String):  The path of the models if is_loaded is True
-            is_uncertainty_prediction (Boolean):    Also predict the uncertainty of the prediction
-            batch_size (int):     The batch size of the data
-            num_time_steps (int): The number of timesteps in the longest track
-            n_mlp_features (int): The numper of features for MLP tracking
+            expert_config (dict):                       The configuration dictionary of all experts
+            is_loaded (Boolean):                        True for loading models, False for creating new models
+            model_path (String):                        The path of the models if is_loaded is True
+            is_uncertainty_prediction (Boolean):        Also predict the uncertainty of the prediction
+            batch_size (int):                           The batch size of the data
+            num_time_steps (int):                       The number of timesteps in the longest track
+            n_mlp_features (int):                       The numper of features for MLP tracking
             n_mlp_features_separation_prediction (int): The number of features for MLP separation prediction networks
-            x_pred_to (double):   The x position of the nozzle array (only needed for kf separation prediction)
-            time_normalization (double): Time normalization constant (only needed for kf separation prediction)
+            x_pred_to (double):                         The x position of the nozzle array (only needed for kf separation prediction)
+            time_normalization (double):                Time normalization constant (only needed for kf separation prediction)
         """
         self.expert_config = expert_config
         self.is_uncertainty_prediction = is_uncertainty_prediction
@@ -67,8 +66,9 @@ class Expert_Manager(object):
         self.create_models(is_loaded, model_path, batch_size, num_time_steps, n_mlp_features, n_mlp_features_separation_prediction, x_pred_to, time_normalization)
         self.n_experts = len(self.experts)
 
-    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 5, n_mlp_features_separation_prediction = 7, x_pred_to = 1550, time_normalization = 22.):
-        """Create list of experts.
+    def create_models(self, is_loaded, model_path="", batch_size=64, num_time_steps=0, n_mlp_features = 5, 
+                        n_mlp_features_separation_prediction = 7, x_pred_to = 1550, time_normalization = 22.):
+        """Create all experts.
 
         Creat experts based on self.expert_cofig.
         Add empty list to list of states for each expert.
@@ -98,7 +98,6 @@ class Expert_Manager(object):
                 model_path = "models/fault_model.pkl"
                 logging.error("Model path of expert {} does not exist.".format(expert_name))
             if expert_type == 'RNN':
-                # TODO: implement uncertainty prediction
                 model = RNN_Model(not is_separation, expert_name, model_path, self.is_uncertainty_prediction, expert.get("options"))
                 if is_loaded:
                     model.load_model()
@@ -106,7 +105,6 @@ class Expert_Manager(object):
                     model.create_model(batch_size=batch_size, 
                                        num_time_steps=num_time_steps)
             elif expert_type == 'KF':
-                # TODO: implement uncertainty prediction
                 # Create Kalman filter model
                 sub_type = expert.get("sub_type")
                 if sub_type == 'CV':
@@ -189,18 +187,18 @@ class Expert_Manager(object):
         Kalman filters and RNNs need a different data format than MLPs.
 
         Args:
-            **_inp (tf.Tensor):    Input tensor of tracks
-            **_target (tf.Tensor): Target tensor of tracks
-            seq2seq_tracking_mask (tf.Tensor): Mask the valid time steps for tracking
-            seq2seq_separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
-            mlp_mask (tf.Tensor):   Mask the tracks that have less than n points
+            **_inp (tf.Tensor):                     Input tensor of tracks
+            **_target (tf.Tensor):                  Target tensor of tracks
+            seq2seq_tracking_mask (tf.Tensor):      Mask the valid time steps for tracking
+            seq2seq_separation_mask (tf.Tensor):    Mask the valid time step(s) for the separation prediction
+            mlp_mask (tf.Tensor):                   Mask the tracks that have less than n points
 
         Returns:
-            predictions (list): Predictions for each expert
-            spatial_losses (list): Spacial loss for each expert 
+            predictions (list):     Predictions for each expert
+            spatial_losses (list):  Spacial loss for each expert 
             temporal_losses (list): Temporal loss for each expert
-            spatial_maes (list): Spacial mae for each expert
-            temporal_maes (list): Temporal mae for each expert
+            spatial_maes (list):    Spacial mae for each expert
+            temporal_maes (list):   Temporal mae for each expert
         """
         prediction_list = []
         spatial_losses = []
@@ -221,14 +219,14 @@ class Expert_Manager(object):
         return prediction_list, spatial_losses, temporal_losses, spatial_maes, temporal_maes
 
     def ence_calibrate_models_separation(self, target, predictions, masks, expert_names, percentage_bin_size = 0.25):
-        """Calibrate the separation uncertainty prediction of all experts with an ENCE calibration.
+        """Calibrate the separation uncertainty prediction of all experts with an SENCE calibration in spatial and temporal dimension.
 
         Args:
-            target (np.array):      Target values
-            predictions (np.array): Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape (n_experts=1, n_tracks, 4)
-            masks (np.array):       Masks for every expert
-            expert_names (list):    Names (String) of each expert
-            percentage_bin_size (double): The percentage size of the sliding window in the ENCE analysis [0, 1]
+            target (np.array):              Target values, shape = [n_tracks, 2]
+            predictions (np.array):         Predicted values [y_nozzle, t_nozzle, s_y, s_t], shape = [n_experts, n_tracks, 4]
+            masks (np.array):               Masks for every expert, shape = [n_experts, n_tracks]
+            expert_names (list):            Names (String) of each expert
+            percentage_bin_size (double):   The percentage size of the sliding window in the ENCE analysis [0, 1]
         """
         assert(len(expert_names)==predictions.shape[0])
 
@@ -260,24 +258,22 @@ class Expert_Manager(object):
                     mlp_inp = None, mlp_target = None, mlp_mask=None):
         """Test one batch for all experts in separation prediction.
 
-        TODO: Consider merging this funftion with train_batch
-
         The training information of each model should be provided in the expert configuration.
         Kalman filters and RNNs need a different data format than MLPs.
 
         Args:
-            **_inp (tf.Tensor):    Input tensor of tracks
-            **_target (tf.Tensor): Target tensor of tracks
-            seq2seq_tracking_mask (tf.Tensor): Mask the valid time steps for tracking
-            seq2seq_separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
-            mlp_mask (tf.Tensor):   Mask the tracks that have less than n points
+            **_inp (tf.Tensor):                     Input tensor of tracks
+            **_target (tf.Tensor):                  Target tensor of tracks
+            seq2seq_tracking_mask (tf.Tensor):      Mask the valid time steps for tracking
+            seq2seq_separation_mask (tf.Tensor):    Mask the valid time step(s) for the separation prediction
+            mlp_mask (tf.Tensor):                   Mask the tracks that have less than n points
 
         Returns:
-            predictions (list): Predictions for each expert
-            spatial_losses (list): Spacial loss for each expert 
+            predictions (list):     Predictions for each expert
+            spatial_losses (list):  Spacial loss for each expert 
             temporal_losses (list): Temporal loss for each expert
-            spatial_maes (list): Spacial mae for each expert
-            temporal_maes (list): Temporal mae for each expert
+            spatial_maes (list):    Spacial mae for each expert
+            temporal_maes (list):   Temporal mae for each expert
         """
         prediction_list = []
         spatial_losses = []
@@ -327,8 +323,8 @@ class Expert_Manager(object):
         """Return masks for each expert.
 
         Args:
-            seq2seq_separation_mask (tf.Tensor): The mask for seq2seq experts
-            mlp_mask (tf.Tensor): The mask for mlp experts
+            seq2seq_separation_mask (tf.Tensor):    The mask for seq2seq experts
+            mlp_mask (tf.Tensor):                   The mask for mlp experts
 
         Returns:
             List of masks. One multidemensional mask for each expert.

@@ -1,8 +1,8 @@
 """Mixture of expert approach for gating structure.
 
-TODO:
-    * Right now the input training data is split into train and test data for the gating network.
-        You may want to change this into passing the test data directly to the training function.
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
 import numpy as np
 import logging
@@ -36,10 +36,10 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         """Initialize a mixture of experts gating network for separation prediction.
         
         Args:
-            n_experts (int):        Number of experts
-            model_path (String):    Path to save/load the ME model
-            is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
-            network_options (dict): Model training options
+            n_experts (int):                        Number of experts
+            model_path (String):                    Path to save/load the ME model
+            is_uncertainty_prediction (Boolean):    Predict uncertainty of predictions. 
+            network_options (dict):                 Model training options
         """
         # Initialize with zero weights
         self.model_structure = network_options.get("model_structure")
@@ -110,10 +110,10 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         Transform the data to fit the network architecture.
 
         Args:
-            inputs (np.array):          All MLP inputs, shape: [n_tracks, 2*n_mlp_inp_points]
-            targets (np.array):         All target values of the given dataset, shape: [n_tracks, 2]
-            predictions (np.array):     All predictions for all experts, shape: [n_experts, n_tracks, 2 or 4]
-            masks (np.array):           Masks for each expert, shape: [n_experts, n_tracks]
+            inputs (np.array):          All MLP inputs, shape = [n_tracks, 2*n_mlp_inp_points]
+            targets (np.array):         All target values of the given dataset, shape = [n_tracks, 2]
+            predictions (np.array):     All predictions for all experts, shape = [n_experts, n_tracks, 2 or 4]
+            masks (np.array):           Masks for each expert, shape = [n_experts, n_tracks]
         """
         ## Create Model
         self.create_model()
@@ -295,11 +295,11 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         """Create masks from track format.
 
         Args:
-            masks (np.array): Mask to mask total prediction, shape: [n_experts, n_tracks, track_length] 
-                                OR shape: [n_experts, n_tracks] if predicting a single time step
+            masks (np.array): Mask to mask total prediction, shape = [n_experts, n_tracks, track_length] 
+                                OR shape = [n_experts, n_tracks] if predicting a single time step
 
         Returns: 
-            mask (np.array): Mask to mask total prediction, shape: [n_tracks * track_length, n_experts]
+            mask (np.array): Mask to mask total prediction, shape = [n_tracks * track_length, n_experts]
         """
         n_tracks = mask.shape[1]
         # In case of live multi-target tracking, the track length is always 1.
@@ -334,8 +334,8 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         If the mask value at an instance is 0, the experts weight is 0.
         
         Args:
-            masks (np.array):  Mask array with shape [n_experts, n_tracks]
-            inputs (np.array): Data input in MLP separation format, shape: [n_tracks, 2*n_mlp_inp]
+            masks (np.array):  Mask array, shape = [n_experts, n_tracks]
+            inputs (np.array): Data input in MLP separation format, shape = [n_tracks, 2*n_mlp_inp]
       
         Returns:
             np.array with weights of shape [mask.shape, 2] -> 2 standing for the two dimensions spatial and temporal
@@ -379,8 +379,8 @@ class MixtureOfExpertsSeparation(GatingNetwork):
         
         Args:
             masks (np.array):  Mask array with shape [n_experts, n_tracks]
-            inputs (np.array): Data input in MLP separation format, shape: [n_tracks, 2*n_mlp_inp]
-            log_variance_predictions (np.array): All uncertainty predictions for all experts, shape: [n_experts, n_tracks, 2]
+            inputs (np.array): Data input in MLP separation format, shape = [n_tracks, 2*n_mlp_inp]
+            log_variance_predictions (np.array): All uncertainty predictions for all experts, shape = [n_experts, n_tracks, 2]
 
         Returns:
             weights: np.array with weights of shape [mask.shape, 2] -> 2 standing for the two dimensions spatial and temporal
@@ -441,20 +441,18 @@ def me_mlp_model_factory(input_dim, n_experts, is_uncertainty_prediction = False
     """Create a new keras MLP model
 
     Args:
-        input_dim (int):            The number of inputs to the model
-        n_experts (int):            The number of experts
-        is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
-        direct_uncertainty_output (Boolean): If this is set to False, the uncertainty is calculated with the weighted variance predictions
-                                             If this is set to True, the uncertainty is directly outputted. (Increases the output dimension by 2.)
-        prediciton_input_dim (int): Should be 2 for spatial and temporal position.
-        features (list):            List of String. Features for MLP. Possibilities:
-                                        "pos":  x and y position of current measurement.
-                                        "id":   Current track id - Number of measurements in track
-                                        "uncertainty_prediction": The uncertainty prediction of each expert
-        layers (list):              List of int. Number of nodes and layers
-        activation (String):        Activation function for layers
-        l1_regularization (double): L1 Regularization factor
-        l2_regularization (double): L2 Regularization factor
+        input_dim (int):                        The number of inputs to the model
+        n_experts (int):                        The number of experts
+        is_uncertainty_prediction (Boolean):    Predict uncertainty of predictions. 
+        direct_uncertainty_output (Boolean):    If this is set to False, the uncertainty is calculated with the weighted variance predictions
+                                                If this is set to True, the uncertainty is directly outputted. (Increases the output dimension by 2.)
+        prediciton_input_dim (int):             Should be 2 for spatial and temporal position.
+        features (list):                        List of String. Features for MLP. Possibilities:
+                                                    "pos":  previous measurements as inputs.
+        layers (list):                          List of int. Number of nodes and layers
+        activation (String):                    Activation function for layers
+        l1_regularization (double):             L1 Regularization factor
+        l2_regularization (double):             L2 Regularization factor
     
     Returns: 
         the model
@@ -529,21 +527,36 @@ def train_step_generator(model, optimizer, is_uncertainty_prediction = False, di
     This function can be called to train the given model with the given optimizer.
 
     Args:
-        model:      model according to estimator api
-        optimizer:  tf estimator
-        is_uncertainty_prediction (Boolean): Predict uncertainty of predictions. 
-        direct_uncertainty_output (Boolean): If this is set to False, the uncertainty is calculated with the weighted variance predictions
-                                             If this is set to True, the uncertainty is directly outputted. (Increases the output dimension by 2.)
-        is_one_out_of_n_selector (Boolean): Only pick the highest ranked expert for the prediction
-        correlations (tf.Tensor): The expert prediction error correlations, 
-                                trained in gating_network.train_correlations(), converted to tf.Tensor,
-                                Shape: [n_dim (2), n_experts, n_experts]
+        model:                                  model according to estimator api
+        optimizer:                              tf estimator
+        is_uncertainty_prediction (Boolean):    Predict uncertainty of predictions. 
+        direct_uncertainty_output (Boolean):    If this is set to False, the uncertainty is calculated with the weighted variance predictions
+                                                If this is set to True, the uncertainty is directly outputted. (Increases the output dimension by 2.)
+        is_one_out_of_n_selector (Boolean):     Only pick the highest ranked expert for the prediction
+        correlations (tf.Tensor):               The expert prediction error correlations, 
+                                                trained in gating_network.train_correlations(), converted to tf.Tensor,
+                                                shape = [n_dim (2), n_experts, n_experts]
 
     Returns:
         function which can be called to train the given model with the given optimizer
     """
     @tf.function
     def train_step(inp, target, expert_predictions, mask, mlp_mask, training=True):
+        """Train step function.
+        
+        Args:
+            inp (tf.Tensor):                The last n measurements as input, shape = [n_samples, n_inputs]
+            target (tf.Tensor):             The [y_nozzle, t_nozzle] target, shape = [n_samples, 2]
+            expert_predictions (tf.Tensor): The predictions of the experts, with/out uncertainty, shape = [n_samples, n_experts, 2/4]
+                                                [y_nozzle, t_nozzle] or [y_nozzle, t_nozzle, log(var_y), log(var_t)]
+            mask (tf.Tensor):               The masks fot all experts, shape = [n_samples, n_experts]
+            mlp_mask (tf.Tensor):           The mask for the ME network, shape = [n_samples]
+            training (Boolean):             Is training activated?
+
+        Returns:
+            weights (tf.Tensor):            Weights for all experts, shape = [n_samples, n_experts, 2]
+            loss (tf.Tensor):               The MSE loss of this training step
+        """
         with tf.GradientTape() as tape:
             #target = K.cast(target, tf.float64)
             # get [n_experts spatial weights, n_experts temporal weights] from MLP
@@ -577,11 +590,11 @@ def mask_weights(weights, mask):
     """Mask the tf weights vector.
 
     Args:
-        weights (list):   The outputs of the MLP network, shape: [[batch_size, n_experts], [batch_size, n_experts]]
-        mask (tf.Tensor): The mask for all experts, shape:       [batch_size, n_experts]
+        weights (list):   The outputs of the MLP network, shape = [[batch_size, n_experts], [batch_size, n_experts]]
+        mask (tf.Tensor): The mask for all experts, shape =       [batch_size, n_experts]
 
     Returns:
-        masked_weights (tf.Tensor):  Weights for spatial and temporal prediction, shape: [batch_size, n_experts, 2]
+        masked_weights (tf.Tensor):  Weights for spatial and temporal prediction, shape = [batch_size, n_experts, 2]
     """
     masked_weights_spatial = tf.multiply(weights[0], mask)
     masked_weights_spatial, _ = tf.linalg.normalize(masked_weights_spatial, ord=1, axis=1)
@@ -594,10 +607,10 @@ def weighted_sum_mse_loss(weights, expert_predictions, target, mask):
     """Return MSE for weighted expert predictions.
 
     Args:
-        expert_predictions (tf.Tensor): The expert predictions, shape: [batch_size, n_experts, 2]
-        weights (tf.Tensor):            The outputs of the MLP network, shape: [batch_size, n_experts, 2]
-        target (tf.Tensor):             The target, shape: [batch_size, 2]
-        mask (tf.Tensor):               Mask entries that are valid, shape: [batch_size,]
+        expert_predictions (tf.Tensor): The expert predictions, shape = [batch_size, n_experts, 2]
+        weights (tf.Tensor):            The outputs of the MLP network, shape = [batch_size, n_experts, 2]
+        target (tf.Tensor):             The target, shape = [batch_size, 2]
+        mask (tf.Tensor):               Mask entries that are valid, shape = [batch_size,]
     Returns:
         loss (float64)
     """
@@ -609,13 +622,13 @@ def weighted_sum_nll_loss(weights, expert_predictions, target, mask, correlation
     """Return negative log likelihood loss for weighted expert predictions.
 
     Args:
-        expert_predictions (tf.Tensor): The expert predictions, shape: [batch_size, n_experts, 4]
-        weights (tf.Tensor):            The outputs of the MLP network, shape: [batch_size, n_experts, 2]
-        target (tf.Tensor):             The target, shape: [batch_size, 2]
-        mask (tf.Tensor):               Mask entries that are valid, shape: [batch_size,]
+        expert_predictions (tf.Tensor): The expert predictions, shape = [batch_size, n_experts, 4]
+        weights (tf.Tensor):            The outputs of the MLP network, shape = [batch_size, n_experts, 2]
+        target (tf.Tensor):             The target, shape = [batch_size, 2]
+        mask (tf.Tensor):               Mask entries that are valid, shape = [batch_size,]
         correlations (tf.Tensor):       The expert prediction error correlations, 
                                         trained in gating_network.train_correlations(), converted to tf.Tensor,
-                                        Shape: [n_dim (2), n_experts, n_experts]
+                                        shape = [n_dim (2), n_experts, n_experts]
     Returns:
         loss (float64)
     """
@@ -641,11 +654,11 @@ def nll_loss(weights, uncertainty_prediction, expert_predictions, target, mask):
     """Return negative log likelihood loss for weighted expert mean predictions and direct uncertainty prediction.
 
     Args:
-        expert_predictions (tf.Tensor):     The expert predictions, shape: [batch_size, n_experts, 4]
-        weights (tf.Tensor):                The outputs of the MLP network, shape: [batch_size, n_experts, 2]
-        uncertainty_prediction (tf.Tensor): The predicted log(variance) output of the gating network, shape: [batch_size, 1, 2]
-        target (tf.Tensor):                 The target, shape: [batch_size, 2]
-        mask (tf.Tensor):                   Mask entries that are valid, shape: [batch_size,]
+        expert_predictions (tf.Tensor):     The expert predictions, shape = [batch_size, n_experts, 4]
+        weights (tf.Tensor):                The outputs of the MLP network, shape = [batch_size, n_experts, 2]
+        uncertainty_prediction (tf.Tensor): The predicted log(variance) output of the gating network, shape = [batch_size, 1, 2]
+        target (tf.Tensor):                 The target, shape = [batch_size, 2]
+        mask (tf.Tensor):                   Mask entries that are valid, shape = [batch_size]
 
     Returns:
         loss (float64)

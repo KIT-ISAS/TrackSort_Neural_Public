@@ -1,8 +1,9 @@
-"""MLP model.
+"""MLP model for tracking and separation prediction.
 
-TODO:
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
-
 import os
 import logging
 
@@ -14,10 +15,10 @@ from tensorflow.keras import backend as K
 from expert import Expert, Expert_Type
 
 class MLP_Model(Expert):
-    """MLP model to predict next positions
+    """MLP model for tracking or separation prediction
 
     The MLP model has a fix number of previous points as input.
-    Therefore, this model can only predict after a certain timestep.
+    Therefore, this model can only make predictions after a certain timestep.
 
     The data structure is:
     [x_in1, x_in2, ..., x_inN, y_in1, y_in2, ..., y_inN]
@@ -30,7 +31,6 @@ class MLP_Model(Expert):
     decay_steps=200,
     decay_rate=0.96,
     staircase=True
-    Batch size = 500
     Epochs = 3000
     Layers = [16, 16, 16]
     """
@@ -107,11 +107,11 @@ class MLP_Model(Expert):
             self.train_step_fn = train_step_generator_separation_prediction(self.mlp_model, self.optimizer, self.loss_object, self.is_uncertainty_prediction)
 
     def train_batch(self, inp, target):
-        """Train the MLP model on a batch of data.
+        """Train the MLP model for tracking on a batch of data.
 
         Args:
-            inp (tf.Tensor): A batch of input tracks
-            target (tf.Tensor): The prediction targets to the inputs
+            inp (tf.Tensor): A batch of input tracks, shape = [batch_size, mlp_input_size]
+            target (tf.Tensor): The prediction targets to the inputs, shape = [batch_size, 2]
 
         Returns
             prediction (tf.Tensor): Predicted positions for training instances
@@ -122,9 +122,9 @@ class MLP_Model(Expert):
         """Train the MLP model on a batch of data.
 
         Args:
-            inp (tf.Tensor):    A batch of input tracks
-            target (tf.Tensor): The prediction targets to the inputs
-            mask (tf.Tensor):   Indicates which tracks are valid
+            inp (tf.Tensor):    A batch of input tracks, shape = [batch_size, mlp_input_size]
+            target (tf.Tensor): The prediction targets to the inputs, shape = [batch_size, 2]
+            mask (tf.Tensor):   Indicates which tracks are valid, shape = [batch_size]
 
         Returns
             prediction (tf.Tensor):     Predicted positions for training instances
@@ -138,9 +138,9 @@ class MLP_Model(Expert):
         """Test the MLP model on a batch of data.
 
         Args:
-            inp (tf.Tensor):    A batch of input tracks
-            target (tf.Tensor): The prediction targets to the inputs
-            mask (tf.Tensor):   Indicates which tracks are valid
+            inp (tf.Tensor):    A batch of input tracks, shape = [batch_size, mlp_input_size]
+            target (tf.Tensor): The prediction targets to the inputs, shape = [batch_size, 2]
+            mask (tf.Tensor):   Indicates which tracks are valid, shape = [batch_size]
 
         Returns
             prediction (tf.Tensor):     Predicted positions for training instances
@@ -157,12 +157,12 @@ class MLP_Model(Expert):
         """Correct the uncertainty prediction of the expert with the ENCE calibration.
 
         Args:
-            prediction (np.array): Predicted positions for training instances, shape = [n_tracks, 4]
-                                    y_nozzle, dt_nozzle, sigma_y_nozzle, sigma_dt_nozzle
-            mask (tf.Tensor):   Indicates which tracks are valid
+            prediction (np.array):  Predicted positions for training instances, shape = [n_tracks, 4]
+                                        y_nozzle, dt_nozzle, sigma_y_nozzle, sigma_dt_nozzle
+            mask (tf.Tensor):       Indicates which tracks are valid, shape = [n_tracks]
 
         Returns:
-            prediction
+            prediction (np.array):  Corrected prediction, shape = [n_tracks, 4]
         """
         for track in range(prediction.shape[0]):
             if mask[track] == 0:
@@ -178,11 +178,25 @@ class MLP_Model(Expert):
         return prediction
 
     def predict_batch(self, inp):
-        """Predict a batch of input data."""
+        """Predict a batch of tracking input data.
+        
+        Args:
+            inp (tf.Tensor):            A batch of input tracks, shape = [batch_size, mlp_input_size]
+        
+        Returns:
+            prediction (tf.Tensor):     A batch of predictions, shape = [batch_size, 2]
+        """
         return self.predict(inp)
 
     def predict(self, inp):
-        """Predict input data."""
+        """Predict one input data.
+
+        Args:
+            inp (tf.Tensor):            Input, shape = [mlp_input_size]
+        
+        Returns:
+            prediction (tf.Tensor):     Prediction, shape = [2]
+        """
         return self.mlp_model(inp)
 
     def save_model(self):
@@ -271,23 +285,33 @@ def mlp_model_factory(input_dim=10, output_dim=2, layers=[16, 16, 16], activatio
     return model
 
 def train_step_generator(model, optimizer, loss_object):
-    """Build a function which returns a computational graph for tensorflow.
+    """Build the train step function for the tracking MLP.
 
     This function can be called to train the given model with the given optimizer.
 
     Args:
-        model:      model according to estimator api
-        optimizer:  tf estimator
-        loss_object: Loss object like keras.losses.MeanSquaredError
+        model:          MLP model
+        optimizer:      Tf estimator
+        loss_object:    Loss object like keras.losses.MeanSquaredError
 
     Returns
         function which can be called to train the given model with the given optimizer
     """
     @tf.function
-    def train_step(inp, target):
+    def train_step(inp, target, training=True):
+        """Train step function for the tracking MLP.
+
+        Args:
+            inp (tf.Tensor):        Input, shape = [n_samples, mlp_input_shape]
+            target (tf.Tensor):     Target, shape = [n_sample, 2]
+            training (Boolean):     Training activated?
+
+        Returns:
+            predictions (tf.Tensor): Predictions, shape = [n_samples, 2]
+        """
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
-            predictions = model(inp, training=True)
+            predictions = model(inp, training=training)
 
             loss = loss_object(target, predictions)
 
@@ -299,14 +323,14 @@ def train_step_generator(model, optimizer, loss_object):
     return train_step
 
 def train_step_generator_separation_prediction(model, optimizer, loss_object, is_uncertainty_prediction):
-    """Build a function which returns a computational graph for tensorflow.
+    """Build the train step function for the separation prediction MLP.
 
     This function can be called to train the given model with the given optimizer.
 
     Args:
-        model: model according to estimator api
-        optimizer: tf estimator
-        is_uncertainty_prediction (Boolean): Also predict the uncertainty of the output.
+        model:                                  Model according to estimator api
+        optimizer:                              Tf estimator
+        is_uncertainty_prediction (Boolean):    Also predict the uncertainty of the output.
 
     Returns:
         function which can be called to train the given model with the given optimizer
@@ -314,6 +338,18 @@ def train_step_generator_separation_prediction(model, optimizer, loss_object, is
     stop=0
     @tf.function
     def train_step(inp, target, mask, training=True):
+        """Train step function for the separation prediction MLP.
+
+        Args:
+            inp (tf.Tensor):        Input, shape = [n_samples, mlp_input_shape]
+            target (tf.Tensor):     Target, shape = [n_sample, 2]
+            mask (tf.Tensor):       Mask, shape = [n_sample]
+            training (Boolean):     Training activated?
+
+        Returns:
+            predictions (tf.Tensor): Predictions, shape = [n_samples, 2/(4)]
+                                     [y_nozzle, dt_nozzle,( log(var_y), log(var_t) )]
+        """
         with tf.GradientTape() as tape:
             #target = K.cast(target, tf.float64)
             predictions = model(inp, training=training, mask=mask)
@@ -338,8 +374,8 @@ def get_separation_loss(prediction, target, mask):
     spatial_loss = MSE([dt_nozzle] prediction<->target)
 
     Args:
-        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
-        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle], shape = [batch_size, track_length, 2]
+        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape = [batch_size, track_length, 2]
         mask (tf.Tensor):       Indicates which instances are valid
 
     Returns:
@@ -355,10 +391,12 @@ def get_separation_loss_uncertainty(prediction, target, mask):
     """Calculate the spatial and temporal loss in the separation prediction training.
     temporal_loss = MSE([y_nozzle] prediction<->target)
     spatial_loss = MSE([dt_nozzle] prediction<->target)
+
     Args:
-        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle, sigma_y_nozzle, sigma_dt_nozzle], shape: [batch_size, track_length, 4]
-        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle, sigma_y_nozzle, sigma_dt_nozzle], shape = [batch_size, track_length, 4]
+        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape = [batch_size, track_length, 2]
         mask (tf.Tensor):       Indicates which instances are valid
+
     Returns:
         spatial_loss, temporal_loss
     """
@@ -377,8 +415,8 @@ def get_separation_mae(prediction, target, mask):
     spatial_loss = MAE([dt_nozzle] prediction<->target)
 
     Args:
-        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
-        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape: [batch_size, track_length, 2]
+        prediction (tf.Tensor): Predicted values [y_nozzle, dt_nozzle], shape = [batch_size, track_length, 2]
+        target (tf.Tensor):     Target values [y_nozzle, dt_nozzle], shape = [batch_size, track_length, 2]
         mask (tf.Tensor):       Indicates which instances are valid
 
     Returns:

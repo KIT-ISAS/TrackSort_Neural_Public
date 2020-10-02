@@ -1,10 +1,9 @@
 """KF Model and KF State.
 
-Todo:
-    * Implement CA Model (and more)
-    * (Convert np representation to tensor representation for mixture of experts)
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
 """
-
 import numpy as np
 import pickle
 import logging
@@ -30,7 +29,17 @@ class KF_Model(Expert):
     __metaclass__ = Expert
 
     def __init__(self, name, model_path, F, C_w, H, C_v, default_state_options):
-        """Initialize a new Kalman filter with given matrices."""
+        """Initialize a new Kalman filter with given matrices.
+        
+        Args:
+            name (String):                  The model name
+            model_path (String):            The path to save the model to
+            F (np.matrix):                  The state transition matrix
+            C_w (np.matrix):                The prediction covariance matrix
+            H (np.matrix):                  The measurement matrix
+            C_v (np.matrix):                The measurement covariance matrix
+            default_state_options (dict):   The options for creating a new state taken from the config file
+        """
         self.F = F
         self.C_w = C_w
         self.H = H
@@ -50,7 +59,7 @@ class KF_Model(Expert):
         Changes the input state to the predicted values.
 
         Args:
-            current_state (np.array): The current state of a particle processed by Kalman filtering
+            current_state (state object):   The current state of a particle processed by Kalman filtering (CV_state or CA_state)
         """
         ## Check matrix and state dimensions
         assert(self.F.shape[0] == current_state.state.shape[0])
@@ -62,11 +71,11 @@ class KF_Model(Expert):
         current_state.C_p = np.matmul(np.matmul(self.F, current_state.C_e), self.F.T) + self.C_w
 
     def update(self, current_state, measurement):
-        """Execute filtering step of the Kalman filter.
+        """Execute update step of the Kalman filter.
 
         Args:
-            current_state (np.array):   The current state of a particle processed by Kalman filtering
-            measurement (list):         The last measurement used for filter step
+            current_state (state object):   The current state of a particle processed by Kalman filtering (CV_state or CA_state)
+            measurement (list):             The last measurement used for filter step
         """
         ## Check matrix and state dimensions
         assert(self.F.shape[0] == current_state.state.shape[0])
@@ -91,10 +100,10 @@ class KF_Model(Expert):
         """Predict a batch of input data for testing.
 
         Args:
-            inp (tf.Tensor): A batch of input tracks
+            inp (tf.Tensor):        A batch of input tracks
 
         Returns
-            prediction (np.array): Predicted positions for training instances
+            prediction (np.array):  Predicted positions for training instances
         """
         pass
 
@@ -150,8 +159,8 @@ class KF_Model(Expert):
         """Correct the uncertainty prediction of the expert with the ENCE calibration.
 
         Args:
-            separation_mask (np.array): Indicates where the separation prediction entries are (end_track)
-            prediction (np.array): shape = n_tracks, n_timesteps, 6
+            separation_mask (np.array): Indicates where the separation prediction entries are (end_track), shape = [n_tracks, n_timesteps]
+            prediction (np.array): shape = [n_tracks, n_timesteps, 6]
                 Tracking entries:
                     prediction[i, 0:end_track, 0:2] = [x_pred, y_pred]
                 Separation prediction entries:

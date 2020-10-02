@@ -1,4 +1,11 @@
-"""The ensemble classes of gating networks."""
+"""The ensemble classes of gating networks for tracking.
+
+An ensemble does not learn the weights based on inputs but assigns the same weights to the experts all the time.
+
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
+"""
 import numpy as np
 import logging
 import pickle
@@ -10,14 +17,21 @@ from expert import Expert_Type
 class Simple_Ensemble(GatingNetwork):
     """The simple ensemble gating network weights every expert with the same weight.
 
+    Inherits from GatingNetwork.
+
     Attributes:
         n_experts (int):    Number of experts
     """
-    
+
     __metaclass__ = GatingNetwork
 
     def __init__(self, n_experts, model_path):
-        """Initialize a simple ensemble gating network."""
+        """Initialize a simple ensemble gating network.
+        
+        Args:
+            n_experts (int): Number of experts in expert net
+            model_path (String): Path to save or load model
+        """
         super().__init__(n_experts, False, "Simple Ensemble", model_path)
 
     def train_network(self, **kwargs):
@@ -30,6 +44,8 @@ class Simple_Ensemble(GatingNetwork):
         The weights sum to 1.
         All Weights are > 0.
 
+        Args:
+            batch_size (int):   Number of tracks
         Returns:
             np.array with weights of shape [n_experts, batch_size]
         """
@@ -52,6 +68,8 @@ class Simple_Ensemble(GatingNetwork):
         [1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]]
         --> Expert 6 is only active at position 0.
         
+        Args:
+            mask (np.array):    Mask array with shape [n_experts, n_tracks, track_length]
         Returns:
             np.array with weights of shape mask.shape
         """
@@ -62,6 +80,8 @@ class Simple_Ensemble(GatingNetwork):
 class Covariance_Weighting_Ensemble(GatingNetwork):
     """This ensemble gating network weights every expert based on their covariance matrix.
 
+    Inherits from GatingNetwork.
+
     Attributes:
         n_experts (int):    Number of experts
         weights (np.array): Weights based on covariance
@@ -70,11 +90,17 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
     __metaclass__ = GatingNetwork
 
     def __init__(self, n_experts, model_path):
-        """Initialize a covariance weighting ensemble gating network."""
+        """Initialize a covariance weighting ensemble gating network.
+        
+        Args:
+            n_experts (int): Number of experts in expert net
+            model_path (String): Path to save or load model
+        """
         self.weights = np.zeros(n_experts)
         super().__init__(n_experts, False, "Covariance Weighting Ensemble", model_path)
 
     def save_model(self):
+        """Save the model weights to self.model_path."""
         folder_path = os.path.dirname(self.model_path)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
@@ -82,6 +108,7 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
         pickle.dump(self.weights, filehandler)
 
     def load_model(self):
+        """Load the model weights from self.model_path."""
         try:
             filehandler = open(self.model_path, 'rb') 
             self.weights = pickle.load(filehandler)
@@ -89,12 +116,14 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
             logging.error("Could not load gating network from path {}".format(self.model_path))
 
     def train_network(self, target, predictions, masks, **kwargs):
-        """Train the ensemble.
+        """Learn the ensemble weights based on the covariance matrix.
         
         Args:
-            targets (np.array):     All target values of the given dataset, shape: [n_tracks, track_length, 2]
-            predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
-            masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks, track_length]
+            targets (np.array):     All target values of the given dataset, shape = [n_tracks, track_length, 2]
+            predictions (np.array): All predictions for all experts, shape = [n_experts, n_tracks, track_length, 2]
+            masks (np.array):       Masks for each expert, shape = [n_experts, n_tracks, track_length]
+        Learns:
+            self.weights
         """
         n_experts = predictions.shape[0]
         # Duplicate mask to be valid for x_target and y_target and invert mask to fit numpy mask format
@@ -128,6 +157,8 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
         The weights sum to 1.
         All Weights are > 0.
 
+        Args:
+            batch_size (int):   Number of tracks
         Returns:
             np.array with weights of shape [n_experts, batch_size]
         """
@@ -168,6 +199,8 @@ class Covariance_Weighting_Ensemble(GatingNetwork):
 class SMAPE_Weighting_Ensemble(GatingNetwork):
     """This ensemble gating network weights every expert based on their SMAPE error.
 
+    Inherits from GatingNetwork.
+
     Attributes:
         n_experts (int):    Number of experts
         weights (np.array): Weights based on covariance
@@ -176,11 +209,17 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
     __metaclass__ = GatingNetwork
 
     def __init__(self, n_experts, model_path):
-        """Initialize a SMAPE weighting ensemble gating network."""
+        """Initialize a SMAPE weighting ensemble gating network.
+        
+        Args:
+            n_experts (int): Number of experts in expert net
+            model_path (String): Path to save or load model
+        """
         self.weights = np.zeros(n_experts)
         super().__init__(n_experts, False, "SMAPE Weighting Ensemble", model_path)
 
     def save_model(self):
+        """Save the model weights to self.model_path."""
         folder_path = os.path.dirname(self.model_path)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
@@ -188,6 +227,7 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
         pickle.dump(self.weights, filehandler)
 
     def load_model(self):
+        """Load the model weights from self.model_path."""
         try:
             filehandler = open(self.model_path, 'rb') 
             self.weights = pickle.load(filehandler)
@@ -195,8 +235,8 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
             logging.error("Could not load gating network from path {}".format(self.model_path))
 
     def train_network(self, target, predictions, masks, expert_types, **kwargs):
-        """Train the ensemble.
-
+        """Learn the ensemble weights based on the SMAPE error.
+        
         Calculate the symetric mean percentage error (SMAPE) for every expert.
         Use the softmax function to generate weights from the SMAPE values
         
@@ -205,6 +245,8 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
             predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, track_length, 2]
             masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks, track_length]
             expert_types (list):    List of Expert_Types
+        Learns:
+            self.weights
         """
         n_experts = predictions.shape[0]
         # Duplicate mask to be valid for x_target and y_target and invert mask to fit numpy mask format
@@ -258,6 +300,8 @@ class SMAPE_Weighting_Ensemble(GatingNetwork):
         The weights sum to 1.
         All Weights are > 0.
 
+        Args:
+            batch_size (int):   Number of tracks
         Returns:
             np.array with weights of shape [n_experts, batch_size]
         """

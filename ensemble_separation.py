@@ -1,4 +1,11 @@
-"""The ensemble classes of gating networks for separation prediction."""
+"""The ensemble classes of gating networks for separation prediction.
+
+An ensemble does not learn the weights based on inputs but assigns the same weights to the experts all the time.
+
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
+"""
 import numpy as np
 import logging
 import pickle
@@ -17,10 +24,17 @@ class Simple_Ensemble_Separation(GatingNetwork):
     __metaclass__ = GatingNetwork
 
     def __init__(self, n_experts, is_uncertainty_prediction, model_path):
-        """Initialize a simple ensemble gating network."""
+        """Initialize a simple ensemble gating network.
+        
+        Args:
+            n_experts (int):                        Number of experts in expert net
+            is_uncertainty_prediction (Boolean):    Is the uncertainty prediction activated or not
+            model_path (String):                    Path to save or load model
+        """
         super().__init__(n_experts, is_uncertainty_prediction, "Simple Ensemble", model_path)
 
     def load_model(self):
+        """Load the model from self.model_path."""
         self.load_calibration()
 
     def train_network(self, **kwargs):
@@ -58,11 +72,18 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
     __metaclass__ = GatingNetwork
 
     def __init__(self, n_experts, is_uncertainty_prediction, model_path):
-        """Initialize a covariance weighting ensemble gating network."""
+        """Initialize a covariance weighting ensemble gating network.
+        
+        Args:
+            n_experts (int):                        Number of experts in expert net
+            is_uncertainty_prediction (Boolean):    Is the uncertainty prediction activated or not
+            model_path (String):                    Path to save or load model
+        """
         self.weights = np.zeros([n_experts, 2])
         super().__init__(n_experts, is_uncertainty_prediction, "Covariance Weighting Ensemble", model_path)
 
     def save_model(self):
+        """Save the weights to self.model_path."""
         folder_path = os.path.dirname(self.model_path)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
@@ -70,6 +91,7 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
         pickle.dump(self.weights, filehandler)
 
     def load_model(self):
+        """Load the weights from self.model_path."""
         try:
             filehandler = open(self.model_path, 'rb') 
             self.weights = pickle.load(filehandler)
@@ -78,12 +100,12 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
         self.load_calibration()
 
     def train_network(self, **kwargs):
-        """Train the ensemble.
+        """Learn the weights based on the covariance matrix.
         
         Args:
-            target (np.array):      All target values of the given dataset, shape: [n_tracks, 2]
-            predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, 2]
-            masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
+            target (np.array):      All target values of the given dataset, shape = [n_tracks, 2]
+            predictions (np.array): All predictions for all experts, shape = [n_experts, n_tracks, 2]
+            masks (np.array):       Masks for each expert, shape = [n_experts, n_tracks]
         """
         for dim in range(2):
             C = np.matrix(self.C[dim])
@@ -97,16 +119,7 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
                  The resulting weights for dimenstion {} are: {}".format(dim, self.weights[:, dim]))
 
     def get_weights(self, batch_size):
-        """Return a weight vector.
-        
-        The weights sum to 1.
-        All Weights are > 0.
-
-        Returns:
-            np.array with weights of shape [n_experts, batch_size]
-        """
-        """weights = np.repeat(np.expand_dims(self.weights, -1), batch_size, axis=-1)
-        return weights"""
+        """Not implemented for separation prediction."""
         pass
 
     def get_masked_weights(self, masks, log_variance_predictions=None, *args):
@@ -127,11 +140,11 @@ class Covariance_Weighting_Ensemble_Separation(GatingNetwork):
         --> Expert 6 is only active at position 0.
         
         Args:
-            masks (tf.Tensor/np.array):                     Mask array, shape: [n_experts, n_tracks]
-            log_variance_predictions (tf.Tensor/np.array):  log of uncertainty prediction of experts, shape: [n_experts, n_tracks, 2]
+            masks (tf.Tensor/np.array):                     Mask array, shape = [n_experts, n_tracks]
+            log_variance_predictions (tf.Tensor/np.array):  log of uncertainty prediction of experts, shape = [n_experts, n_tracks, 2]
 
         Returns:
-            np.array with weights, shape: [n_experts, n_tracks, 2]
+            np.array with weights, shape = [n_experts, n_tracks, 2]
         """
         assert(masks.shape[0] == self.n_experts)
         if not self.is_uncertainty_prediction:
@@ -177,11 +190,18 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
     __metaclass__ = GatingNetwork
 
     def __init__(self, n_experts, is_uncertainty_prediction, model_path):
-        """Initialize a SMAPE weighting ensemble gating network."""
+        """Initialize a SMAPE weighting ensemble gating network.
+        
+        Args:
+            n_experts (int):                        Number of experts in expert net
+            is_uncertainty_prediction (Boolean):    Is the uncertainty prediction activated or not
+            model_path (String):                    Path to save or load model
+        """
         self.weights = np.zeros([n_experts, 2])
         super().__init__(n_experts, is_uncertainty_prediction, "SMAPE Weighting Ensemble", model_path)
 
     def save_model(self):
+        """Save the weights to self.model_path."""
         folder_path = os.path.dirname(self.model_path)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
@@ -189,6 +209,7 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
         pickle.dump(self.weights, filehandler)
 
     def load_model(self):
+        """Load the weights from self.model_path."""
         try:
             filehandler = open(self.model_path, 'rb') 
             self.weights = pickle.load(filehandler)
@@ -203,9 +224,9 @@ class SMAPE_Weighting_Ensemble_Separation(GatingNetwork):
         Use the softmax function to generate weights from the SMAPE values
         
         Args:
-            targets (np.array):     All target values of the given dataset, shape: [n_tracks, 2]
-            predictions (np.array): All predictions for all experts, shape: [n_experts, n_tracks, 2]
-            masks (np.array):       Masks for each expert, shape: [n_experts, n_tracks]
+            targets (np.array):     All target values of the given dataset, shape= [n_tracks, 2]
+            predictions (np.array): All predictions for all experts, shape= [n_experts, n_tracks, 2]
+            masks (np.array):       Masks for each expert, shape= [n_experts, n_tracks]
         """
         n_experts = predictions.shape[0]
         # convert masks for numpy

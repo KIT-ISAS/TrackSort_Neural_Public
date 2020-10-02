@@ -1,3 +1,10 @@
+"""Recurrent Neural Network model.
+
+Change log (Please insert your name here if you worked on this file)
+    * Created by: Daniel Pollithy 
+    * Complete rework by: Jakob Thumm (jakob.thumm@student.kit.edu)
+    * Jakob Thumm 2.10.2020:    Completed documentation.
+"""
 import logging
 import math
 import os
@@ -12,6 +19,7 @@ from expert import Expert, Expert_Type
 
 tf.keras.backend.set_floatx('float64')
 
+# The available recurrent model types. Just pick lstm and be happy.
 rnn_models = {
     'lstm': tf.keras.layers.LSTM,
     'rnn': tf.keras.layers.SimpleRNN,
@@ -27,29 +35,31 @@ def rnn_model_factory(
         num_time_steps=35, batch_size=128, nan_value=0, input_dim=2, output_dim=2,
         unroll=False, stateful=True):
     """
-    Create a new keras model with the sequential API
+    Create a new tf model with the sequential API
 
     Note: The number of layers is fixed, because the HParams Board can't handle lists at the moment (Nov-2019)
 
-    :param num_units_first_rnn:
-    :param num_units_second_rnn:
-    :param num_units_third_rnn:
-    :param num_units_fourth_rnn:
-    :param num_units_first_dense:
-    :param num_units_second_dense:
-    :param num_units_third_dense:
-    :param num_units_fourth_dense:
-    :param rnn_model_name:
-    :param use_batchnorm_on_dense:
-    :param num_time_steps:
-    :param batch_size:
-    :param nan_value:
-    :param input_dim:
-    :param output_dim:
-    :param unroll:
-    :param stateful: If this is False, then the state of the rnn will be reset after every batch.
-            We want to control this manually therefore the default is True.
-    :return: the model and a hash string identifying the architecture uniquely
+    Args:
+        num_units_first_rnn (int):          Number of rnn nodes in first layer
+        num_units_second_rnn (int):         Number of rnn nodes in second layer  
+        num_units_third_rnn (int):          Number of rnn nodes in third layer
+        num_units_fourth_rnn (int):         Number of rnn nodes in fourth layer
+        num_units_first_dense (int):        Number of dense nodes in first layer
+        num_units_second_dense (int):       Number of dense nodes in second layer
+        num_units_third_dense (int):        Number of dense nodes in third layer
+        num_units_fourth_dense (int):       Number of dense nodes in fourth layer
+        rnn_model_name (string):            Model name
+        use_batchnorm_on_dense (Boolean):   Use batch normalization on dense layers
+        num_time_steps (int):               Number of timesteps in each track
+        batch_size (int):                   Batch size
+        nan_value:                          Value to mask out non valid measurements in track (0.0)
+        input_dim (int):                    Input dimension (Should be 2 for [x, y]-measurement)
+        output_dim (int):                   Output dimension - 2 for tracking, 4 for sep. pre. multitask, 6 for sep. pre. multitask with uncertainty 
+        unroll (Boolean):                   Use unroll for the separation prediction (Not recommended - Choose multitask)
+        stateful (Boolean):                 If this is False, then the state of the rnn will be reset after every batch.
+                                                We want to control this manually therefore the default is True.
+    Returns: 
+        the model and a hash string identifying the architecture uniquely
     """
     model = tf.keras.Sequential()
 
@@ -113,10 +123,29 @@ def train_step_separation_prediction_generator(model, optimizer, is_uncertainty_
         model (tf.keras.Model):         The trainable tensorflow model
         optimizer (tf.keras.Optimizer): The optimizer (e.g. ADAM) 
         nan_value (any):                The padding value
-    """
 
+    Returns:
+        The train step function for separation prediction
+    """
     @tf.function
     def train_step(inp, target, tracking_mask, separation_mask, train = True):
+        """The train step function for the separation prediction.
+
+        Args:
+            inp (tf.Tensor):                Input [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor):             Target [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape = [n_tracks, track_length, 5]
+            tracking_mask (tf.Tensor):      Indicates valid tracking indices with a 1, else 0, shape = [n_tracks, track_length]
+            separation_mask (tf.Tensor):    One entry per track is 1 - the point where the separation prediction should be, shape = [n_tracks, track_length]
+            train (Boolean):                Training activated?
+        
+        Returns:
+            predictions (tf.Tensor):    Tracking and separation predictions (with uncertainty), shape = [n_tracks, track_length, 4/(6)]
+                                            [x, y, y_nozzle, dt_nozzle, (log(var_y), log(var_dt))]
+            spatial_loss (tf.Tensor):   Spatial MSE loss
+            temporal_loss (tf.Tensor):  Temporal MSE loss
+            spatial_mae (tf.Tensor):    Spatial MAE loss
+            temporal_mae (tf.Tensor):   Temporal MAE loss
+        """
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
             predictions = model(inp, training=train)
@@ -136,6 +165,8 @@ def train_step_separation_prediction_generator(model, optimizer, is_uncertainty_
 
 def create_separation_masks(inp, mask_value=0, only_last_timestep_additional_loss=True):
     """Create two Keras masks for the separation prediction training.
+
+    NOT IN USE ANYMORE
 
     The first mask is for the tracking and has the shape [batch_size, track_length]. 
         Example track mask: [1, 1, 1, 1, 1, 0, 0, 0]
@@ -166,10 +197,10 @@ def get_tracking_loss(prediction, target, tracking_mask):
     tracking_loss = MSE([x,y] prediction<->target)
 
     Args:
-        prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
-        tracking_mask from create_separation_masks(...)
-
+        prediction (tf.Tensor):         Predicted values [x, y, ...], shape = [batch_size, track_length, 2+]
+        target (tf.Tensor):             Target values [x, y, ...], shape = [batch_size, track_length, 2+]
+        tracking_mask (tf.Tensor):      Indicates valid tracking indices with a 1, else 0, shape = [n_tracks, track_length]
+            
     Returns:
         The tracking loss
     """
@@ -186,9 +217,9 @@ def get_separation_loss(prediction, target, separation_mask):
     spatial_loss = MSE([dt_nozzle] prediction<->target)
 
     Args:
-        prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
-        separation_mask from create_separation_masks(...)
+        prediction (tf.Tensor):         Predicted values [x, y, y_nozzle, dt_nozzle], shape = [batch_size, track_length, 4]
+        target (tf.Tensor):             Target values [x, y, y_nozzle, dt_nozzle, ...], shape = [batch_size, track_length, 4+]
+        separation_mask (tf.Tensor):    One entry per track is 1 - the point where the separation prediction should be, shape = [n_tracks, track_length]
 
     Returns:
         spatial_loss, temporal_loss
@@ -204,14 +235,13 @@ def get_separation_loss(prediction, target, separation_mask):
 def get_separation_loss_uncertainty(prediction, target, separation_mask):
     """Calculate the spatial and temporal loss in the separation prediction training.
 
-    temporal_loss = MSE([y_nozzle] prediction<->target)
-    spatial_loss = MSE([dt_nozzle] prediction<->target)
+    Uses the negative log-likelihood loss as described in Jakob Thumms fantastic master's thesis.
 
     Args:
-        prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle, s_y, s_t], shape: [batch_size, track_length, 6]
-                                s_y = log(sigma_y^2)
-        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
-        separation_mask from create_separation_masks(...), shape: [batch_size, track_length]
+        prediction (tf.Tensor):         Predicted values [x, y, y_nozzle, dt_nozzle, s_y, s_t], shape = [batch_size, track_length, 6]
+                                            s_y = log(sigma_y^2)
+        target (tf.Tensor):             Target values [x, y, y_nozzle, dt_nozzle, ...], shape = [batch_size, track_length, 4+]
+        separation_mask (tf.Tensor):    One entry per track is 1 - the point where the separation prediction should be, shape = [n_tracks, track_length]
 
     Returns:
         spatial_loss, temporal_loss
@@ -231,9 +261,9 @@ def get_separation_mae(prediction, target, separation_mask):
     spatial_mae = MAE([dt_nozzle] prediction<->target)
 
     Args:
-        prediction (tf.Tensor): Predicted values [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-        target (tf.Tensor):     Target values [x, y, y_nozzle, dt_nozzle, y_velocity_nozzle], shape: [batch_size, track_length, 5]
-        separation_mask from create_separation_masks(...)
+        prediction (tf.Tensor):         Predicted values [x, y, y_nozzle, dt_nozzle], shape = [batch_size, track_length, 4]
+        target (tf.Tensor):             Target values [x, y, y_nozzle, dt_nozzle, ...], shape = [batch_size, track_length, 4+]
+        separation_mask (tf.Tensor):    One entry per track is 1 - the point where the separation prediction should be, shape = [n_tracks, track_length]
 
     Returns:
         spatial_mae, temporal_mae
@@ -248,35 +278,29 @@ def get_separation_mae(prediction, target, separation_mask):
 
 
 def train_step_generator(model, optimizer, loss_object, nan_value=0):
-    """Build a function which returns a computational graph for tensorflow.
+    """Generate the train step function for tracking.
 
-    This function can be called to train the given model with the given optimizer.
+    Args:
+        model (tf.keras.Model):         The trainable tensorflow model
+        optimizer (tf.keras.Optimizer): The optimizer (e.g. ADAM) 
+        loss_object (tf.keras.losses):  The loss object (e.g. tf.keras.losses.MeanSquaredError)
+        nan_value (any):                The padding value
 
-    :param model: model according to estimator api
-    :param optimizer: tf estimator
-    :param nan_value: e.g. 0
-
-    Example:
-        >>> import data_manager
-        >>> keras_model = rnn_model_factory()
-        >>> dataset_train, _ = data_manager.FakeDataSet().get_tf_data_sets_seq2seq_data()
-        >>> train_step = model.train_step_generator(model, optimizer)
-        >>>
-        >>> step, batch_size = 0, 32
-        >>> for epoch in range(100):
-        >>>     for (batch_n, (inp, target)) in enumerate(dataset_train):
-        >>>         # _ = keras_model.reset_states()
-        >>>         mse, mae = train_step(inp, target)
-        >>>         step += batch_size
-        >>>     tf.summary.scalar('loss', mse, step=step)
-
-    :return: function which can be called to train the given model with the given optimizer
+    Returns:
+        The train step function for tracking
     """
     # the placeholder character used for padding
     mask_value = K.variable(np.array([nan_value, nan_value]), dtype=tf.float64)
     
     @tf.function
     def train_step(inp, target, training=True):
+        """Train step function for tracking.
+
+        Args:
+            inp (tf.Tensor):    Input, [x, y], shape = [n_tracks, track_length, 2]
+            target (tf.Tensor): Target, [x, y], shape = [n_tracks, track_length, 2]
+            training (Boolean): Is the training activated?
+        """
         with tf.GradientTape() as tape:
             target = K.cast(target, tf.float64)
             predictions = model(inp, training=training)
@@ -298,57 +322,13 @@ def train_step_generator(model, optimizer, loss_object, nan_value=0):
 
     return train_step
 
-
-def train_epoch_generator(rnn_model, train_step, dataset_train, batch_size):
-    """
-    Build a function which returns a computational graph for tensorflow.
-    This function can be called to train the given model with the given
-    optimizer **for a number of epochs**.
-    It optimizes the training as it lets tensorflow train whole epochs
-    without coming back to the python code.
-
-    This uses the train_step. You can call the train_step function on
-    your own if you want more control.
-
-    Attention: Keyboard interrupts are not stopping the training.
-
-    Example:
-        >>> import data
-        >>> dataset_train, _ = data.FakeDataSet().get_tf_data_sets_seq2seq_data()
-        >>> train_step = rnn_model.train_step_generator(rnn_model,  tf.keras.optimizers.Adam())
-        >>> step, batch_size = 0, 32
-        >>> for epoch in range(100):
-        >>>     avg_loss, train_step_counter = train_epoch(1)
-        >>>     tf.summary.scalar('loss', avg_loss, step=train_step_counter)
-
-    :param rnn_model:
-    :param train_step:
-    :param dataset_train:
-    :param batch_size:
-    :return:
-    """
-
-    @tf.function
-    def train_epoch(n_epochs):
-        train_step_counter = tf.constant(0, dtype=tf.float64)
-        batch_counter = tf.constant(0, dtype=tf.float64)
-        sum_loss = tf.constant(0, dtype=tf.float64)
-
-        for inp, target in dataset_train.repeat(n_epochs):
-            hidden = rnn_model.reset_states()
-            loss = train_step(inp, target)
-            sum_loss += loss
-            train_step_counter += batch_size
-            batch_counter += 1
-
-        avg_loss = sum_loss / batch_counter
-
-        return avg_loss, train_step_counter
-
-    return train_epoch
-
-
 def set_state(rnn_model, batch_state):
+    """Set the state of a given RNN model manually.
+
+    Args:
+        rnn_model (tf.model):       The RNN model
+        batch_state (tf.Tensor):    A batch of states
+    """
     rnn_layer_counter = 0
     for i in range(1000):
         try:
@@ -362,8 +342,8 @@ def set_state(rnn_model, batch_state):
                     tf.convert_to_tensor(batch_state[rnn_layer_counter][sub_state_number]))
             rnn_layer_counter += 1
 
-
 def get_state(rnn_model):
+    """Get the current state of the RNN model."""
     rnn_layer_states = []
     # get all layers in ascending order
     i = -1
@@ -384,10 +364,33 @@ def get_state(rnn_model):
 
 
 class RNN_Model(Expert):
+    """RNN model for tracking and separation prediction.
+
+
+    Good model properties:
+    Activation: leaky relu
+    optimizer: ADAM
+    Basislernrate: 0.005
+    decay_steps=200,
+    decay_rate=0.96,
+    staircase=True
+    Batch size = 128
+    Epochs = 1000
+    Layers = [64, 16]
+    """
 
     __metaclass__ = Expert
 
     def __init__(self, is_next_step, name, model_path, is_uncertainty_prediction = False, rnn_config = {}):
+        """Create a RNN object.
+
+        Args:
+            is_next_step (Boolean):              True = Tracking, False = Separation Prediction
+            name (String):                       Model name
+            model_path (String):                 Path to save the model to
+            is_uncertainty_prediction (Boolean): Predict an uncertainty
+            rnn_config (dict):                   Parameters for rnn model creation
+        """
         self.model_structure = rnn_config.get("model_structure")
         self.clear_state = rnn_config.get("clear_state")
         self.base_learning_rate = rnn_config.get("base_learning_rate") if "base_learning_rate" in rnn_config else 0.005
@@ -402,11 +405,12 @@ class RNN_Model(Expert):
         super().__init__(Expert_Type.RNN, name, model_path)
 
     def get_zero_state(self, batch_size):
+        """Return default state for RNN model."""
         self.rnn_model.reset_states()
         return get_state(self.rnn_model)
 
-    # expected to return list<vector<pair<float,float>>>, list<RNNStateTuple>
     def predict(self, current_input, state):
+        """Predict a batch of inputs for MTT."""
         current_input = np.expand_dims(current_input, axis=1)
         # TEST BUGFIX
         current_input[current_input==0]=-1
@@ -471,7 +475,7 @@ class RNN_Model(Expert):
         """Train the rnn model on a batch of data.
 
         Args:
-            inp (tf.Tensor): A batch of input tracks
+            inp (tf.Tensor):    A batch of input tracks
             target (tf.Tensor): The prediction targets to the inputs
 
         Returns
@@ -485,10 +489,10 @@ class RNN_Model(Expert):
         """Train the rnn model on a batch of data.
 
         Args:
-            inp (tf.Tensor): A batch of input tracks
-            target (tf.Tensor): The prediction targets to the inputs
-            tracking_mask (tf.Tensor): Mask the valid time steps for tracking
-            separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
+            inp (tf.Tensor):                A batch of input tracks
+            target (tf.Tensor):             The prediction targets to the inputs
+            tracking_mask (tf.Tensor):      Mask the valid time steps for tracking
+            separation_mask (tf.Tensor):    Mask the valid time step(s) for the separation prediction
 
         Returns
             prediction (tf.Tensor): Predicted positions for training instances
@@ -501,10 +505,10 @@ class RNN_Model(Expert):
         """Test the rnn model on a batch of data.
 
         Args:
-            inp (tf.Tensor): A batch of input tracks
-            target (tf.Tensor): The prediction targets to the inputs
-            tracking_mask (tf.Tensor): Mask the valid time steps for tracking
-            separation_mask (tf.Tensor): Mask the valid time step(s) for the separation prediction
+            inp (tf.Tensor):                A batch of input tracks
+            target (tf.Tensor):             The prediction targets to the inputs
+            tracking_mask (tf.Tensor):      Mask the valid time steps for tracking
+            separation_mask (tf.Tensor):    Mask the valid time step(s) for the separation prediction
 
         Returns
             prediction (tf.Tensor): Predicted positions for training instances
@@ -521,7 +525,7 @@ class RNN_Model(Expert):
 
         Args:
             separation_mask (np.array): Indicates where the separation prediction entries are (end_track)
-            prediction (np.array): shape = n_tracks, n_timesteps, 6
+            prediction (np.array):      Predictions with uncertainty, shape = [n_tracks, n_timesteps, 6]
                 Tracking entries:
                     prediction[i, 0:end_track, 0:2] = [x_pred, y_pred]
                 Separation prediction entries:
@@ -531,7 +535,7 @@ class RNN_Model(Expert):
                     prediction[i, end_track, 5] = log(var_t)       (Predicted variance of temporal prediction)
 
         Returns:
-            prediction (np.array)
+            prediction (np.array):  Corrected Predictions, shape = [n_tracks, n_timesteps, 6]
         """
         for track in range(prediction.shape[0]):
             sep_pos = np.where(separation_mask[track] == 1)
@@ -561,6 +565,8 @@ class RNN_Model(Expert):
     def change_learning_rate(self, lr_change=1):
         """Change the learning rate of the model optimizer.
 
+        NOT IN USE ANYMORE -- USE lr shedule instead.
+
         This can be used to lower the learning rate after n time steps to increase the accuracy.
         The change is implemented multiplicative. Set lr_change > 1 to increase and < 1 to decrease the lr.
 
@@ -576,10 +582,10 @@ class RNN_Model(Expert):
         """Calculate spatial and temporal errors.
 
         Args:
-            seq2seq_target (tf.Tensor): Target      [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-            prediction:                 Prediction  [x, y, y_nozzle, dt_nozzle], shape: [batch_size, track_length, 4]
-            tracking_mask (tf.Tensor):  Mask for all valid tracking indices
-            separation_mask (tf.Tensor):Mask for the indice(s) that are used to validate the separation prediction
+            seq2seq_target (tf.Tensor):     Target      [x, y, y_nozzle, dt_nozzle], shape = [batch_size, track_length, 4]
+            prediction:                     Prediction  [x, y, y_nozzle, dt_nozzle], shape = [batch_size, track_length, 4]
+            tracking_mask (tf.Tensor):      Mask for all valid tracking indices
+            separation_mask (tf.Tensor):    Mask for the indice(s) that are used to validate the separation prediction
 
         Returns:
             spatial_loss, temporal_loss, spatial_mae, temporal_mae
@@ -591,266 +597,3 @@ class RNN_Model(Expert):
         t_3 = time.time()
         print("Time for loss calculation = {} s; Time for mae calculation = {} s".format(t_2-t_1, t_3-t_2))
         return spatial_loss, temporal_loss, spatial_mae, temporal_mae
-        
-
-    ########## OLD FUNCTIONS
-    def train_separation_prediction(self):
-        dataset_train, dataset_test, num_time_steps = self.data_source.get_tf_data_sets_seq2seq_with_separation_data(
-            normalized=True,
-            time_normalization=self.global_config['time_normalization_constant'],
-            virtual_belt_edge_x_position=self.global_config['virtual_belt_edge_x_position'],
-            virtual_nozzle_array_x_position=self.global_config['virtual_nozzle_array_x_position']
-        )
-
-        self.rnn_model, self.model_hash = rnn_model_factory(batch_size=self.global_config['batch_size'],
-                                                            num_time_steps=num_time_steps,
-                                                            output_dim=self._label_dim,
-                                                            **self.global_config['rnn_model_factory'])
-        logging.info(self.rnn_model.summary())
-
-        optimizer = tf.keras.optimizers.Adam()
-        train_step_fn = train_step_separation_prediction_generator(self.rnn_model, optimizer,
-                                                                   batch_size=self.global_config['batch_size'],
-                                                                   num_time_steps=num_time_steps,
-                                                                   time_normalization=self.global_config[
-                                                                       'time_normalization_constant'],
-                                                                   only_last_timestep_additional_loss=
-                                                                   self.global_config[
-                                                                       'only_last_timestep_additional_loss'],
-                                                                   apply_gradients=True
-                                                                   )
-
-        test_step_fn = train_step_separation_prediction_generator(self.rnn_model, optimizer,
-                                                                  batch_size=self.global_config['batch_size'],
-                                                                  num_time_steps=num_time_steps,
-                                                                  time_normalization=self.global_config[
-                                                                      'time_normalization_constant'],
-                                                                  only_last_timestep_additional_loss=
-                                                                  self.global_config[
-                                                                      'only_last_timestep_additional_loss'],
-                                                                  apply_gradients=False
-                                                                  )
-
-        # dict(epoch->float)
-        train_losses = []
-        test_losses = []
-
-        # Train model
-        epoch = 0
-        for epoch in range(self.global_config['num_train_epochs']):
-            # learning rate decay after 100 epochs
-            if (epoch + 1) % self.global_config['lr_decay_after_epochs'] == 0:
-                old_lr = K.get_value(optimizer.lr)
-                new_lr = old_lr * self.global_config['lr_decay_factor']
-                logging.info("Reducing learning rate from {} to {}.".format(old_lr, new_lr))
-                K.set_value(optimizer.lr, new_lr)
-
-            # Train for one batch
-            errors_in_one_batch = []
-
-            _ = self.rnn_model.reset_states()
-            for (batch_n, (inp, target)) in enumerate(dataset_train):
-                # Mini-Batches
-                if self.clear_state:
-                    self.rnn_model.reset_states()
-                errors = train_step_fn(inp, target)
-                errors_in_one_batch.append(errors)
-
-            error_list = np.mean(errors_in_one_batch, axis=0).tolist()
-            train_losses.append([epoch] + error_list)
-
-            log_string = "{}/{}: \t MSE={}".format(epoch, self.global_config['num_train_epochs'], error_list[0])
-
-            # Evaluate
-            if (epoch + 1) % self.global_config['evaluate_every_n_epochs'] == 0 \
-                    or (epoch + 1) == self.global_config['num_train_epochs']:
-                logging.info(log_string)
-
-                errors_in_one_batch = []
-
-                _ = self.rnn_model.reset_states()
-                for (batch_n, (inp, target)) in enumerate(dataset_test):
-                    # Mini-Batches
-                    if self.clear_state:
-                        self.rnn_model.reset_states()
-                    errors = test_step_fn(inp, target)
-                    errors_in_one_batch.append(errors)
-
-                error_list = np.mean(errors_in_one_batch, axis=0).tolist()
-                test_losses.append([epoch] + error_list)
-            else:
-                logging.debug(log_string)
-
-        self._evaluate_separation_model(dataset_test, epoch)
-
-        # Store meta info
-        self.rnn_model.save(os.path.join(self.global_config['diagrams_path'], 'model.h5'))
-
-        # Visualize loss curve
-        # columns: epoch, mse, mae, pred_mse, pred_mae, spatial_mse, spatial_mae, temporal_mse, temporal_mae
-        train_losses = np.array(train_losses)
-        test_losses = np.array(test_losses)
-
-        # MSEs
-        plt.plot(train_losses[:, 0], train_losses[:, 1], c='navy', label="Training MSE")
-        plt.plot(train_losses[:, 0], train_losses[:, 3], c='blue', label="Training MSE (prediction)")
-        plt.plot(train_losses[:, 0], train_losses[:, 5], c='cornflowerblue', label="Training MSE (sep. spatial)")
-        plt.plot(train_losses[:, 0], train_losses[:, 7], c='deepskyblue', label="Training MSE (sep. temporal)")
-
-        plt.plot(test_losses[:, 0], test_losses[:, 1], c='maroon', label="Test MSE")
-        plt.plot(test_losses[:, 0], test_losses[:, 3], c='red', label="Test MSE (prediction)")
-        plt.plot(test_losses[:, 0], test_losses[:, 5], c='tomato', label="Test MSE (sep. spatial)")
-        plt.plot(test_losses[:, 0], test_losses[:, 7], c='orange', label="Test MSE (sep. temporal)")
-        plt.legend(loc="upper right")
-        plt.yscale('log')
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MSE.png'))
-        plt.clf()
-
-        # MAEs
-        plt.plot(train_losses[:, 0], train_losses[:, 2], c='blue', label="Training MAE")
-        plt.plot(test_losses[:, 0], test_losses[:, 2], c='red', label="Test MAE")
-        plt.legend(loc="upper right")
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], 'MAE.png'))
-        plt.clf()
-
-    def _evaluate_model(self, dataset_test, epoch):
-        """Plot boxplot of MSE and MAE.
-
-        TODO: Move evaluation functions into seperate class.
-                This function should only return the predictions.
-        """
-        mses = np.array([])
-        maes = np.array([])
-
-        mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
-        normalization_factor = self.data_source.normalization_constant
-
-        _ = self.rnn_model.reset_states()
-        for input_batch, target_batch in dataset_test:
-            if selfclear_state:
-                self.rnn_model.reset_states()
-
-            batch_predictions = self.rnn_model(input_batch)
-
-            # Calculate the mask
-            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
-            mask = 1 - K.cast(mask, tf.float64)
-            mask = K.cast(mask, tf.float64)
-
-            target_batch_unnormalized = target_batch
-            pred_batch_unnormalized = batch_predictions
-
-            batch_loss = tf.keras.losses.mean_squared_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
-            num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
-            batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
-
-            batch_mae = tf.keras.losses.mean_absolute_error(target_batch_unnormalized, pred_batch_unnormalized) * mask
-            batch_mae_per_track = tf.reduce_sum(batch_mae, axis=-1) / num_time_steps_per_track
-
-            mses = np.concatenate((mses, batch_loss_per_track.numpy().reshape([-1])))
-            maes = np.concatenate((maes, batch_mae_per_track.numpy().reshape([-1])))
-
-        test_mae = np.mean(maes)
-        test_mse = np.mean(mses)
-
-        logging.info("Evaluate: MSE={}".format(test_mse))
-        logging.info("Evaluate: MAE={}".format(test_mae))
-
-        plt.rc('grid', linestyle=":")
-        fig1, ax1 = plt.subplots()
-        ax1.yaxis.grid(True)
-        ax1.set_ylim([0, 4.0])
-
-        name = '{:05d}epoch-NextStep-RNN ({})'.format(epoch, self.model_hash)
-        ax1.set_title(name)
-        prop = dict(linewidth=2.5)
-        ax1.boxplot(maes * self.data_source.normalization_constant, showfliers=False, boxprops=prop, whiskerprops=prop,
-                    medianprops=prop, capprops=prop)
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], name + '.png'))
-        plt.clf()
-
-        return test_mse, test_mae
-
-    def _evaluate_separation_model(self, dataset_test, epoch):
-        prediction_maes = np.array([])
-        spatial_errors = np.array([])
-        time_errors = np.array([])
-
-        mask_value = K.variable(np.array([self.data_source.nan_value, self.data_source.nan_value]), dtype=tf.float64)
-        normalization_factor = self.global_config['CsvDataSet']['normalization_constant']
-        time_normalization_constant = self.global_config['time_normalization_constant']
-
-        hidden = self.rnn_model.reset_states()
-        for input_batch, target_batch in dataset_test:
-            if self.clear_state:
-                self.rnn_model.reset_states()
-
-            batch_predictions = self.rnn_model(input_batch)
-            batch_predictions_np = batch_predictions.numpy()
-
-            # Calculate the mask
-            mask = K.all(K.equal(input_batch, mask_value), axis=-1)
-            mask = 1 - K.cast(mask, tf.float64)
-            mask = K.cast(mask, tf.float64)
-
-            batch_loss = tf.keras.losses.mean_absolute_error(target_batch[:, :, :2], batch_predictions[:, :, :2]) * mask * normalization_factor
-            num_time_steps_per_track = tf.reduce_sum(mask, axis=-1)
-            batch_loss_per_track = tf.reduce_sum(batch_loss, axis=-1) / num_time_steps_per_track
-
-            # Spatial and temporal error
-
-            # taken from the last timestep (this is correct due to masking which copies
-            #   the last values until the end)
-            spatial_diff = (batch_predictions[:, -1, 2:3] - target_batch[:, -1, 2:3]).numpy().flatten() * normalization_factor
-
-            # temporal diff:
-            #   example: label=17.3
-            #    -> get prediction of timestep 17 -> could be 0.9
-            #    => 0.9 - (17.3 - 17)
-            temporal_diff = []
-            for track_i in range(target_batch.shape[0]):
-                track_input = input_batch[track_i]
-                last_time_step = self.data_source.get_last_timestep_of_track(track_input) - 1
-                target_sep_time = target_batch[track_i, 0, 3] - last_time_step / self.global_config[
-                    'time_normalization_constant']
-                pred_sep_time = batch_predictions[track_i, -1, 3]
-                time_error = self.global_config['time_normalization_constant'] * (pred_sep_time - target_sep_time)
-                temporal_diff.append(time_error)
-            temporal_diff = np.array(temporal_diff)
-
-            spatial_errors = np.concatenate((spatial_errors, spatial_diff))
-            time_errors = np.concatenate((time_errors, temporal_diff))
-            prediction_maes = np.concatenate((prediction_maes, batch_loss_per_track.numpy().reshape([-1])))
-
-        test_pred_loss = np.mean(prediction_maes)
-        test_spatial_loss = np.mean(spatial_errors)
-        test_time_loss = np.mean(time_errors)
-        test_loss = test_pred_loss + test_time_loss + test_spatial_loss
-
-        logging.info("Evaluate: Mean Next Step Error = {}".format(test_pred_loss))
-        logging.info("Evaluate: Mean Sep Spatial Error = {}".format(test_spatial_loss))
-        logging.info("Evaluate: Mean Sep Time Error = {}".format(test_time_loss))
-        logging.info("Evaluate: Sum of Error = {}".format(test_loss))
-
-        #  [0, 4.0]
-        self._box_plot(prediction_maes, None, 'Next-Step', epoch, 'MAE')
-        # [-59, 59]
-        self._box_plot(spatial_errors, None, 'Separation-Spatial', epoch, 'Spatial error')
-        self._box_plot(100 * time_errors, None, 'Separation-Temporal', epoch, 'Temporal error [1/100 Frames]')
-
-        return test_loss, test_pred_loss, test_spatial_loss, test_time_loss
-
-    def _box_plot(self, errors, y_lim, name, epoch, ylabel):
-        plt.rc('grid', linestyle=":")
-        fig1, ax1 = plt.subplots()
-        ax1.yaxis.grid(True)
-        if y_lim is not None:
-            ax1.set_ylim(y_lim)
-
-        file_name = '{:05d}epoch-{} ({})'.format(epoch, name, self.model_hash)
-        ax1.set_title(name)
-        plt.ylabel(ylabel)
-        prop = dict(linewidth=2.5)
-        ax1.boxplot(errors, showfliers=False, boxprops=prop, whiskerprops=prop, medianprops=prop, capprops=prop)
-        plt.savefig(os.path.join(self.global_config['diagrams_path'], file_name + '.png'))
-        plt.clf()
