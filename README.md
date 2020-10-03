@@ -1,19 +1,54 @@
-# NextStep-RNN
+# TrackSort Neural
+Implementation of multitarget tracking and separation prediction for optical belt sorters.
+**Key features:**
+* Multiple experts for tracking and separation prediction
+  * Kalman filters (KF) - constant velocity (CV) and constant acceleration (CA)
+  * Multilayer Perceptrons (MLP)
+  * Long-short term memory networks (LSTM)
+* Expert combination methods to combine the predictions of multiple experts
+  * Simple ensemble
+  * Covariance weighting
+  * SMAPE weighting
+  * **Mixture of experts (ME)**
+* Uncertainty prediction of the separation predictions
+* Uncertainty evaluation and calibration with **new SENCE method**
+* Large variety of evaluation functions for tracking and separation prediction
 
-**Content:**
+**Outline:**
+* [Motivation](#motivation)
+* [Code Structure](#code-structure)
+* [Installation](#installation)
+* [Common Run Commands](#common-run-commands)
+* [Config files](#config-files)
+* [Contribute](#contribute)
+* [Credits](#credits)
 
-- Using a RNN to predict next measurement of tracks
-- Using a RNN to make separation predictions
-- Python implementation of data assocation (local and global nearest neighbour)
+## Motivation
+This framework allows us to test and compare a vast variety of experts for the tasks of tracking and separation prediction in optical belt sorters.
+The code includes every step from the data pipeline to the training and testing of the experts.
+With this code we are able to train a state of the art ME approach that is able to outperform single experts in every sorting scenario and improves the sorting accuracy in dynamic scenarios significantly.
+The implemented uncertainty prediction for the separation prediction not only improves the accuracy of the neural networks but is also a potential key input for a dynamic nozzle control.
 
-## Run with CPU
+## Code Structure
+The idea of the expert combination in tracking can be explained with the following figure.
+![ME structure](/images/ME_Structure_Tracking.png)
+For every new measurement of a particle, the experts, here one KF, one LSTM, and one MLP, predict the next particle position.
+The gating network then assigns weights to each expert prediction. The combined expert prediction is the weighted sum of expert predictions.
+The combined prediction is used in the data association to match a prediction to a new measurement and the cycle restarts.
+
+An example workflow with the most important classes and functions is displayed in the following figure.
+![Sequence diagramm](/images/sequence_diagramm.svg)
+
+## Installation
+
+### Run with CPU
 
 1. `. setup.sh` (creates a virtualenv and sources it -> `.` in the beginning is necessary)
 2. `python main.py`
 
 You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing `python main.py --help`
 
-## Run with GPU (Docker)
+### Run with GPU (Docker)
 
 1. Pull docker image `docker pull tensorflow/tensorflow:2.1.0-gpu-py3`
 2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
