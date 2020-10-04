@@ -54,7 +54,7 @@ then
       sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/data_thumm_ss_20.zip" tmp_download_dir/
 
       # Unzip the data
-      unzip -r tmp_download_dir/data_thumm_ss_20.zip -d ./
+      unzip tmp_download_dir/data_thumm_ss_20.zip -d ./
 
   fi
   # remove tmp data
