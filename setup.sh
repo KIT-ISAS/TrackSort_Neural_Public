@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#apt install wget python3-pip virtualenv openssh-server  # openssh-server for sftp
+apt install wget python3-pip virtualenv openssh-server  # openssh-server for sftp
 
 
 
@@ -8,26 +8,26 @@
 # Setup virtualenv and install requirements
 # ------------------------------------------
 
-#read -p "GPU support? (y/n) " -n 1 -r
-#echo
-#if [[ $REPLY =~ ^[Yy]$ ]]
-#then
+read -p "GPU support? (y/n) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
   # GPU
-#  if [ ! -f "gpu_env" ]
-#  then
-#    virtualenv -p python3 "gpu_env"
-#  fi
-#  . gpu_env/bin/activate
-#  pip install -r "requirements_gpu.txt"
-#else
+  if [ ! -f "gpu_env" ]
+  then
+    virtualenv -p python3 "gpu_env"
+  fi
+  . gpu_env/bin/activate
+  pip install -r "requirements_gpu.txt"
+else
   # CPU
-#  if [ ! -f "cpu_env" ]
-#  then
-#    virtualenv -p python3 "cpu_env"
-#  fi
-#  . cpu_env/bin/activate
-#  pip install -r "requirements_cpu.txt"
-#fi
+  if [ ! -f "cpu_env" ]
+  then
+    virtualenv -p python3 "cpu_env"
+  fi
+  . cpu_env/bin/activate
+  pip install -r "requirements_cpu.txt"
+fi
 
 # ------------------------------------------
 # Download data
@@ -50,22 +50,12 @@ then
 
       # Download bundle
       mkdir tmp_download_dir
-      sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/proprak_ws1920.zip" tmp_download_dir/
-      sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/DEM-Simulation/csv_converted/camera_FOV/*" ./data/DEM_Data/csv_converted/
+      sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/data_thumm_ss_20.zip.zip" tmp_download_dir/
 
-  else
-      # pollithy.com
-      wget -P "./tmp_download_dir/" -N "pollithy.com/proprak_ws1920.zip"
+      # Unzip the data
+      unzip -r tmp_download_dir/data_thumm_ss_20.zip -d ./
+
   fi
-
-  # Unzip and move the resources
-  unzip tmp_download_dir/proprak_ws1920.zip -d tmp_download_dir/
-  mv tmp_download_dir/proprak_ws1920/models/* ./models
-  mv tmp_download_dir/proprak_ws1920/CsvDataSets/* ./data
-
-  # Unzip the datasets
-  ( cd data && unzip -n \*.zip )
-
   # remove tmp data
   rm -r tmp_download_dir
 fi
