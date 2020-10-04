@@ -1,32 +1,33 @@
 #!/bin/bash
-
-apt install wget python3-pip virtualenv openssh-server  # openssh-server for sftp
-
-
-
 # ------------------------------------------
 # Setup virtualenv and install requirements
 # ------------------------------------------
-
-read -p "GPU support? (y/n) " -n 1 -r
+read -p "Install virtualenv? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
-  # GPU
-  if [ ! -f "gpu_env" ]
+  apt install wget python3-pip virtualenv openssh-server  # openssh-server for sftp
+
+  read -p "GPU support? (y/n) " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]
   then
-    virtualenv -p python3 "gpu_env"
+    # GPU
+    if [ ! -f "gpu_env" ]
+    then
+      virtualenv -p python3 "gpu_env"
+    fi
+    . gpu_env/bin/activate
+    pip install -r "requirements_gpu.txt"
+  else
+    # CPU
+    if [ ! -f "cpu_env" ]
+    then
+      virtualenv -p python3 "cpu_env"
+    fi
+    . cpu_env/bin/activate
+    pip install -r "requirements_cpu.txt"
   fi
-  . gpu_env/bin/activate
-  pip install -r "requirements_gpu.txt"
-else
-  # CPU
-  if [ ! -f "cpu_env" ]
-  then
-    virtualenv -p python3 "cpu_env"
-  fi
-  . cpu_env/bin/activate
-  pip install -r "requirements_cpu.txt"
 fi
 
 # ------------------------------------------
@@ -50,7 +51,7 @@ then
 
       # Download bundle
       mkdir tmp_download_dir
-      sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/data_thumm_ss_20.zip.zip" tmp_download_dir/
+      sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/data_thumm_ss_20.zip" tmp_download_dir/
 
       # Unzip the data
       unzip -r tmp_download_dir/data_thumm_ss_20.zip -d ./
