@@ -1,6 +1,6 @@
 #!/bin/bash
 
-apt install wget python3-pip virtualenv openssh-server  # openssh-server for sftp
+#apt install wget python3-pip virtualenv openssh-server  # openssh-server for sftp
 
 
 
@@ -8,26 +8,26 @@ apt install wget python3-pip virtualenv openssh-server  # openssh-server for sft
 # Setup virtualenv and install requirements
 # ------------------------------------------
 
-read -p "GPU support? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]
-then
+#read -p "GPU support? (y/n) " -n 1 -r
+#echo
+#if [[ $REPLY =~ ^[Yy]$ ]]
+#then
   # GPU
-  if [ ! -f "gpu_env" ]
-  then
-    virtualenv -p python3 "gpu_env"
-  fi
-  . gpu_env/bin/activate
-  pip install -r "requirements_gpu.txt"
-else
+#  if [ ! -f "gpu_env" ]
+#  then
+#    virtualenv -p python3 "gpu_env"
+#  fi
+#  . gpu_env/bin/activate
+#  pip install -r "requirements_gpu.txt"
+#else
   # CPU
-  if [ ! -f "cpu_env" ]
-  then
-    virtualenv -p python3 "cpu_env"
-  fi
-  . cpu_env/bin/activate
-  pip install -r "requirements_cpu.txt"
-fi
+#  if [ ! -f "cpu_env" ]
+#  then
+#    virtualenv -p python3 "cpu_env"
+#  fi
+#  . cpu_env/bin/activate
+#  pip install -r "requirements_cpu.txt"
+#fi
 
 # ------------------------------------------
 # Download data
@@ -51,6 +51,8 @@ then
       # Download bundle
       mkdir tmp_download_dir
       sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/proprak_ws1920.zip" tmp_download_dir/
+      sftp "${username}@i81server.iar.kit.edu:/mnt/data/user/home/inside-schuettgut/Datensaetze/DEM-Simulation/csv_converted/camera_FOV/*" ./data/DEM_Data/csv_converted/
+
   else
       # pollithy.com
       wget -P "./tmp_download_dir/" -N "pollithy.com/proprak_ws1920.zip"
