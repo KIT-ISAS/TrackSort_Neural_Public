@@ -21,7 +21,6 @@ from data_manager import FakeDataSet, CsvDataSet
 from evaluation_functions import calculate_error_first_and_second_kind
 from kalman_playground import kalman_playground
 from velocity_plot import velocity_plot
-from sep_mlp_tests import *
 # Test
 from cv_model import *
 from ca_model import *
@@ -43,24 +42,18 @@ def str2bool(v):
 
 
 # the possible arguments you can give to the model
+parser.add_argument('--config_path', default="configs/default_config.json",
+                    help='Path to config file including information about experts, gating network and weighting function.')
 parser.add_argument('--is_loaded', type=str2bool, default=True,
                     help='Whether the models should be loaded or trained.')
 parser.add_argument('--is_loaded_gating_network', type=str2bool, default=True,
                     help='Whether the gating network should be loaded or trained.')
-parser.add_argument('--model_path', default='models/rnn_model_fake_data.h5',
-                    help='The path where the model is stored or loaded from.')
-parser.add_argument('--matching_algorithm', default='global', choices=['local', 'global'],
-                    help='The algorithm, that is used for matching.')
 parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv',
                     help='The directory of the data set. Only needed for CsvDataset.')
 parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDataset', 'CsvDataset'],
                     help='The type of the dataset.')
 parser.add_argument('--result_path', default='results/default_results/',
                     help='The path where the model is stored or loaded from.')
-parser.add_argument('--distance_threshold', type=float, default=0.02,
-                    help='The threshold used for the matching with the artificial measurements and predictions')
-parser.add_argument('--config_path', default="configs/default_config.json",
-                    help='Path to config file including information about experts, gating network and weighting function.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--evaluation_ratio', type=float, default=0.15, help='The ratio of data used for evaluation.')
 parser.add_argument('--test_ratio', type=float, default=0.15, help='The ratio of data used for the final unbiased test.')
@@ -70,6 +63,10 @@ parser.add_argument('--num_train_epochs', type=int, default=1000, help='Only nec
 parser.add_argument('--improvement_break_condition', type=float, default=-100, 
                     help='Break training if test loss on every expert does not improve by more than this value.')
 parser.add_argument('--nan_value', type=float, default=0.0, help='The Nan value, that is used by the DataManager')
+parser.add_argument('--matching_algorithm', default='global', choices=['local', 'global'],
+                    help='The algorithm, that is used for matching.')
+parser.add_argument('--distance_threshold', type=float, default=0.02,
+                    help='The threshold used for the matching with the artificial measurements and predictions')
 parser.add_argument('--birth_rate_mean', type=float, default=5.0,
                     help='The birth_rate_mean value, that is used by the DataManager')
 parser.add_argument('--birth_rate_std', type=float, default=2.0,
@@ -135,7 +132,6 @@ global_config = {
 
     'is_loaded': args.is_loaded,
     'is_loaded_gating_network': args.is_loaded_gating_network,
-    'model_path': args.model_path,
     'result_path': args.result_path,
     'distance_threshold': args.distance_threshold,
     'config_path': args.config_path,
