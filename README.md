@@ -36,26 +36,41 @@ For every new measurement of a particle, the experts, here one KF, one LSTM, and
 The gating network then assigns weights to each expert prediction. The combined expert prediction is the weighted sum of expert predictions.
 The combined prediction is used in the data association to match a prediction to a new measurement and the cycle restarts.
 
-An example workflow with the most important classes and functions is displayed in the following figure.
+An example work flow with the most important classes and functions is displayed in the following figure. The sequence diagram shows the process of training multiple experts in parallel and afterwards training a gating network using the predictions of the trained experts. (Note: Often, it is not recommended to train experts in parallel because they then use the same number of training epochs. It is more reliable to train each expert separately and then load them in.)
 ![Sequence diagramm](/images/sequence_diagramm.svg)
+The model manager has an expert manager object and a gating network object. The expert manager manages all experts for training and testing. The gating network assigns weights to the experts. The model manager is responsible for the interaction between the experts and the gating network. All training and testing calls start from the model manager and are then sent to either the expert manager or gating network.
 
 ## Installation
 
+### Setup Git Repo
+1. `git clone https://github.com/KIT-ISAS/TrackSort_Neural.git` to clone this repo to the folder of your choice.
+2. `cd TrackSort_Neural` to work in the newly cloned project.
+2. `git checkout jakob_master` to checkout this branch.
+3. `. setup.sh` to automatically install virtualenv and download the data and models from the ISAS server 
+    --> Access needed! Please contact marcel.reith-braun@kit.edu for external access.
+    `Install virtualenv? (y/n)`, this is not necessarily needed if you are planning to work with GPU docker.
+    `Do you want to download the data from ISAS i81server? (y/n)` --> `y`
+    Enter username and password for the ISAS server access.
+    Now the files will be downloaded and unziped.
+    
 ### Run with CPU
+`python main.py` should work when you select `y` at the question `Install virtualenv? (y/n)` in `setup.sh`.
 
-1. `. setup.sh` (creates a virtualenv and sources it -> `.` in the beginning is necessary)
-2. `python main.py`
+### Run with GPU and Docker (recommended)
+1. `docker build -t py3-tensorflow/jakob-thumm:v1 . ` builds the docker image
+2. `docker run --gpus '"device=0"' -it -v "/home/thumm/masterthesis/code/TrackSort_Neural:/home/TrackSort_Neural" py3-tensorflow/jakob-thumm:v1` build a interactive container
+3. `cd home/TrackSort_Neural/` cd into the working folder in the running container
+4. `python main.py` to run the programm
 
-You can find the visualizations (step wise and as video) in the visualizations folder and you can set the hyperparams as described when typing `python main.py --help`
-
-### Run with GPU (Docker)
-
-1. Pull docker image `docker pull tensorflow/tensorflow:2.1.0-gpu-py3`
-2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
-3. Run docker with mounted dir: `docker run -it -v $PWD:/tf -w /tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3`
-4. Inside the container: `cd next_step_rnn`
-5. Inside: `. setup.sh`
-6. Inside: `python main.py ...`
+### Run Time-Intensive Training Scripts on the GPU-Server
+1. `ssh [username]@i81-gpu-server.iar.kit.edu` replace `[username]` with your username.
+2. setup the git repo as described in [Setup Git Repo](#setup-git-repo)
+3. `docker build -t py3-tensorflow/jakob-thumm:v1 . ` builds the docker image
+3. `tmux` to start a tmux session (Does not quit when closing the terminal if properly detached.)
+4. `docker run --gpus '"device=0"' -d -v "/home/TrackSort_Neural:/home/TrackSort_Neural" py3-tensorflow/jakob-thumm:v1` to start a docker container in detached state. Change `"/home/TrackSort_Neural:` to whereever you put your project folder on the server.
+5. `docker container ls` to show the currently running docker containers --> Copy the id of `py3-tensorflow/jakob-thumm:v1`
+6. `docker exec -d [docker_id] /bin/sh -c "cd home/TrackSort_Neural/scripts; ./run_train_tracking_DEM_cylinder.sh"` to run a bash script in the container. Replace `[docker_id]` with the copied docker id.
+7. `tmux detach` detach the tmux session. Now you can close the terminal and let the GPU server do its magic.
 
 ## `python main.py`
 
