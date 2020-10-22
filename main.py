@@ -53,7 +53,7 @@ parser.add_argument('--dataset_dir', default='data/Pfeffer/trackSortResultPfeffe
 parser.add_argument('--dataset_type', default='CsvDataset', choices=['FakeDataset', 'CsvDataset'],
                     help='The type of the dataset.')
 parser.add_argument('--result_path', default='results/default_results/',
-                    help='The path where the model is stored or loaded from.')
+                    help='The path where the results are stored.')
 parser.add_argument('--batch_size', type=int, default=64, help='The batchsize, that is used for training and inference')
 parser.add_argument('--evaluation_ratio', type=float, default=0.15, help='The ratio of data used for evaluation.')
 parser.add_argument('--test_ratio', type=float, default=0.15, help='The ratio of data used for the final unbiased test.')
@@ -95,7 +95,7 @@ parser.add_argument('--uncertainty_prediction', type=str2bool, default=False,
                     help='Perform uncertainty predcition')
 parser.add_argument('--verbosity', default='INFO', choices=logging._nameToLevel.keys())
 parser.add_argument('--logfile', default='', help='Path to logfile. Leave this out to only log to console.')
-parser.add_argument('--additive_noise_stddev', type=float, default=0.0)
+parser.add_argument('--additive_noise_stddev', type=float, default=0.0, help='Standard deviation of additional Gaussian white noise. This can be used to add noise to the otherwise perfect simulation data.')
 
 parser.add_argument('--virtual_belt_edge_x_position', type=float, default=800,
                     help='Where does the virtual belt end?')
