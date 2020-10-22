@@ -32,7 +32,6 @@ Implementation of multitarget tracking and separation prediction for optical bel
   * [Separation Prediction with MLP Model and Uncertainty Prediction](#separation-prediction-with-mlp-model-and-uncertainty-prediction)
 * [Config files](#config-files)
 * [Contribute](#contribute)
-* [Credits](#credits)
 
 ## Motivation
 This framework allows us to test and compare a vast variety of experts for the tasks of tracking and separation prediction in optical belt sorters.
@@ -313,123 +312,36 @@ The model manager has an expert manager object and a gating network object. The 
   --execute_multi_target_tracking False
 ```
 
-## `python main.py`
+## Config Files
+Json file options:
+* `batch_size` - Batch size of experts (Especially neccessary for RNN)
+* `experts` - The experts for tracking or separation prediction
+  * `expert name` - The name of the expert (e.g. "MLP")
+    * `type` - "KF", "MLP", or "RNN"
+    * `sub_type` - Only needed for KF, "CV" or "CA"
+    * `model_path` - Path to load or save the model
+    * `is_separator` - Separation prediction or tracking expert
+    * `model_options` - Options for the model
+    * `state_options` - Only for KF, default state options
+* `gating` - The gating networkork
+  * `type` - "Simple_Ensemble", "Covariance_Weighting", "SMAPE_Weighting", or "Mixture_of_Experts"
+  * `model_path` - Path to save or load gating network
+  * `options` - Options for training (especially for ME)
+* `gating_separation` - The gating networkork for the separation prediction
+  * `type` - "Simple_Ensemble", "Covariance_Weighting", "SMAPE_Weighting", or "Mixture_of_Experts"
+  * `model_path` - Path to save or load gating network
+  * `options` - Options for training (especially for ME)
 
-This is the main starting point and it has a lot of settings.
-See: `python main.py --help`
+## Contribute
+If you are intereseted in contributing to this project, please contact 
+* Marcel Reith-Braun https://isas.iar.kit.edu/de/Mitarbeiter_Reith-Braun.php
+* Florian Pfaff https://isas.iar.kit.edu/de/Mitarbeiter_Pfaff.php
+* Jakob Thumm jakob.thumm@web.de
 
-### Example configurations for ` python main.py`
+We are happy, that you decided to work on this project. Please keep the code clean, so:
+* Make sure to comment every function in docstring. 
+* Comment your code so someone can work with it after you left.
+* Do not push uncommented code.
+* Delete unneccessary code when you are done with it.
 
-- Evaluate a pretrained model on the DEM dataset
-
-  ```shell script
-  python main.py \
-    --is_loaded True \
-    --model_path "models/DEM_model.h5" \
-    --dataset_dir "data/DEM_cylinder.csv" \
-    --data_is_aligned False \
-    --rotate_columns True \
-    --normalization_constant 1.0
-  ```
-
-- Evaluate a pretrained model on the Pfeffer data
-
-  ```shell script
-  python main.py \
-     --is_loaded True \
-     --model_path "models/rnn_model_fake_data.h5" \
-     --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv" \
-     --data_is_aligned True \
-     --normalization_constant 2000.0 
-  ```
-
-- Train a lstm-16-16 on the Pfeffer data
-  ```shell script
-  python main.py \
-     --is_loaded False \
-     --num_train_epochs 1000 \
-     --evaluate_every_n_epochs 10 \
-     --num_units_first_rnn 16 \
-     --num_units_second_rnn 16 \
-     --lr_decay_after_epochs 150 \
-     --dataset_dir "data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv" \
-     --data_is_aligned True \
-     --normalization_constant 2000.0 
-  ```
-  
-- Train a lstm-16-16 on the DEM data
-  ```shell script
-  python main.py \
-     --is_loaded False \
-     --num_train_epochs 1000 \
-     --evaluate_every_n_epochs 10 \
-     --num_units_first_rnn 16 \
-     --num_units_second_rnn 16 \
-     --lr_decay_after_epochs 150 \
-     --dataset_dir "data/DEM_cylinders.csv" \
-     --data_is_aligned False \
-     --normalization_constant 1.0 \
-     --rotate_columns True
-  ```
-  
-- Evaluate the separation prediction on the DEM cuboids
-
-  ```shell script
-  python main.py \
-     --is_loaded False \
-     --dataset_dir "data/DEM_cuboids.csv" \
-     --data_is_aligned False \
-     --rotate_columns True \
-     --normalization_constant 1.0 \
-     --separation_prediction True \
-     --virtual_nozzle_array_x_position 0.7 \
-     --virtual_belt_edge_x_position 0.55
-  ```
-  
-- Evaluate impact of noise
-
-  ```shell script
-  python main.py \
-    --is_loaded True \
-    --model_path "models/DEM_model.h5" \
-    --dataset_dir "data/DEM_cylinder.csv" \
-    --data_is_aligned False \
-    --rotate_columns True \
-    --normalization_constant 1.0 \
-    --test_noise_robustness True
-  ```
-    
-
-### Hyperparameter search with `python main.py`
-
-ToDo: Explain --run_hyperparameter_search
-
-## Notebooks:  Run with GPU (Docker)
-
-Before implementing a functionality in the main code, we have tested and experimented in jupyter
-notebooks. 
-
-The `Notebook/`-folder contains short code samples to_
-
-- train a NextStep-RNN
-- Use the ModelManager
-- Load FakeData
-- Load CsvData
-- Experiments with curriculum learning
-- Experiments with Bayesian learning
-- The broader line of the data association
-- Gridsearch for models
-- Evaluation of separation models
-
-Follow these instructions to run notebooks on the gpu pc at the institute.
-
-1. `docker pull tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
-2. Clone repo: `git clone https://github.com/sidney1505/next_step_rnn`
-3. `docker run -it -p 8888:8888 -v $PWD:/tf --gpus "device=0" tensorflow/tensorflow:2.1.0-gpu-py3-jupyter`
-4. (ssh tunneling on remote machine: `ssh -L 8888:127.0.0.1:8888 proprak7@i81-gpu-server`)
-
-## Data store
-
-The files are downloaded either from:
-- private server  or
-- ISAS i81server (you have to be in the institute's network)
+Thank you and have fun.
