@@ -3,7 +3,7 @@
   "experts": {
     "MLP": {
       "type": "MLP",
-      "model_path": "models/pepper/MLP_separator_uncertainty.h5",
+      "model_path": "models/kalk/MLP_separator_uncertainty.h5",
       "is_separator": true,
       "options": {
         "base_learning_rate": 0.005,
@@ -20,7 +20,7 @@
     "LSTM": {
       "type": "RNN",
       "is_separator": true,
-      "model_path": "models/pepper/LSTM_64_16_separation_uncertainty.h5",
+      "model_path": "models/kalk/LSTM_64_16_separation_uncertainty.h5",
       "options": {
         "clear_state": true,
         "base_learning_rate": 0.005,
@@ -44,7 +44,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CV_CV.pkl",
+      "model_path": "models/kalk/KF_sep_CV_CV_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -63,7 +63,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CVBC_CV.pkl",
+      "model_path": "models/kalk/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -82,7 +82,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_IA_CV.pkl",
+      "model_path": "models/kalk/KF_sep_CV_IA_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 0.4,
@@ -101,7 +101,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_CVBC_CV.pkl",
+      "model_path": "models/kalk/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -120,7 +120,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CV_IA_Ratio.pkl",
+      "model_path": "models/kalk/KF_sep_CV_IA_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 0.4,
@@ -139,7 +139,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_VABC_CA.pkl",
+      "model_path": "models/kalk/KF_sep_CA_VABC_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.2E3,
@@ -161,7 +161,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/pepper/KF_sep_CA_VABC_CA.pkl",
+      "model_path": "models/kalk/KF_sep_CA_VABC_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.2E3,
@@ -182,14 +182,14 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating.pkl",
+    "model_path": "models/kalk/simple_gating.pkl",
     "options": {
 
     }
   },
   "gating_separation": {
     "type": "Mixture_of_Experts",
-    "model_path": "models/pepper/me_gating_sep.h5",
+    "model_path": "models/kalk/me_gating_sep.h5",
     "options": {
       "batch_size": 128,
       "n_epochs": 3000,

@@ -10,9 +10,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded False \
   --is_loaded_gating_network True \
-  --config_path configs/pepper/train_pepper_mlp_sep_uncertainty.json \
-  --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/pepper_all/separation_prediction_mlp_uncertainty/ \
+  --config_path configs/kalk/train_kalk_mlp_sep_uncertainty.json \
+  --dataset_dir 'data/Bauschutt/stationary/kalk/Nurkalk10gpros_debayered.csv' \
+  --result_path results/kalk_all/separation_prediction_mlp_uncertainty/ \
   --separation_mlp_input_dim 7 \
   --time_normalization_constant 15.71 \
   --num_train_epochs 4000 \
@@ -31,9 +31,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded False \
   --is_loaded_gating_network True \
-  --config_path configs/pepper/train_pepper_rnn_hyb_uncertainty.json \
-  --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/pepper_all/separation_prediction_lstm_uncertainty/ \
+  --config_path configs/kalk/train_kalk_rnn_hyb_uncertainty.json \
+  --dataset_dir 'data/Bauschutt/stationary/kalk/Nurkalk10gpros_debayered.csv' \
+  --result_path results/kalk_all/separation_prediction_lstm_uncertainty/ \
   --time_normalization_constant 15.71 \
   --num_train_epochs 1000 \
   --batch_size 128 \
@@ -51,9 +51,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded False \
   --is_loaded_gating_network True \
-  --config_path configs/pepper/train_pepper_kf_sep.json \
-  --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/pepper_all/separation_prediction_kf/ \
+  --config_path configs/kalk/train_kalk_kf_sep.json \
+  --dataset_dir 'data/Bauschutt/stationary/kalk/Nurkalk10gpros_debayered.csv' \
+  --result_path results/kalk_all/separation_prediction_kf/ \
   --time_normalization_constant 15.71 \
   --num_train_epochs 1 \
   --batch_size 128 \
@@ -71,9 +71,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded True \
   --is_loaded_gating_network False \
-  --config_path configs/pepper/train_pepper_sep_gating_me.json \
-  --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/pepper_all/separation_prediction_gating_me/ \
+  --config_path configs/kalk/train_kalk_sep_gating_me.json \
+  --dataset_dir 'data/Bauschutt/stationary/kalk/Nurkalk10gpros_debayered.csv' \
+  --result_path results/kalk_all/separation_prediction_gating_me/ \
   --time_normalization_constant 15.71 \
   --num_train_epochs 3000 \
   --separation_mlp_input_dim 7 \

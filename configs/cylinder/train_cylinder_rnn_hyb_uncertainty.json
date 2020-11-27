@@ -4,11 +4,11 @@
     "LSTM": {
       "type": "RNN",
       "is_separator": true,
-      "model_path": "models/pepper/LSTM_1024_16_separation.h5",
+      "model_path": "models/cylinder/LSTM_64_16_separation_uncertainty.h5",
       "options": {
         "clear_state": true,
         "base_learning_rate": 0.005,
-        "decay_steps":200,
+        "decay_steps":500,
         "decay_rate":0.96,
         "model_structure": {
           "num_units_first_rnn": 64,
@@ -27,14 +27,14 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating.pkl",
+    "model_path": "models/cylinder/simple_gating.pkl",
     "options": {
 
     }
   },
   "gating_separation": {
     "type": "Simple_Ensemble",
-    "model_path": "models/pepper/simple_gating_sep.pkl",
+    "model_path": "models/cylinder/simple_gating_sep.pkl",
     "options": {
 
     }

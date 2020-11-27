@@ -47,3 +47,24 @@ cd ..
     --execute_multi_target_tracking False \
     --no_show True \
     --logfile logs/terminal_logs/run_train_pepper_separation_prediction_uncertainty_cross_eval.log
+
+./main.py \
+    --separation_prediction True \
+    --tracking False \
+    --uncertainty_prediction False \
+    --virtual_belt_edge_x_position 800 \
+    --virtual_nozzle_array_x_position 1550 \
+    --is_loaded False \
+    --is_loaded_gating_network True \
+    --n_folded_cross_evaluation 5 \
+    --config_path configs/pepper/train_pepper_rnn_hyb.json \
+    --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
+    --num_train_epochs 1000 \
+    --batch_size 128 \
+    --evaluate_every_n_epochs 100 \
+    --time_normalization_constant 15.71 \
+    --result_path results/pepper_all/separation_prediction_rnn_uncertainty/ \
+    --execute_evaluation True \
+    --execute_multi_target_tracking False \
+    --no_show True \
+    --logfile logs/terminal_logs/run_train_pepper_separation_prediction_uncertainty_cross_eval.log
