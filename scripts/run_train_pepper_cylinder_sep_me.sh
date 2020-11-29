@@ -10,7 +10,7 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded True \
   --is_loaded_gating_network False \
-  --config_path configs/pepper_cylinder/train_pepper_cylinder_sep_gating_me.json \
+  --config_path configs/pepper_and_cylinder/train_pepper_cylinder_sep_gating_me.json \
   --dataset_dir 'data/pepper_and_cylinder/*_trackHistory_NothingDeleted.csv' \
   --result_path results/pepper_cylinder/separation_prediction_gating_me/ \
   --time_normalization_constant 15.71 \
