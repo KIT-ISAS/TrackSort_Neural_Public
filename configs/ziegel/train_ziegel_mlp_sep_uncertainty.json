@@ -1,4 +1,4 @@
-#{
+{
   "batch_size": 128,
   "experts": {
     "MLP": {
