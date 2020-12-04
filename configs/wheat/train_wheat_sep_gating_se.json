@@ -1,0 +1,276 @@
+{
+  "batch_size": 128,
+  "experts": {
+    "MLP": {
+      "type": "MLP",
+      "model_path": "models/wheat/MLP_separator_uncertainty.h5",
+      "is_separator": true,
+      "options": {
+        "base_learning_rate": 0.005,
+        "decay_steps":500,
+        "decay_rate":0.96,
+        "model_structure": {
+          "layers": [16, 16, 16, 16],
+          "activation": "Default",
+          "l1_regularization": 1e-8,
+          "l2_regularization": 0
+        }
+      }
+    },
+    "LSTM": {
+      "type": "RNN",
+      "is_separator": true,
+      "model_path": "models/wheat/LSTM_64_16_separation_uncertainty.h5",
+      "options": {
+        "clear_state": true,
+        "base_learning_rate": 0.005,
+        "decay_steps":500,
+        "decay_rate":0.96,
+        "model_structure": {
+          "num_units_first_rnn": 64,
+          "num_units_second_rnn": 16,
+          "num_units_third_rnn": 0,
+          "num_units_fourth_rnn": 0,
+          "num_units_first_dense": 0,
+          "num_units_second_dense": 0,
+          "num_units_third_dense": 0,
+          "num_units_fourth_dense": 0,
+          "rnn_model_name": "lstm",
+          "use_batchnorm_on_dense": true
+        }
+      }
+    },
+    "KF_CV_CV_CV": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CV_CV_CV.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
+        "temporal_separator": "default",
+        "spatial_separator": "default"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_CVBC_CV": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CV_CVBC_CV.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
+        "temporal_separator": "BC",
+        "spatial_separator": "default"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_IA_CV": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CV_IA_CV.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
+        "temporal_separator": "IA",
+        "spatial_separator": "default"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_CV_Ratio": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CV_CV_Ratio.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
+        "temporal_separator": "default",
+        "spatial_separator": "ratio"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_CVBC_Ratio": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CV_CVBC_Ratio.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
+        "temporal_separator": "BC",
+        "spatial_separator": "ratio"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CV_IA_Ratio": {
+      "type": "KF",
+      "sub_type": "CV",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CV_IA_Ratio.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 18,
+        "s_v": 3.6E-7,
+        "temporal_separator": "IA",
+        "spatial_separator": "ratio"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7
+      }
+    },
+    "KF_CA_CA_CA": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CA_CA_CA.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
+        "temporal_separator": "CA",
+        "spatial_separator": "CA"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    },
+    "KF_CA_IA_CA": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CA_IA_CA.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
+        "temporal_separator": "IA",
+        "spatial_separator": "CA"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    },
+    "KF_CA_CA_Ratio": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CA_CA_Ratio.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
+        "temporal_separator": "CA",
+        "spatial_separator": "ratio"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    },
+    "KF_CA_IA_Ratio": {
+      "type": "KF",
+      "sub_type": "CA",
+      "is_separator": true,
+      "model_path": "models/wheat/KF_sep_CA_IA_Ratio.pkl",
+      "model_options": {
+        "dt": 0.005,
+        "s_w": 1.8E3,
+        "s_v": 3.6E-7,
+        "temporal_separator": "IA",
+        "spatial_separator": "ratio"
+      },
+      "state_options": {
+        "velocity_guess": 1.8,
+        "velo_var_x": 0.13,
+        "velo_var_y": 0.5,
+        "pos_var": 3.6E-7,
+        "accel_guess": 0.0,
+        "accel_var_x": 1800,
+        "accel_var_y": 18000
+      }
+    }
+  },
+  "gating": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/wheat/simple_gating.pkl",
+    "options": {
+
+    }
+  },
+  "gating_separation": {
+    "type": "Simple_Ensemble",
+    "model_path": "models/wheat/simple_gating_sep.pkl",
+    "options": {
+
+    }
+  },
+  "data_association": {
+    "association_config": {
+      "matching_algorithm": "global",
+      "delta_start_end_phase":0.025,
+      "no_change_dist":0.005,
+      "new_track_at_beginning_dist":0.005,
+      "new_track_middle_dist":0.02,
+      "track_disappear_at_end_dist":0.005,
+      "track_disappear_at_middle_dist":0.02
+    },
+    "track_config": {
+      "initial_is_alive_probability": 0.5,
+      "is_alive_decrease": 0.25,
+      "is_alive_increase": 0.5
+    }
+  }
+}
