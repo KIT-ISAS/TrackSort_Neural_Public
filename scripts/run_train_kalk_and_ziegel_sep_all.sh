@@ -114,9 +114,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded True \
   --is_loaded_gating_network False \
-  --config_path configs/kalk/train_kalk_sep_gating_cov.json \
+  --config_path configs/kalk/train_kalk_sep_gating_smape.json \
   --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/kalk_all/separation_prediction_gating_cov/ \
+  --result_path results/kalk_all/separation_prediction_gating_smape/ \
   --time_normalization_constant 15.71 \
   --num_train_epochs 1 \
   --separation_mlp_input_dim 7 \
@@ -239,9 +239,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded True \
   --is_loaded_gating_network False \
-  --config_path configs/ziegel/train_ziegel_sep_gating_cov.json \
+  --config_path configs/ziegel/train_ziegel_sep_gating_smape.json \
   --dataset_dir 'data/ziegel/trackSortResultziegel/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/ziegel_all/separation_prediction_gating_cov/ \
+  --result_path results/ziegel_all/separation_prediction_gating_smape/ \
   --time_normalization_constant 15.71 \
   --num_train_epochs 1 \
   --separation_mlp_input_dim 7 \

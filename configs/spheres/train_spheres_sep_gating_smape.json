@@ -3,7 +3,7 @@
   "experts": {
     "MLP": {
       "type": "MLP",
-      "model_path": "models/wheat/MLP_separator_uncertainty.h5",
+      "model_path": "models/spheres/MLP_separator_uncertainty.h5",
       "is_separator": true,
       "options": {
         "base_learning_rate": 0.005,
@@ -20,7 +20,7 @@
     "LSTM": {
       "type": "RNN",
       "is_separator": true,
-      "model_path": "models/wheat/LSTM_64_16_separation_uncertainty.h5",
+      "model_path": "models/spheres/LSTM_64_16_separation_uncertainty.h5",
       "options": {
         "clear_state": true,
         "base_learning_rate": 0.005,
@@ -44,7 +44,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CV_CV_CV.pkl",
+      "model_path": "models/spheres/KF_sep_CV_CV_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -63,7 +63,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CV_CVBC_CV.pkl",
+      "model_path": "models/spheres/KF_sep_CV_CVBC_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -82,7 +82,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CV_IA_CV.pkl",
+      "model_path": "models/spheres/KF_sep_CV_IA_CV.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -101,7 +101,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CV_CV_Ratio.pkl",
+      "model_path": "models/spheres/KF_sep_CV_CV_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -120,7 +120,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CV_CVBC_Ratio.pkl",
+      "model_path": "models/spheres/KF_sep_CV_CVBC_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -139,7 +139,7 @@
       "type": "KF",
       "sub_type": "CV",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CV_IA_Ratio.pkl",
+      "model_path": "models/spheres/KF_sep_CV_IA_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 18,
@@ -158,7 +158,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CA_CA_CA.pkl",
+      "model_path": "models/spheres/KF_sep_CA_CA_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -180,7 +180,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CA_IA_CA.pkl",
+      "model_path": "models/spheres/KF_sep_CA_IA_CA.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -202,7 +202,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CA_CA_Ratio.pkl",
+      "model_path": "models/spheres/KF_sep_CA_CA_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -224,7 +224,7 @@
       "type": "KF",
       "sub_type": "CA",
       "is_separator": true,
-      "model_path": "models/wheat/KF_sep_CA_IA_Ratio.pkl",
+      "model_path": "models/spheres/KF_sep_CA_IA_Ratio.pkl",
       "model_options": {
         "dt": 0.005,
         "s_w": 1.8E3,
@@ -245,14 +245,14 @@
   },
   "gating": {
     "type": "Simple_Ensemble",
-    "model_path": "models/wheat/simple_gating.pkl",
+    "model_path": "models/spheres/simple_gating.pkl",
     "options": {
 
     }
   },
   "gating_separation": {
-    "type": "Covariance_Weighting",
-    "model_path": "models/wheat/cov_gating_sep.pkl",
+    "type": "SMAPE_Weighting",
+    "model_path": "models/spheres/smape_gating_sep.pkl",
     "options": {
 
     }

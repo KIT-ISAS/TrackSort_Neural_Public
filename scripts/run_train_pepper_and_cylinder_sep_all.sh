@@ -106,7 +106,7 @@ cd ..
   --execute_multi_target_tracking False \
   --no_show True
 
-# COV
+# SMAPE
 ./main.py \
   --separation_prediction True \
   --tracking False \
@@ -114,9 +114,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded True \
   --is_loaded_gating_network False \
-  --config_path configs/pepper/train_pepper_sep_gating_cov.json \
+  --config_path configs/pepper/train_pepper_sep_gating_smape.json \
   --dataset_dir 'data/Pfeffer/trackSortResultPfeffer/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/pepper_all/separation_prediction_gating_cov/ \
+  --result_path results/pepper_all/separation_prediction_gating_smape/ \
   --time_normalization_constant 15.71 \
   --num_train_epochs 1 \
   --separation_mlp_input_dim 7 \
@@ -239,9 +239,9 @@ cd ..
   --virtual_nozzle_array_x_position 1550 \
   --is_loaded True \
   --is_loaded_gating_network False \
-  --config_path configs/cylinder/train_cylinder_sep_gating_cov.json \
+  --config_path configs/cylinder/train_cylinder_sep_gating_smape.json \
   --dataset_dir 'data/Zylinder/trackSortResultZylinder/*_trackHistory_NothingDeleted.csv' \
-  --result_path results/cylinder_all/separation_prediction_gating_cov/ \
+  --result_path results/cylinder_all/separation_prediction_gating_smape/ \
   --time_normalization_constant 15.71 \
   --num_train_epochs 1 \
   --separation_mlp_input_dim 7 \
