@@ -748,7 +748,7 @@ def single_SENCE_analysis(predicted_var, target_y, predicted_y, result_dir, expe
     #RMV_corrected = reg.predict(np.expand_dims(RMV, -1))
     #corrected_ENCE = np.mean(np.abs(RMV_corrected-RMSE)/RMV_corrected)
     # Logging output
-    logging.info("SENCE for expert {} in {} domain = {}".format(expert_name, domain, ENCE))
+    logging.info("SENCE for expert {} in {} domain = {}".format(expert_name, domain, SENCE))
     #logging.info("Corrected ENCE for expert {} in {} domain = {}".format(expert_name, domain, corrected_ENCE))
     logging.info("C_v for expert {} in {} domain = {}".format(expert_name, domain, C_v))
     # Plot RMSE over RMV
